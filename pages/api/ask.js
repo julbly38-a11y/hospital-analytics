@@ -1,3 +1,5 @@
+import { routeQuery } from './query-router'
+
 const SYSTEM_PROMPT = `Ти SQL асистент для PostgreSQL бази даних лікарні ЛСМД. Відповідаєш українською.
 
 ОСНОВНІ ТАБЛИЦІ:
@@ -214,22 +216,34 @@ export default async function handler(req, res) {
   if (!PROVIDERS[provider]) return res.status(400).json({ error: 'Невідомий провайдер' })
 
   try {
-    const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...history,
-      { role: 'user', content: question }
-    ]
+    // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
+    const routed = routeQuery(question)
+    let parsed, aiResult, cost, cfg
 
-    const aiResult = await callAI(provider, messages)
-    const cfg = PROVIDERS[provider]
-    const cost = (aiResult.tokens_in / 1000000) * cfg.pricing.in + (aiResult.tokens_out / 1000000) * cfg.pricing.out
+    if (routed) {
+      // Готовий SQL — пропускаємо LLM повністю
+      parsed = { sql: routed.sql, explanation: routed.explanation }
+      aiResult = { tokens_in: 0, tokens_out: 0, limits: null }
+      cfg = { name: 'Роутер (кеш)', model: '—', pricing: { free: true } }
+      cost = 0
+    } else {
+      // Звичайний шлях через LLM
+      const messages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...history,
+        { role: 'user', content: question }
+      ]
 
-    let parsed
-    try { parsed = JSON.parse(aiResult.text) }
-    catch {
-      const m = aiResult.text.match(/\{[\s\S]*\}/)
-      if (m) parsed = JSON.parse(m[0])
-      else throw new Error('Не вдалось розпарсити відповідь AI')
+      aiResult = await callAI(provider, messages)
+      cfg = PROVIDERS[provider]
+      cost = (aiResult.tokens_in / 1000000) * cfg.pricing.in + (aiResult.tokens_out / 1000000) * cfg.pricing.out
+
+      try { parsed = JSON.parse(aiResult.text) }
+      catch {
+        const m = aiResult.text.match(/\{[\s\S]*\}/)
+        if (m) parsed = JSON.parse(m[0])
+        else throw new Error('Не вдалось розпарсити відповідь AI')
+      }
     }
 
     const r2 = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
