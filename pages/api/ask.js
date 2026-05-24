@@ -20,18 +20,45 @@ v_hospital_summary — загальна статистика (1 рядок):
   total_cases, unique_patients, avg_bed_days, total_bed_days, deaths, death_rate_pct,
   urgent, planned, urgent_pct, operations, surgical_activity_pct, transferred, worse
 
-v_department_stats — статистика по відділеннях:
+v_department_stats — по відділеннях:
   department, total_cases, unique_patients, avg_bed_days, max_bed_days, deaths, death_rate_pct,
   urgent, urgent_pct, operations, surgical_activity_pct, avg_age, women, men, children, elderly,
   with_referral, improved, nochange
 
-v_diagnosis_stats — статистика по діагнозах:
+v_diagnosis_stats — по діагнозах:
   icd_primary, cases, unique_patients, avg_bed_days, deaths, death_rate_pct, urgent, operations
 
-v_peak_by_hour / v_peak_by_weekday / v_peak_by_month — навантаження за часом
-v_patient_stats, v_region_stats, v_urgency_stats, v_readmissions — інша аналітика
+v_case_metrics — деталі кожного випадку з прапорцями (35 метрик):
+  id_case, patient_id, doctor_id, admission_date_d, discharge_date_d, bed_days, hosp_type,
+  discharge_status, admission_department, discharge_department, icd_primary, operation_id,
+  shift_time, day_type, patient_age, gender, age_group,
+  f_death, f_urgent, f_planned, f_operation, f_worse, f_transferred, f_improved, f_nochange,
+  f_referral, f_female, f_male, f_child, f_elderly, f_urgent_death, f_planned_death,
+  f_urgent_transfer, f_urgent_operation, f_night
+  (всі f_* — це 0/1 прапорці, зручно для SUM())
 
-ПРАВИЛО: для летальності, навантаження, статистики відділень — бери з VIEW, не рахуй вручну!
+v_urgency_stats — ургентні vs планові по відділеннях:
+  department, urgent, planned, urgent_deaths, planned_deaths, avg_bed_days_urgent,
+  avg_bed_days_planned, urgent_transfers, urgent_operations, urgent_surgical_pct
+
+v_patient_stats — за статтю/віком:
+  gender, age_group, cases, unique_patients, avg_bed_days, death_rate_pct
+
+v_region_stats — за регіонами:
+  region, district, cases, unique_patients, avg_bed_days, deaths
+
+v_readmission_metrics — повторні госпіталізації (1 рядок):
+  total_with_followup, readmit_30d, readmit_30d_pct, readmit_90d, readmit_90d_pct, same_dx_30d
+
+v_readmissions — деталі повторних:
+  id_case, patient_id, admission_date_d, discharge_date_d, icd_primary, next_admission,
+  days_to_readmission, readmit_30d, readmit_90d, same_diagnosis
+
+v_peak_by_hour — за годинами: hour, cases, deaths
+v_peak_by_weekday — за днями тижня: dow, weekday_name, cases
+v_peak_by_month — за місяцями: month, cases, deaths, avg_bed_days
+
+ПРАВИЛО: для летальності, навантаження, статистики, повторних госпіталізацій — бери з VIEW, не рахуй вручну!
 Приклад: "летальність по відділеннях" → SELECT department, death_rate_pct FROM v_department_stats ORDER BY death_rate_pct DESC
 
 ПРИКЛАДИ:
