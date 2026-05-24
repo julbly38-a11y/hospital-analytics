@@ -102,7 +102,15 @@ SELECT COUNT(DISTINCT patient_id) as унікальні_пацієнти, COUNT(
 FROM lsmd
 WHERE LOWER(doc_name) LIKE LOWER('%ім\'я%')
   AND EXTRACT(YEAR FROM admission_date_d::date) = рік
-ВАЖЛИВО для цього типу: НЕ робити JOIN, лишь просто WHERE на doc_name (текст). admission_date_d це DATE.
+ВАЖЛИВО: НЕ JOIN, лишь просто WHERE на doc_name (текст). admission_date_d це DATE.
+
+📌 "Скільки пацієнтів пролікував доктор [ІМ'Я] за [МІСЯЦЬ]" (або "грудень", "січень", тощо):
+SELECT COUNT(DISTINCT patient_id) as унікальні_пацієнти, COUNT(*) as всього_випадків
+FROM lsmd
+WHERE LOWER(doc_name) LIKE LOWER('%ім\'я%')
+  AND EXTRACT(YEAR FROM admission_date_d::date) = рік
+  AND EXTRACT(MONTH FROM admission_date_d::date) = номер_місяця (1=січень, 2=лютий... 12=грудень)
+ВАЖЛИВО: ЗАВЖДИ додай обидва фільтри (рік І місяць), по замовчуванню поточний рік = 2024.
 
 ПРАВИЛА:
 
