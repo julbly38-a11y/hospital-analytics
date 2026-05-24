@@ -1,0 +1,9 @@
+# Core dependencies
+psycopg[binary]>=3.2.0
+python-dotenv>=1.0.0
+
+# API clients
+requests>=2.31.0
+
+# Token optimization (optional but recommended)
+tiktoken>=0.5.0
