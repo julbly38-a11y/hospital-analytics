@@ -97,6 +97,13 @@ WHERE admission_ts IS NOT NULL
 GROUP BY день
 ORDER BY count DESC
 
+📌 "Скільки пацієнтів пролікував доктор [ІМ'Я] за [РІК]":
+SELECT COUNT(DISTINCT patient_id) as унікальні_пацієнти, COUNT(*) as всього_випадків
+FROM lsmd
+WHERE LOWER(doc_name) LIKE LOWER('%ім\'я%')
+  AND EXTRACT(YEAR FROM admission_date_d::date) = рік
+ВАЖЛИВО для цього типу: НЕ робити JOIN, лишь просто WHERE на doc_name (текст). admission_date_d це DATE.
+
 ПРАВИЛА:
 
 - Відповідай ТІЛЬКИ валідним JSON: {"sql": "SELECT ...", "explanation": "Опис"}
