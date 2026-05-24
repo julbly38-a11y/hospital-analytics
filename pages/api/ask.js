@@ -136,6 +136,28 @@ WHERE l.icd_primary LIKE 'I63%'  ← зміни на потрібний діаг
 GROUP BY l.icd_primary, i.diagnosis_level3
 ORDER BY cases DESC
 
+📌 \"Статистика по вихідних/робочих днях\": (або \"на вихідні\" vs \"на тиждень\")
+SELECT day_type, cases, unique_patients, avg_bed_days, letality_percent
+FROM v_weekend_vs_weekday
+ORDER BY cases DESC
+
+📌 \"По днях тижня\" (або \"по дням тижня\"):
+SELECT weekday_name, cases, unique_patients, avg_bed_days, letality_percent
+FROM v_admissions_by_weekday
+ORDER BY day_number
+
+📌 \"Тижнева статистика\" (або \"по тижнях\"):
+SELECT week_start, week_number, admissions, unique_patients, urgent, deaths, avg_bed_days
+FROM v_weekly_admissions
+WHERE year = 2024
+ORDER BY week_number DESC
+LIMIT 10
+
+📌 \"Вихідні vs робочі дні по [ВІДДІЛЕННЯ]\": (або \"в якому відділенні більше на вихідні\")
+SELECT department, day_type, cases, unique_patients, avg_bed_days, deaths
+FROM v_department_weekend_stats
+ORDER BY department, day_type DESC
+
 ПРАВИЛА:
 
 - Відповідай ТІЛЬКИ валідним JSON: {"sql": "SELECT ...", "explanation": "Опис"}
