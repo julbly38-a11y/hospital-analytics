@@ -50,13 +50,9 @@ GROUP BY i.icd_code, i.diagnosis_level3
 ORDER BY count DESC LIMIT 10
 
 📌 "Летальність по відділеннях":
-SELECT discharge_department as відділення, 
-  COUNT(*) as всього,
-  COUNT(*) FILTER (WHERE discharge_status = 'Помер') as померло
-FROM lsmd
-WHERE discharge_department IS NOT NULL
-GROUP BY discharge_department
-ORDER BY всього DESC
+SELECT department as відділення, total_cases as всього, deaths as померло, death_rate_pct as летальність
+FROM v_department_stats
+ORDER BY death_rate_pct DESC
 
 📌 "Пікові години госпіталізацій":
 SELECT EXTRACT(HOUR FROM admission_ts::timestamp) as година, COUNT(*) as count
