@@ -163,6 +163,16 @@ SELECT time_period, cases, unique_patients, avg_bed_days, urgent_cases, letality
 FROM v_night_vs_day_admissions
 ORDER BY time_period DESC
 
+📌 \"Скільки нічних поступлень у доктора [ІМ'Я]\":
+SELECT doc_name, COUNT(*) as нічні_поступлення, COUNT(DISTINCT patient_id) as пацієнти
+FROM lsmd
+WHERE LOWER(doc_name) LIKE LOWER('%ім\\'я%')
+  AND admission_ts IS NOT NULL
+  AND (EXTRACT(HOUR FROM admission_ts::timestamp) >= 22 
+       OR EXTRACT(HOUR FROM admission_ts::timestamp) < 6)
+GROUP BY doc_name
+ВАЖЛИВО: нічні години = EXTRACT(HOUR ...) >= 22 OR < 6. Порівнюй з ЧИСЛОМ (22, 6), НЕ з текстом ('06:00')!
+
 📌 \"Нічні поступлення по [ВІДДІЛЕННЯ]\" (або \"в якому відділенні більше ночами\"):
 SELECT department, time_period, cases, unique_patients, urgent_cases, avg_bed_days, deaths
 FROM v_night_admissions_by_department
@@ -191,6 +201,7 @@ LIMIT 10
 - admission_date_d та discharge_date_d це DATE
 - discharge_status: 'Помер', 'Виписаний', 'Переведений'
 - EXTRACT(HOUR FROM admission_ts::timestamp) — правильний синтаксис
+- Години порівнюй з ЧИСЛОМ (0-23), НЕ з текстом! Нічні = >= 22 OR < 6. НІКОЛИ не пиши EXTRACT(HOUR...) = '06:00'
 - TO_CHAR(admission_ts::timestamp, 'Day') — правильний синтаксис`
 
 const PROVIDERS = {
