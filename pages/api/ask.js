@@ -112,6 +112,30 @@ WHERE LOWER(doc_name) LIKE LOWER('%ім\'я%')
   AND EXTRACT(MONTH FROM admission_date_d::date) = номер_місяця (1=січень, 2=лютий... 12=грудень)
 ВАЖЛИВО: ЗАВЖДИ додай обидва фільтри (рік І місяць), по замовчуванню поточний рік = 2024.
 
+📌 \"Скільки [ДІАГНОЗ: інсультів/діабету/пневмонії/тощо] пролікувано за [ПЕРІОД: квартал/місяць/рік]\":
+Кроки:
+1. Визнач ICD-10 код діагнозу:
+   - Інсульт = I63% (ішемічний), I61% (геморагічний)
+   - Діабет = E10%, E11%, E12%, E13%, E14%
+   - Пневмонія = J18%
+   - Інфаркт = I21%, I24%
+2. Фільтруй за датою допуску (admission_date_d):
+   - Q1 (1-3), Q2 (4-6), Q3 (7-9), Q4 (10-12)
+3. Приклад для Q2 2025 інсультів:
+
+SELECT 
+  l.icd_primary,
+  i.diagnosis_level3 as diagnosis,
+  COUNT(*) as cases,
+  COUNT(DISTINCT l.patient_id) as patients
+FROM lsmd l
+LEFT JOIN icd_10 i ON l.icd_primary = i.icd_code
+WHERE l.icd_primary LIKE 'I63%'  ← зміни на потрібний діагноз
+  AND l.admission_date_d >= '2025-04-01'  ← початок періоду
+  AND l.admission_date_d <= '2025-06-30'  ← кінець періоду
+GROUP BY l.icd_primary, i.diagnosis_level3
+ORDER BY cases DESC
+
 ПРАВИЛА:
 
 - Відповідай ТІЛЬКИ валідним JSON: {"sql": "SELECT ...", "explanation": "Опис"}
