@@ -14,6 +14,26 @@ patients_best (72,293) — пацієнти:
 icd_10 (19,824) — діагнози МКХ-10:
   icd_code, diagnosis_level2, diagnosis_level3
 
+📊 АНАЛІТИЧНІ VIEW (готові формули — ВИКОРИСТОВУЙ ЇХ для складних запитів):
+
+v_hospital_summary — загальна статистика (1 рядок):
+  total_cases, unique_patients, avg_bed_days, total_bed_days, deaths, death_rate_pct,
+  urgent, planned, urgent_pct, operations, surgical_activity_pct, transferred, worse
+
+v_department_stats — статистика по відділеннях:
+  department, total_cases, unique_patients, avg_bed_days, max_bed_days, deaths, death_rate_pct,
+  urgent, urgent_pct, operations, surgical_activity_pct, avg_age, women, men, children, elderly,
+  with_referral, improved, nochange
+
+v_diagnosis_stats — статистика по діагнозах:
+  icd_primary, cases, unique_patients, avg_bed_days, deaths, death_rate_pct, urgent, operations
+
+v_peak_by_hour / v_peak_by_weekday / v_peak_by_month — навантаження за часом
+v_patient_stats, v_region_stats, v_urgency_stats, v_readmissions — інша аналітика
+
+ПРАВИЛО: для летальності, навантаження, статистики відділень — бери з VIEW, не рахуй вручну!
+Приклад: "летальність по відділеннях" → SELECT department, death_rate_pct FROM v_department_stats ORDER BY death_rate_pct DESC
+
 ПРИКЛАДИ:
 
 📌 "Загальна статистика лікарні":
