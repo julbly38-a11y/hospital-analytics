@@ -12,12 +12,31 @@ const PROVIDERS = [
 const EXAMPLES = [
   'Загальна статистика лікарні',
   'Показники по всіх відділеннях',
-  'Пікові навантаження по годинах',
-  'Топ 10 діагнозів за кількістю випадків',
   'Летальність по відділеннях',
-  'Скільки пролікувала доктор Дубець за грудень?',
-  'Повторні госпіталізації — топ пацієнти',
+  'Топ 10 діагнозів за кількістю випадків',
+  'Ургентні vs планові по відділеннях',
+  'Розподіл за статтю та віком',
+  'Повторні госпіталізації 30 і 90 днів',
+  'Статистика за регіонами',
+  'Пікові навантаження по годинах',
   'Навантаження по днях тижня',
+  'Динаміка по місяцях',
+  'Скільки пролікувала доктор Дубець за грудень?',
+]
+
+// Спливаючі підказки про доступні VIEW (показуються періодично)
+const VIEW_HINTS = [
+  { view: 'v_hospital_summary', desc: 'загальна статистика лікарні' },
+  { view: 'v_department_stats', desc: 'летальність та активність по відділеннях' },
+  { view: 'v_case_metrics', desc: '35 прапорців кожного випадку' },
+  { view: 'v_urgency_stats', desc: 'ургентні проти планових' },
+  { view: 'v_readmission_metrics', desc: 'повторні госпіталізації 30/90 днів' },
+  { view: 'v_diagnosis_stats', desc: 'статистика по діагнозах МКХ-10' },
+  { view: 'v_patient_stats', desc: 'розподіл за статтю та віком' },
+  { view: 'v_region_stats', desc: 'географія пацієнтів' },
+  { view: 'v_peak_by_hour', desc: 'навантаження по годинах' },
+  { view: 'v_peak_by_weekday', desc: 'навантаження по днях тижня' },
+  { view: 'v_peak_by_month', desc: 'динаміка по місяцях' },
 ]
 
 const COL_LABELS = {
@@ -114,11 +133,25 @@ export default function Home() {
   const [stats, setStats] = useState({ count: 0, tokensIn: 0, tokensOut: 0, cost: 0 })
   const [limits, setLimits] = useState(null)
   const [provider, setProvider] = useState('groq')
+  const [hint, setHint] = useState(null)
   const bottomRef = useRef(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Спливаючі підказки про VIEW — періодична ротація
+  useEffect(() => {
+    let idx = 0
+    const show = () => {
+      setHint(VIEW_HINTS[idx % VIEW_HINTS.length])
+      idx++
+      setTimeout(() => setHint(null), 4000) // показ 4 сек
+    }
+    const first = setTimeout(show, 3000)      // перша через 3 сек
+    const loop = setInterval(show, 11000)     // потім кожні 11 сек
+    return () => { clearTimeout(first); clearInterval(loop) }
+  }, [])
 
   async function send(question) {
     if (!question.trim() || loading) return
@@ -279,6 +312,34 @@ export default function Home() {
           </div>
         </main>
       </div>
+
+      {/* Спливаюче вікно: періодично показує доступні VIEW */}
+      {hint && (
+        <div
+          onClick={() => send(`Покажи дані з ${hint.view}`)}
+          style={{
+            position: 'fixed', bottom: '24px', right: '24px', zIndex: 50,
+            background: 'var(--surface, #1a1a1a)', border: '1px solid var(--accent, #4ade80)',
+            borderRadius: '10px', padding: '12px 16px', maxWidth: '320px', cursor: 'pointer',
+            boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
+            animation: 'hintIn 0.4s ease', fontFamily: "'IBM Plex Mono', monospace"
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ color: 'var(--accent, #4ade80)', fontSize: '11px', letterSpacing: '0.05em' }}>📊 VIEW</span>
+            <code style={{ color: 'var(--text, #fff)', fontSize: '13px', fontWeight: 500 }}>{hint.view}</code>
+          </div>
+          <p style={{ color: 'var(--text2, #999)', fontSize: '12px', margin: 0, lineHeight: 1.4 }}>{hint.desc}</p>
+          <p style={{ color: 'var(--text3, #666)', fontSize: '10px', margin: '6px 0 0', fontStyle: 'italic' }}>натисни щоб спробувати →</p>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes hintIn {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </>
   )
 }
