@@ -158,6 +158,30 @@ SELECT department, day_type, cases, unique_patients, avg_bed_days, deaths
 FROM v_department_weekend_stats
 ORDER BY department, day_type DESC
 
+📌 \"Нічні поступлення\" (або \"статистика по ночі\", \"ніч vs день\"):
+SELECT time_period, cases, unique_patients, avg_bed_days, urgent_cases, letality_percent
+FROM v_night_vs_day_admissions
+ORDER BY time_period DESC
+
+📌 \"Нічні поступлення по [ВІДДІЛЕННЯ]\" (або \"в якому відділенні більше ночами\"):
+SELECT department, time_period, cases, unique_patients, urgent_cases, avg_bed_days, deaths
+FROM v_night_admissions_by_department
+WHERE department LIKE '%[НАЗВА]%'  ← фільтр по назві
+ORDER BY department, time_period DESC
+
+📌 \"Захворюванність по відділеннях\" (або \"розподіл діагнозів по відділеннях\"):
+SELECT department, disease_category, cases, unique_patients, percent_of_dept
+FROM v_morbidity_by_department
+WHERE department IS NOT NULL
+ORDER BY department, cases DESC
+
+📌 \"Топ діагнозів в [ВІДДІЛЕННЯ]\" (або \"найпоширенніші хвороби в [ВІДДІЛЕННЯ]\"):
+SELECT department, diagnosis, icd_code, cases, percent_of_dept, deaths
+FROM v_top_diagnoses_by_department
+WHERE department LIKE '%[НАЗВА]%'  ← фільтр по назві
+ORDER BY cases DESC
+LIMIT 10
+
 ПРАВИЛА:
 
 - Відповідай ТІЛЬКИ валідним JSON: {"sql": "SELECT ...", "explanation": "Опис"}
