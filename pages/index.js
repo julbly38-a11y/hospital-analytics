@@ -2,13 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
-const PROVIDERS = [
-  { id: 'groq', name: 'Groq', label: 'безкоштовно', free: true },
-  { id: 'gemini', name: 'Gemini', label: 'безкоштовно', free: true },
-  { id: 'openai', name: 'OpenAI', label: '$0.15/M', free: false },
-  { id: 'anthropic', name: 'Anthropic', label: '$3/M', free: false },
-]
-
 const EXAMPLES = [
   'Загальна статистика лікарні',
   'Показники по всіх відділеннях',
@@ -132,8 +125,8 @@ export default function Home() {
   const [showSql, setShowSql] = useState({})
   const [stats, setStats] = useState({ count: 0, tokensIn: 0, tokensOut: 0, cost: 0 })
   const [limits, setLimits] = useState(null)
-  const [provider, setProvider] = useState('groq')
   const [hint, setHint] = useState(null)
+  const provider = 'groq' // завжди Groq, без вибору
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -235,26 +228,6 @@ export default function Home() {
         </aside>
 
         <main className={styles.main}>
-          <div style={{padding: '12px 40px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '6px', alignItems: 'center', background: 'var(--surface)'}}>
-            <span style={{fontSize: '11px', color: 'var(--text3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: '8px'}}>AI:</span>
-            {PROVIDERS.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setProvider(p.id)}
-                style={{
-                  padding: '5px 12px',
-                  border: '1px solid ' + (provider === p.id ? 'var(--text)' : 'var(--border)'),
-                  background: provider === p.id ? 'var(--text)' : 'transparent',
-                  color: provider === p.id ? 'var(--bg)' : 'var(--text)',
-                  borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
-                  fontFamily: 'var(--mono)', display: 'flex', gap: '6px', alignItems: 'center'
-                }}>
-                {p.name}
-                <span style={{fontSize: '9px', color: provider === p.id ? 'var(--bg)' : (p.free ? '#16a34a' : 'var(--text3)'), opacity: 0.8}}>{p.label}</span>
-              </button>
-            ))}
-          </div>
-
           <div className={styles.chatArea}>
             {messages.length === 0 && (
               <div className={styles.welcome}>
