@@ -16,6 +16,9 @@ patients_best (72,293) — пацієнти:
 icd_10 (19,824) — діагнози МКХ-10:
   icd_code, diagnosis_level2, diagnosis_level3
 
+empl — працівники:
+  emp_name (НЕ empl_name!), specialization, position, department, full_name, emp_status
+
 📊 АНАЛІТИЧНІ VIEW (готові формули — ВИКОРИСТОВУЙ ЇХ для складних запитів):
 
 v_hospital_summary — загальна статистика (1 рядок):
@@ -185,12 +188,30 @@ FROM v_morbidity_by_department
 WHERE department IS NOT NULL
 ORDER BY department, cases DESC
 
-📌 \"Топ діагнозів в [ВІДДІЛЕННЯ]\" (або \"найпоширенніші хвороби в [ВІДДІЛЕННЯ]\"):
-SELECT department, diagnosis, icd_code, cases, percent_of_dept, deaths
-FROM v_top_diagnoses_by_department
-WHERE department LIKE '%[НАЗВА]%'  ← фільтр по назві
-ORDER BY cases DESC
-LIMIT 10
+📌 \"Яка спеціалізація у лікаря [ІМ'Я]\" (або \"ким працює\", \"яка посада\"):
+SELECT emp_name, specialization, position, department
+FROM empl WHERE emp_name ILIKE '%[ІМ\\'Я]%'
+ВАЖЛИВО: колонка emp_name (НЕ empl_name!)
+
+📌 \"Скільки вихідних діб в лікаря [ІМ'Я] за [ПЕРІОД]\":
+SELECT COUNT(DISTINCT admission_date_d) AS вихідних_діб
+FROM lsmd WHERE doc_name ILIKE '%[ІМ\\'Я]%'
+  AND EXTRACT(DOW FROM admission_date_d) IN (0, 6)
+  AND admission_date_d BETWEEN '[date_from]' AND '[date_to]'
+ВАЖЛИВО: DOW=0 неділя, DOW=6 субота. \"перше півріччя\" = 01-01 до 06-30.
+
+📌 \"Скільки нічних поступлень у доктора [ІМ'Я] за [МІСЯЦЬ]\":
+SELECT COUNT(*) as нічні_поступлення
+FROM lsmd WHERE doc_name ILIKE '%[ІМ\\'Я]%'
+  AND admission_ts IS NOT NULL
+  AND (EXTRACT(HOUR FROM admission_ts::timestamp) >= 22 OR EXTRACT(HOUR FROM admission_ts::timestamp) < 6)
+  AND admission_date_d BETWEEN '[date_from]' AND '[date_to]'
+ВАЖЛИВО: завжди додай фільтр дат якщо вказаний період!
+
+📌 \"Топ діагнозів\":
+SELECT icd_code, diagnosis_name, cases, unique_patients, letality_percent
+FROM v_top_diagnoses
+ORDER BY cases DESC LIMIT 10
 
 ПРАВИЛА:
 
