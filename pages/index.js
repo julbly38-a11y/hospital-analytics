@@ -142,6 +142,7 @@ export default function Home() {
   const [limits, setLimits] = useState(null)
   const [hint, setHint] = useState(null)
   const [exPage, setExPage] = useState(0)
+  const [globalStats, setGlobalStats] = useState(null)
   const provider = 'groq'
   const bottomRef = useRef(null)
   const totalPages = Math.ceil(ALL_EXAMPLES.length / PAGE_SIZE)
@@ -150,6 +151,17 @@ export default function Home() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Завантажуємо глобальну статистику при старті
+  useEffect(() => {
+    fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {})
+  }, [])
+
+  // Оновлюємо після кожного запиту
+  useEffect(() => {
+    if (stats.count > 0)
+      fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {})
+  }, [stats.count])
 
   // Ротація прикладів кожні 12 сек
   useEffect(() => {
@@ -244,12 +256,26 @@ export default function Home() {
             <p>20 відділень · 265 лікарів</p>
 
             <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
-              <p style={{color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px'}}>Сесія</p>
+              <p style={{color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px'}}>Ця сесія</p>
               <p>Запитів: <strong>{stats.count}</strong></p>
               <p>Токенів ↓: <strong>{formatNum(stats.tokensIn)}</strong></p>
               <p>Токенів ↑: <strong>{formatNum(stats.tokensOut)}</strong></p>
               <p>Ціна: <strong>{formatCost(stats.cost)}</strong></p>
             </div>
+            {globalStats && (
+              <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
+                <p style={{color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px'}}>Всього за весь час</p>
+                <p>Запитів: <strong>{formatNum(globalStats.total_requests)}</strong></p>
+                <p>Токенів: <strong>{formatNum(globalStats.total_tokens)}</strong></p>
+                <p>Витрачено: <strong>{formatCost(Number(globalStats.total_cost))}</strong></p>
+                <p>Активних днів: <strong>{globalStats.active_days}</strong></p>
+                {globalStats.last_request && (
+                  <p style={{color:'var(--text3)',marginTop:'4px'}}>
+                    Останній: {new Date(globalStats.last_request).toLocaleString('uk-UA', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                  </p>
+                )}
+              </div>
+            )}
 
             {limits && provider === 'groq' && (
               <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>

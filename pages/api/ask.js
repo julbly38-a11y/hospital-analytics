@@ -386,6 +386,24 @@ export default async function handler(req, res) {
       throw new Error(`DB error: ${errText}`)
     }
 
+    // Зберігаємо статистику в БД (fire & forget)
+    fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': process.env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({
+        provider: cfg.name,
+        tokens_in: aiResult.tokens_in,
+        tokens_out: aiResult.tokens_out,
+        cost_usd: cost,
+        question: question.slice(0, 200)
+      })
+    }).catch(() => {})
+
     res.status(200).json({
       sql: parsed.sql,
       explanation: parsed.explanation,
