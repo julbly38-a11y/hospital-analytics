@@ -52,6 +52,10 @@ v_patient_stats — за статтю/віком:
 v_region_stats — за регіонами:
   region, district, cases, unique_patients, avg_bed_days, deaths
 
+v_icu_mortality — летальність реанімації (1 рядок, ЄДИНА правильна формула для реанімації):
+  всього_поступлень, померло, летальність_pct, вижило, середній_ліжкодень, ліжкодень_померлих
+  ВАЖЛИВО: для летальності реанімації ЗАВЖДИ використовуй v_icu_mortality, НЕ v_department_stats!
+
 v_readmission_metrics — повторні госпіталізації (1 рядок):
   total_with_followup, readmit_30d, readmit_30d_pct, readmit_90d, readmit_90d_pct, same_dx_30d
 
