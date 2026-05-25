@@ -30,7 +30,7 @@ const ALL_EXAMPLES = [
   'Хірургічна активність по відділеннях',
 ]
 const PAGE_SIZE = 8
-const ROTATE_MS = 12000
+const ROTATE_MS = 60000
 
 // Спливаючі підказки про доступні VIEW (показуються періодично)
 const VIEW_HINTS = [
