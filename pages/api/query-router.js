@@ -23,16 +23,53 @@ function doctorSQL(t, doc) {
   return {explanation:`Статистика: ${doc}${pl}`,sql:`SELECT doc_name as лікар,COUNT(*) as випадків,COUNT(DISTINCT patient_id) as пацієнтів,ROUND(AVG(length_of_stay),1) as ліжкодень,SUM(CASE WHEN discharge_status='Помер' THEN 1 ELSE 0 END) as померло FROM lsmd WHERE doc_name ILIKE '%${doc}%' ${df} GROUP BY doc_name`}
 }
 
+// Детектор районів: keyword → {district, region}
+const DISTRICT_MAP = [
+  ['новоселицьк','Новоселицький','Чернівецька'],
+  ['глибоцьк','Глибоцький','Чернівецька'],
+  ['сторожинецьк','Сторожинецький','Чернівецька'],
+  ['хотинськ','Хотинський','Чернівецька'],
+  ['кіцманськ','Кіцманський','Чернівецька'],
+  ['заставнівськ','Заставнівський','Чернівецька'],
+  ['герцаївськ','Герцаївський','Чернівецька'],
+  ['вижницьк','Вижницький','Чернівецька'],
+  ['кельменецьк','Кельменецький','Чернівецька'],
+  ['сокирянськ','Сокирянський','Чернівецька'],
+  ['путильськ','Путильський','Чернівецька'],
+  ['снятинськ','Снятинський','Івано-Франківська'],
+  ['косівськ','Косівський','Івано-Франківська'],
+  ['заліщицьк','Заліщицький','Тернопільська'],
+  ['коломийськ','Коломийський','Івано-Франківська'],
+  ['борщівськ','Борщівський','Тернопільська'],
+]
+
+function districtSQL(t, district, region) {
+  if (any(t,'топ','діагноз','найчастіш','поширен'))
+    return {explanation:`Топ діагнозів: ${district}`,
+      sql:`SELECT icd_code as код,diagnosis as діагноз,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло,percent_of_district as відс FROM district_diagnoses WHERE region='${region}' AND district='${district}' AND is_top10=TRUE ORDER BY cases DESC`}
+  if (any(t,'підкатегор','блок','група','підгруп'))
+    return {explanation:`Підкатегорії: ${district}`,
+      sql:`SELECT subcategory as підкатегорія,cases as випадків,unique_patients as пацієнтів,percent_of_district as відс FROM district_disease_subcategories WHERE region='${region}' AND district='${district}' ORDER BY cases DESC LIMIT 15`}
+  return {explanation:`Категорії хвороб: ${district}`,
+    sql:`SELECT disease_category as категорія,cases as випадків,unique_patients as пацієнтів,percent_of_district as відс,is_primary as основна FROM district_disease_categories WHERE region='${region}' AND district='${district}' ORDER BY cases DESC`}
+}
+
 export function routeQuery(question) {
   const t = n(question)
+
+  // Детектор лікаря
   const doc = detectDoctor(t)
   if (doc) return {cached:true,...doctorSQL(t,doc)}
+
+  // Детектор районів
+  for (const [kw,district,region] of DISTRICT_MAP)
+    if (t.includes(kw)) return {cached:true,...districtSQL(t,district,region)}
 
   // Загальна статистика
   if (has(t,'загальн','статистик')||has(t,'скільки','всього'))
     return {cached:true,explanation:'Загальна статистика',sql:`SELECT total_cases as всього,unique_patients as пацієнтів,avg_bed_days as ліжкодень,death_rate_pct as летальність_пр,surgical_activity_pct as хірург_акт FROM v_hospital_summary`}
 
-  // Відділення — загальні
+  // Відділення
   if (has(t,'показник','відділ')||has(t,'статистик','відділ')||has(t,'всі','відділ'))
     return {cached:true,explanation:'По відділеннях',sql:`SELECT department as відділення,total_cases as випадків,avg_bed_days as ліжкодень,death_rate_pct as летальність,surgical_activity_pct as хірург_акт FROM v_department_stats ORDER BY total_cases DESC`}
   if (has(t,'летальн','відділ'))
@@ -42,7 +79,7 @@ export function routeQuery(question) {
   if (has(t,'операц','відділ')||has(t,'хірург','активн'))
     return {cached:true,explanation:'Хірургічна активність',sql:`SELECT department as відділення,operations as операцій,surgical_activity_pct as акт_пр FROM v_department_stats ORDER BY surgical_activity_pct DESC`}
 
-  // Діагнози / категорії по конкретному відділенню
+  // Діагнози/категорії по конкретному відділенню
   const deptMap=[
     ['гастроентерол','Гастроентерологічне відділення'],
     ['гематолог','Гематологічне відділення'],
@@ -59,19 +96,41 @@ export function routeQuery(question) {
   for (const [kw,dept] of deptMap) {
     if (!t.includes(kw)) continue
     if (any(t,'топ','діагноз','найчастіш','поширен'))
-      return {cached:true,explanation:`Топ діагнозів: ${dept}`,
-        sql:`SELECT icd_code as код,diagnosis as діагноз,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло,percent_of_dept as відс FROM department_diagnoses WHERE department='${dept}' AND is_top10=TRUE ORDER BY cases DESC`}
-    if (any(t,'підкатегор','блок','група','підгруп'))
-      return {cached:true,explanation:`Підкатегорії: ${dept}`,
-        sql:`SELECT subcategory as підкатегорія,cases as випадків,percent_of_dept as відс FROM department_disease_subcategories WHERE department='${dept}' ORDER BY cases DESC LIMIT 15`}
+      return {cached:true,explanation:`Топ діагнозів: ${dept}`,sql:`SELECT icd_code as код,diagnosis as діагноз,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло FROM department_diagnoses WHERE department='${dept}' AND is_top10=TRUE ORDER BY cases DESC`}
+    if (any(t,'підкатегор','блок','група'))
+      return {cached:true,explanation:`Підкатегорії: ${dept}`,sql:`SELECT subcategory as підкатегорія,cases as випадків,percent_of_dept as відс FROM department_disease_subcategories WHERE department='${dept}' ORDER BY cases DESC LIMIT 15`}
     if (any(t,'категор','захворюван','хвороб'))
-      return {cached:true,explanation:`Категорії хвороб: ${dept}`,
-        sql:`SELECT disease_category as категорія,cases as випадків,percent_of_dept as відс,is_primary as основна FROM department_disease_categories WHERE department='${dept}' ORDER BY cases DESC`}
-    return {cached:true,explanation:`Статистика: ${dept}`,
-      sql:`SELECT department as відділення,total_cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло,death_rate_pct as летальність,operations as операцій FROM v_department_stats WHERE department ILIKE '%${kw}%'`}
+      return {cached:true,explanation:`Категорії: ${dept}`,sql:`SELECT disease_category as категорія,cases as випадків,percent_of_dept as відс,is_primary as основна FROM department_disease_categories WHERE department='${dept}' ORDER BY cases DESC`}
+    return {cached:true,explanation:`Статистика: ${dept}`,sql:`SELECT department as відділення,total_cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло,death_rate_pct as летальність FROM v_department_stats WHERE department ILIKE '%${kw}%'`}
   }
 
-  // Основні категорії по всіх відділеннях
+  // Регіональна захворюваність (Чернівецька, Івано-Франківська тощо)
+  const regions=[
+    ['чернівецьк','Чернівецька'],['івано-франківськ','Івано-Франківська'],
+    ['тернопільськ','Тернопільська'],['хмельницьк','Хмельницька'],
+    ['закарпатськ','Закарпатська'],['львівськ','Львівська'],
+  ]
+  for (const [kw,region] of regions) {
+    if (!t.includes(kw)) continue
+    if (any(t,'топ','діагноз','найчастіш'))
+      return {cached:true,explanation:`Топ діагнозів: ${region}`,
+        sql:`SELECT district as район,icd_code as код,diagnosis as діагноз,cases as випадків FROM district_diagnoses WHERE region='${region}' AND is_top10=TRUE ORDER BY cases DESC LIMIT 30`}
+    if (any(t,'підкатегор','блок','група'))
+      return {cached:true,explanation:`Підкатегорії: ${region}`,
+        sql:`SELECT district as район,subcategory as підкатегорія,cases as випадків FROM district_disease_subcategories WHERE region='${region}' ORDER BY cases DESC LIMIT 30`}
+    return {cached:true,explanation:`Хвороби по районах: ${region}`,
+      sql:`SELECT district as район,disease_category as категорія,cases as випадків,unique_patients as пацієнтів,percent_of_district as відс,is_primary as основна FROM district_disease_categories WHERE region='${region}' ORDER BY district,cases DESC`}
+  }
+
+  // Загальні регіон/район запити
+  if (has(t,'основн','категор','район')||has(t,'хвороб','район'))
+    return {cached:true,explanation:'Основні хвороби по районах',
+      sql:`SELECT region as регіон,district as район,disease_category as категорія,cases as випадків FROM district_disease_categories WHERE is_primary=TRUE ORDER BY cases DESC LIMIT 30`}
+  if (has(t,'основн','категор','регіон')||has(t,'хвороб','регіон'))
+    return {cached:true,explanation:'Основні хвороби по регіонах',
+      sql:`SELECT region as регіон,disease_category as категорія,cases as випадків,unique_patients as пацієнтів FROM region_disease_categories WHERE is_primary=TRUE ORDER BY cases DESC`}
+
+  // Загальне: регіони/райони
   if (has(t,'основн','категор')||has(t,'головн','хвороб','відділ'))
     return {cached:true,explanation:'Основні категорії по відділеннях',
       sql:`SELECT department as відділення,disease_category as категорія,cases as випадків,percent_of_dept as відс FROM department_disease_categories WHERE is_primary=TRUE ORDER BY cases DESC`}
