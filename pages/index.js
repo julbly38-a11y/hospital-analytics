@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
-const EXAMPLES = [
+const ALL_EXAMPLES = [
   'Загальна статистика лікарні',
   'Показники по всіх відділеннях',
   'Летальність по відділеннях',
@@ -12,10 +12,25 @@ const EXAMPLES = [
   'Повторні госпіталізації 30 і 90 днів',
   'Статистика за регіонами',
   'Пікові навантаження по годинах',
+  'Навантаження по днях тижня',
+  'Динаміка по місяцях',
+  'Вихідні vs робочі дні',
+  'Нічні vs денні поступлення',
   'Скільки вихідних діб в лікаря Грабовського за перше півріччя 2023',
   'Яка спеціалізація у лікаря Арійчука О.І',
-  'Cкільки ночних поступленнь у Блинду за липень 2024?',
+  'Скільки нічних поступлень у Блинду за липень 2024',
+  'Відділення з найдовшим ліжкоднем',
+  'Скільки інсультів пролікувано за 2024 рік',
+  'Топ відділень за кількістю операцій',
+  'Скільки пацієнтів з Чернівецького району',
+  'Скільки дітей госпіталізовано за 2024',
+  'Навантаження по тижнях 2024',
+  'Нічні поступлення по відділеннях',
+  'Скільки пацієнтів пролікував Грабовський за 2023 рік',
+  'Хірургічна активність по відділеннях',
 ]
+const PAGE_SIZE = 8
+const ROTATE_MS = 12000
 
 // Спливаючі підказки про доступні VIEW (показуються періодично)
 const VIEW_HINTS = [
@@ -126,12 +141,21 @@ export default function Home() {
   const [stats, setStats] = useState({ count: 0, tokensIn: 0, tokensOut: 0, cost: 0 })
   const [limits, setLimits] = useState(null)
   const [hint, setHint] = useState(null)
-  const provider = 'groq' // завжди Groq, без вибору
+  const [exPage, setExPage] = useState(0)
+  const provider = 'groq'
   const bottomRef = useRef(null)
+  const totalPages = Math.ceil(ALL_EXAMPLES.length / PAGE_SIZE)
+  const visibleExamples = ALL_EXAMPLES.slice(exPage * PAGE_SIZE, exPage * PAGE_SIZE + PAGE_SIZE)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Ротація прикладів кожні 12 сек
+  useEffect(() => {
+    const timer = setInterval(() => setExPage(p => (p + 1) % totalPages), ROTATE_MS)
+    return () => clearInterval(timer)
+  }, [totalPages])
 
   // Спливаючі підказки про VIEW — періодична ротація
   useEffect(() => {
@@ -199,10 +223,20 @@ export default function Home() {
             <div className={styles.logoText}>ЛСМД<small>AI Асистент</small></div>
           </div>
           <div className={styles.sideSection}>
-            <p className={styles.sideLabel}>Приклади</p>
-            {EXAMPLES.map((ex, i) => (
-              <button key={i} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
+              <p className={styles.sideLabel} style={{margin:0}}>Приклади</p>
+              <span style={{fontSize:'10px',color:'var(--text3)',fontFamily:'var(--mono)'}}>{exPage+1}/{totalPages}</span>
+            </div>
+            {visibleExamples.map((ex, i) => (
+              <button key={`${exPage}-${i}`} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
             ))}
+            <div style={{display:'flex',gap:'4px',marginTop:'6px'}}>
+              {Array.from({length:totalPages}).map((_,i) => (
+                <button key={i} onClick={() => setExPage(i)}
+                  style={{flex:1,height:'3px',border:'none',borderRadius:'2px',cursor:'pointer',
+                    background: i===exPage ? 'var(--accent)' : 'var(--border)'}}/>
+              ))}
+            </div>
           </div>
           <div className={styles.sideFooter}>
             <p>110,206 госпіталізацій</p>
