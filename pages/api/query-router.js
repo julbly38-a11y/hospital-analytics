@@ -184,6 +184,10 @@ export function routeQuery(question) {
   if (has(t,'нічн')&&has(t,'відділ'))
     return {cached:true,explanation:'Нічні по відділеннях',sql:`SELECT department as відділення,time_period as період,cases as випадків,deaths as померло FROM v_night_admissions_by_department ORDER BY department,time_period DESC`}
 
+  // Реанімація / ІТ летальність
+  if (any(t,'реанімац','інтенсивн','іт','icu') && any(t,'летальн','смертн','померл','статистик'))
+    return {cached:true,explanation:'Летальність реанімації',sql:`SELECT всього_поступлень,померло,летальність_pct as летальність_відс,вижило,ліжкодень_померлих,середній_ліжкодень FROM v_icu_mortality`}
+
   // Інше
   if (has(t,'повторн')||has(t,'реадміс'))
     return {cached:true,explanation:'Повторні госпіталізації',sql:`SELECT readmit_30d as повторні_30д,readmit_30d_pct as пр_30д,readmit_90d as повторні_90д,readmit_90d_pct as пр_90д FROM v_readmission_metrics`}
