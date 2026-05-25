@@ -79,6 +79,10 @@ export function routeQuery(question) {
   if (has(t,'операц','відділ')||has(t,'хірург','активн'))
     return {cached:true,explanation:'Хірургічна активність',sql:`SELECT department as відділення,operations as операцій,surgical_activity_pct as акт_пр FROM v_department_stats ORDER BY surgical_activity_pct DESC`}
 
+  // Реанімація / ІТ летальність — перевіряємо ДО deptMap
+  if (any(t,'реанімац','інтенсивн','іт','icu') && any(t,'летальн','смертн','померл','статистик'))
+    return {cached:true,explanation:'Летальність реанімації',sql:`SELECT всього_поступлень,померло,летальність_pct as летальність_відс,вижило,ліжкодень_померлих,середній_ліжкодень FROM v_icu_mortality`}
+
   // Діагнози/категорії по конкретному відділенню
   const deptMap=[
     ['гастроентерол','Гастроентерологічне відділення'],
@@ -183,10 +187,6 @@ export function routeQuery(question) {
     return {cached:true,explanation:'Нічні vs денні',sql:`SELECT time_period as період,cases as випадків,urgent_cases as ургентних,letality_percent as летальність FROM v_night_vs_day_admissions ORDER BY time_period DESC`}
   if (has(t,'нічн')&&has(t,'відділ'))
     return {cached:true,explanation:'Нічні по відділеннях',sql:`SELECT department as відділення,time_period as період,cases as випадків,deaths as померло FROM v_night_admissions_by_department ORDER BY department,time_period DESC`}
-
-  // Реанімація / ІТ летальність
-  if (any(t,'реанімац','інтенсивн','іт','icu') && any(t,'летальн','смертн','померл','статистик'))
-    return {cached:true,explanation:'Летальність реанімації',sql:`SELECT всього_поступлень,померло,летальність_pct as летальність_відс,вижило,ліжкодень_померлих,середній_ліжкодень FROM v_icu_mortality`}
 
   // Інше
   if (has(t,'повторн')||has(t,'реадміс'))
