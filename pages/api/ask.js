@@ -390,8 +390,8 @@ export default async function handler(req, res) {
       throw new Error(`DB error: ${errText}`)
     }
 
-    // Зберігаємо статистику в БД (fire & forget)
-    fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+    // Зберігаємо статистику в БД (await — Vercel завершує функцію до fire&forget)
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
