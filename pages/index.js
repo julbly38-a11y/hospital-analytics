@@ -143,6 +143,7 @@ export default function Home() {
   const [hint, setHint] = useState(null)
   const [exPage, setExPage] = useState(0)
   const [globalStats, setGlobalStats] = useState(null)
+  const [icuStats, setIcuStats] = useState(null)
   const provider = 'groq'
   const bottomRef = useRef(null)
   const totalPages = Math.ceil(ALL_EXAMPLES.length / PAGE_SIZE)
@@ -155,6 +156,7 @@ export default function Home() {
   // Завантажуємо глобальну статистику при старті
   useEffect(() => {
     fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {})
+    fetch('/api/icu').then(r => r.json()).then(setIcuStats).catch(() => {})
   }, [])
 
   // Оновлюємо після кожного запиту
@@ -168,6 +170,7 @@ export default function Home() {
     const timer = setInterval(() => setExPage(p => (p + 1) % totalPages), ROTATE_MS)
     return () => clearInterval(timer)
   }, [totalPages])
+
 
   // Спливаючі підказки про VIEW — періодична ротація
   useEffect(() => {
@@ -254,6 +257,27 @@ export default function Home() {
             <p>110,206 госпіталізацій</p>
             <p>72,293 пацієнти</p>
             <p>20 відділень · 265 лікарів</p>
+
+            {icuStats && icuStats.icu_mortality != null && (
+              <div style={{
+                marginTop: '12px', borderRadius: '8px', padding: '10px 12px',
+                background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)',
+                fontSize: '10px', lineHeight: '1.8'
+              }}>
+                <p style={{color:'rgba(239,68,68,0.8)', letterSpacing:'0.08em',
+                  textTransform:'uppercase', marginBottom:'6px',
+                  fontFamily:'var(--mono)', fontSize:'9px'}}>
+                  🏥 Реанімаційна летальність
+                </p>
+                <p style={{fontSize:'22px', fontWeight:600, color:'rgba(239,68,68,0.9)',
+                  margin:'0 0 4px', fontFamily:'var(--mono)'}}>
+                  {Number(icuStats.icu_mortality).toFixed(1)}%
+                </p>
+                <p style={{color:'var(--text2)', margin:0, fontSize:'10px'}}>
+                  {formatNum(icuStats.died)} / {formatNum(icuStats.total_admitted)} за поступленнями
+                </p>
+              </div>
+            )}
 
             <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
               <p style={{color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px'}}>Ця сесія</p>
