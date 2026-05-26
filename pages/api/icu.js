@@ -18,7 +18,15 @@ export default async function handler(req, res) {
       `})
     })
     const data = await r.json()
-    res.status(200).json(data[0]?.execute_sql?.[0] || {})
+    let row = {}
+    if (Array.isArray(data) && data.length > 0) {
+      if (data[0].execute_sql !== undefined) {
+        row = data[0].execute_sql?.[0] || {}
+      } else {
+        row = data[0]
+      }
+    }
+    res.status(200).json(row)
   } catch (e) {
     res.status(500).json({ error: e.message })
   }
