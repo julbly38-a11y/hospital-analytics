@@ -65,9 +65,9 @@ v_readmissions — деталі повторних:
   id_case, patient_id, admission_date_d, discharge_date_d, icd_primary, next_admission,
   days_to_readmission, readmit_30d, readmit_90d, same_diagnosis
 
-v_peak_by_hour — за годинами: hour, admissions, urgent, planned
-v_peak_by_weekday — за днями тижня: weekday, admissions, urgent, night_admissions
-v_peak_by_month — за місяцями: month, admissions, deaths, operations
+v_peak_by_hour — за годинами: hour, cases, deaths
+v_peak_by_weekday — за днями тижня: dow, weekday_name, cases
+v_peak_by_month — за місяцями: month, cases, deaths, avg_bed_days
 
 ПРАВИЛО: для летальності, навантаження, статистики, повторних госпіталізацій — бери з VIEW, не рахуй вручну!
 Приклад: "летальність по відділеннях" → SELECT department, death_rate_pct FROM v_department_stats ORDER BY death_rate_pct DESC
