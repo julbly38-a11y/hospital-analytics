@@ -338,7 +338,7 @@ export default async function handler(req, res) {
   if (!question) return res.status(400).json({ error: 'Немає питання' })
   if (!PROVIDERS[provider]) return res.status(400).json({ error: 'Невідомий провайдер' })
 
-  let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error' }
+  let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error', sql_query: null, row_count: null, error_message: null }
 
   try {
     // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
@@ -411,7 +411,7 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
         'Prefer': 'return=minimal'
       },
-      body: JSON.stringify({ ...logData, status: 'success' })
+      body: JSON.stringify({ ...logData, status: 'success', sql_query: safeSql.slice(0, 1000), row_count: rows.length })
     }).catch(() => {})
 
     res.status(200).json({
@@ -431,6 +431,7 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     logData.status = 'error'
+    logData.error_message = e.message.slice(0, 500)
     // Логуємо помилку
     await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
       method: 'POST',
