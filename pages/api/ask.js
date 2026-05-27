@@ -100,7 +100,7 @@ GROUP BY година
 ORDER BY count DESC
 
 📌 "Навантаження по днях тижня":
-SELECT TO_CHAR(admission_ts::timestamp, 'Day') as день, COUNT(*) as count
+SELECT TO_CHAR(DAY FROM admission_ts::timestamp, 'Day') as день, COUNT(*) as count
 FROM lsmd
 WHERE admission_ts IS NOT NULL
 GROUP BY день
