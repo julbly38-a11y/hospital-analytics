@@ -74,7 +74,7 @@ export function routeQuery(question) {
     return {cached:true,explanation:'По відділеннях',sql:`SELECT department as відділення,total_cases as випадків,avg_bed_days as ліжкодень,death_rate_pct as летальність,surgical_activity_pct as хірург_акт FROM v_department_stats ORDER BY total_cases DESC`}
   if (has(t,'летальн','відділ'))
     return {cached:true,explanation:'Летальність по відділеннях',sql:`SELECT department as відділення,total_cases as всього,deaths as померло,death_rate_pct as летальність FROM v_department_stats ORDER BY death_rate_pct DESC`}
-  if (has(t,'ліжкоден','відділ')||has(t,'середн','ліжкоден')||any(t,'найдовш','найбільш','довг')&&any(t,'ліжкоден','ліжко-ден'))
+  if (has(t,'ліжкоден','відділ')||has(t,'середн','ліжкоден')||(any(t,'найдовш','найбільш','довг')&&any(t,'ліжкоден','ліжко-ден')))
     return {cached:true,explanation:'Ліжкодень по відділеннях',sql:`SELECT department as відділення,avg_bed_days as середній,max_bed_days as макс FROM v_department_stats ORDER BY avg_bed_days DESC`}
   if (has(t,'операц','відділ')||has(t,'хірург','активн'))
     return {cached:true,explanation:'Хірургічна активність',sql:`SELECT department as відділення,operations as операцій,surgical_activity_pct as акт_пр FROM v_department_stats ORDER BY surgical_activity_pct DESC`}
