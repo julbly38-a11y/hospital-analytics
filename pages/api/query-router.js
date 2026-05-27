@@ -3,7 +3,7 @@ import { detectDoctor, detectYear, detectPeriod } from './doctors.js'
 const n = t => t.toLowerCase().trim()
 const has = (t,...w) => w.every(x=>t.includes(x))
 const any = (t,...w) => w.some(x=>t.includes(x))
-const hasBedDays = t => t.includes('ліжкоден') || t.includes('ліжкодн') // ліжкодень / ліжкоднем / ліжкодня
+const hasBedDays = t => t.includes('ліжкоден') || t.includes('ліжкодн') || t.includes('ліжко-ден') || t.includes('ліжко-дн') // всі форми
 
 function doctorSQL(t, doc) {
   const yr = detectYear(t)
