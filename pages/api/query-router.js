@@ -154,7 +154,7 @@ export function routeQuery(question) {
 
   // Діти / вік
   if (any(t,'дітей','дитин','дітям','дитяч','педіатр')&&any(t,'госпіталізов','скільки','кількість','поступил'))
-    return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
+    return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age::integer < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
 
   // Топ діагнозів загально
   if (has(t,'топ','діагноз')||has(t,'найчастіш','діагноз'))
