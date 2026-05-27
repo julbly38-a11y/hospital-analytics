@@ -93,7 +93,7 @@ FROM v_department_stats
 ORDER BY death_rate_pct DESC
 
 📌 "Пікові години госпіталізацій":
-SELECT EXTRACT(HOUR FROM admission_ts::timestamp) as година, COUNT(*) as count
+SELECT EXTRACT(HOUR FROM admission_ts::timestamp, 'hour') as година, COUNT(*) as count
 FROM lsmd
 WHERE admission_ts IS NOT NULL
 GROUP BY година
