@@ -73,9 +73,9 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Analytics() {
   const summary = useQuery('SELECT total_cases,unique_patients,avg_bed_days,death_rate_pct,surgical_activity_pct FROM v_hospital_summary')
   const deptStats = useQuery('SELECT department as відділення, total_cases as випадків, death_rate_pct as летальність, avg_bed_days as ліжкодень FROM v_department_stats ORDER BY total_cases DESC LIMIT 10')
-  const peakHour = useQuery('SELECT hour as година, admissions as поступлень FROM v_peak_by_hour ORDER BY година')
-  const peakMonth = useQuery('SELECT month as місяць, admissions as поступлень, deaths as померло FROM v_peak_by_month ORDER BY місяць')
-  const peakWeekday = useQuery('SELECT weekday as день, admissions as поступлень, night_admissions as нічних FROM v_peak_by_weekday ORDER BY день')
+  const peakHour = useQuery('SELECT hour as година, cases as поступлень FROM v_peak_by_hour ORDER BY hour')
+  const peakMonth = useQuery('SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month ORDER BY month')
+  const peakWeekday = useQuery('SELECT dow as день, weekday_name as назва, cases as поступлень FROM v_peak_by_weekday ORDER BY dow')
   const urgency = useQuery('SELECT department as відділення, urgent as ургентних, planned as планових FROM v_urgency_stats ORDER BY ургентних DESC LIMIT 8')
   const patStats = useQuery('SELECT age_group as вік, cases as випадків, death_rate_pct as летальність FROM v_patient_stats WHERE gender=\'Ч\' OR gender=\'Ж\' GROUP BY вік,летальність ORDER BY випадків DESC LIMIT 8')
   const icu = useQuery('SELECT всього_поступлень,померло,летальність_pct,середній_ліжкодень FROM v_icu_mortality')
@@ -199,14 +199,12 @@ export default function Analytics() {
             <Card title="Поступлення по днях тижня">
               {peakWeekday.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={(peakWeekday.data || []).map((d,i) => ({...d, назва: weekdays[d.день] || d.день}))}>
+                  <BarChart data={peakWeekday.data}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="назва" tick={{ fontSize: 11, fontFamily: 'var(--mono)' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fontFamily: 'var(--mono)' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'var(--mono)' }} />
                     <Bar dataKey="поступлень" fill="var(--accent)" radius={[3,3,0,0]} />
-                    <Bar dataKey="нічних" fill="var(--text3)" radius={[3,3,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
