@@ -10,6 +10,7 @@ lsmd (110,206 записів) — госпіталізації:
   admission_ts (timestamp), discharge_ts (timestamp), admission_date_d (date), discharge_date_d (date),
   admission_department (text), current_department (text), discharge_department (text),
   icd_primary, discharge_status, length_of_stay, admission_type
+  ⚠️ УВАГА: колонки 'department' НЕ ІСНУЄ в lsmd! Тільки admission_department / current_department / discharge_department
 
 patients_best (72,293) — пацієнти:
   patient_id, full_name, date_of_birth, gender, locality
