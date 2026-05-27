@@ -74,7 +74,7 @@ export function routeQuery(question) {
     return {cached:true,explanation:'По відділеннях',sql:`SELECT department as відділення,total_cases as випадків,avg_bed_days as ліжкодень,death_rate_pct as летальність,surgical_activity_pct as хірург_акт FROM v_department_stats ORDER BY total_cases DESC`}
   if (has(t,'летальн','відділ'))
     return {cached:true,explanation:'Летальність по відділеннях',sql:`SELECT department as відділення,total_cases as всього,deaths as померло,death_rate_pct as летальність FROM v_department_stats ORDER BY death_rate_pct DESC`}
-  if (has(t,'ліжкодень','відділ')||has(t,'середн','ліжкодень')||has(t,'найдовш','ліжкодень')||has(t,'довг','ліжкодень')||any(t,'найдовший ліжкодень','найбільший ліжкодень'))
+  if (has(t,'ліжкоден','відділ')||has(t,'середн','ліжкоден')||any(t,'найдовш','найбільш','довг')&&any(t,'ліжкоден','ліжко-ден'))
     return {cached:true,explanation:'Ліжкодень по відділеннях',sql:`SELECT department as відділення,avg_bed_days as середній,max_bed_days as макс FROM v_department_stats ORDER BY avg_bed_days DESC`}
   if (has(t,'операц','відділ')||has(t,'хірург','активн'))
     return {cached:true,explanation:'Хірургічна активність',sql:`SELECT department as відділення,operations as операцій,surgical_activity_pct as акт_пр FROM v_department_stats ORDER BY surgical_activity_pct DESC`}
@@ -165,11 +165,11 @@ export function routeQuery(question) {
 
   // Навантаження
   if (has(t,'годин')&&any(t,'пік','навантаж','по'))
-    return {cached:true,explanation:'По годинах',sql:`SELECT hour as година,cases as випадків,deaths as померло FROM v_peak_by_hour ORDER BY hour`}
+    return {cached:true,explanation:'По годинах',sql:`SELECT hour as година,admissions as поступлень,urgent as ургентних,planned as планових FROM v_peak_by_hour ORDER BY hour`}
   if (has(t,'тижн')&&any(t,'день','дн')&&!has(t,'статистик'))
-    return {cached:true,explanation:'По днях тижня',sql:`SELECT weekday_name as день,cases as випадків FROM v_peak_by_weekday ORDER BY dow`}
+    return {cached:true,explanation:'По днях тижня',sql:`SELECT weekday as день_номер,admissions as поступлень,urgent as ургентних,night_admissions as нічних FROM v_peak_by_weekday ORDER BY weekday`}
   if (has(t,'місяц')&&any(t,'динамік','по','навантаж'))
-    return {cached:true,explanation:'По місяцях',sql:`SELECT month as місяць,cases as випадків,deaths as померло,avg_bed_days as ліжкодень FROM v_peak_by_month ORDER BY month`}
+    return {cached:true,explanation:'По місяцях',sql:`SELECT month as місяць,admissions as поступлень,deaths as померло,operations as операцій FROM v_peak_by_month ORDER BY month`}
   if (has(t,'тижн')&&any(t,'статистик','навантаж')) {
     const y=detectYear(t)||2024
     return {cached:true,explanation:`Тижнева ${y}`,sql:`SELECT week_start as тиждень,admissions as поступлень,deaths as померло FROM v_weekly_admissions WHERE year=${y} ORDER BY week_number DESC LIMIT 20`}
