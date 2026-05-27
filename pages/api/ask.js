@@ -374,9 +374,15 @@ export default async function handler(req, res) {
     }
 
     let safeSql = validateReadOnlySql(parsed.sql)
-    // Автофікс: якщо SQL звертається до lsmd і містить голу 'department' без префікса — замінюємо
+    // Автофікс: неправильні колонки
     if (/\blsmd\b/i.test(safeSql)) {
       safeSql = safeSql.replace(/(?<![a-z_])department(?!_)/gi, 'admission_department')
+    }
+    // v_peak_by_* має cases, не admissions
+    if (/v_peak_by/i.test(safeSql)) {
+      safeSql = safeSql.replace(/\badmissions\b/gi, 'cases')
+      safeSql = safeSql.replace(/\bnight_admissions\b/gi, 'cases')
+      safeSql = safeSql.replace(/\bweekday\b(?=\s*[,\s])/gi, 'dow')
     }
 
     const r2 = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
