@@ -257,6 +257,13 @@ export default function Home() {
             <p>110,206 госпіталізацій</p>
             <p>72,293 пацієнти</p>
             <p>20 відділень · 265 лікарів</p>
+            <a href="/analytics" style={{
+              display: 'block', marginTop: '10px', padding: '6px 10px',
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              borderRadius: '6px', fontSize: '11px', color: 'var(--text2)',
+              fontFamily: 'var(--mono)', textDecoration: 'none',
+              textAlign: 'center', transition: 'all .15s'
+            }}>📊 Графічна аналітика →</a>
 
             {icuStats && icuStats.icu_mortality != null && (
               <div style={{
