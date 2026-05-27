@@ -373,7 +373,11 @@ export default async function handler(req, res) {
       }
     }
 
-    const safeSql = validateReadOnlySql(parsed.sql)
+    let safeSql = validateReadOnlySql(parsed.sql)
+    // Автофікс: якщо SQL звертається до lsmd і містить голу 'department' без префікса — замінюємо
+    if (/\blsmd\b/i.test(safeSql)) {
+      safeSql = safeSql.replace(/(?<![a-z_])department(?!_)/gi, 'admission_department')
+    }
 
     const r2 = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
       method: 'POST',
