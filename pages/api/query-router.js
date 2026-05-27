@@ -159,8 +159,10 @@ export function routeQuery(question) {
   if (any(t,'пікові навант','пікове навант','навантаження по год','по годинах доби','поступлення по год'))
     return {cached:true,explanation:'Пікове навантаження по годинах',sql:`SELECT hour as година, cases as поступлень, deaths as померло FROM v_peak_by_hour ORDER BY година`}
 
-  if (any(t,'пікові навант','пікове навант','навантаження по міс','по місяцях')&&!any(t,'годин','днях','тижня'))
-    return {cached:true,explanation:'Динаміка по місяцях',sql:`SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month ORDER BY місяць`}
+  if (any(t,'пікові навант','пікове навант','навантаження по міс','по місяцях','динаміка по міс')&&!any(t,'годин','днях','тижня')) {
+    const yr = detectYear(t) || 2024
+    return {cached:true,explanation:`Динаміка по місяцях ${yr}`,sql:`SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month WHERE year=${yr} ORDER BY month_num`}
+  }
   if (has(t,'топ','діагноз')||has(t,'найчастіш','діагноз'))
     return {cached:true,explanation:'Топ діагнозів',sql:`SELECT icd_code,diagnosis_name,cases as випадків,unique_patients as пацієнтів,letality_percent as летальність FROM v_top_diagnoses ORDER BY cases DESC LIMIT 20`}
   if (has(t,'діагноз','відділ')||has(t,'захворюван','відділ'))

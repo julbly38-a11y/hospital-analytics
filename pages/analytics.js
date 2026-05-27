@@ -74,7 +74,7 @@ export default function Analytics() {
   const summary = useQuery('SELECT total_cases,unique_patients,avg_bed_days,death_rate_pct,surgical_activity_pct FROM v_hospital_summary')
   const deptStats = useQuery('SELECT department as відділення, total_cases as випадків, death_rate_pct as летальність, avg_bed_days as ліжкодень FROM v_department_stats ORDER BY total_cases DESC LIMIT 10')
   const peakHour = useQuery('SELECT hour as година, cases as поступлень FROM v_peak_by_hour ORDER BY hour')
-  const peakMonth = useQuery('SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month ORDER BY month')
+  const peakMonth = useQuery('SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month WHERE year=2024 ORDER BY month_num')
   const peakWeekday = useQuery('SELECT dow as день, weekday_name as назва, cases as поступлень FROM v_peak_by_weekday ORDER BY dow')
   const urgency = useQuery('SELECT department as відділення, urgent as ургентних, planned as планових FROM v_urgency_stats ORDER BY ургентних DESC LIMIT 8')
   const patStats = useQuery('SELECT age_group as вік, cases as випадків, death_rate_pct as летальність FROM v_patient_stats WHERE gender=\'Ч\' OR gender=\'Ж\' GROUP BY вік,летальність ORDER BY випадків DESC LIMIT 8')
