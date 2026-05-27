@@ -1,4 +1,5 @@
 import { routeQuery } from './query-router'
+import { validateReadOnlySql } from './sql-guard'
 
 const SYSTEM_PROMPT = `Ти SQL асистент для PostgreSQL бази даних лікарні ЛСМД. Відповідаєш українською.
 
@@ -63,9 +64,9 @@ v_readmissions — деталі повторних:
   id_case, patient_id, admission_date_d, discharge_date_d, icd_primary, next_admission,
   days_to_readmission, readmit_30d, readmit_90d, same_diagnosis
 
-v_peak_by_hour — за годинами: hour, cases, deaths
-v_peak_by_weekday — за днями тижня: dow, weekday_name, cases
-v_peak_by_month — за місяцями: month, cases, deaths, avg_bed_days
+v_peak_by_hour — за годинами: hour, admissions, urgent, planned
+v_peak_by_weekday — за днями тижня: weekday, admissions, urgent, night_admissions
+v_peak_by_month — за місяцями: month, admissions, deaths, operations
 
 ПРАВИЛО: для летальності, навантаження, статистики, повторних госпіталізацій — бери з VIEW, не рахуй вручну!
 Приклад: "летальність по відділеннях" → SELECT department, death_rate_pct FROM v_department_stats ORDER BY death_rate_pct DESC
@@ -336,6 +337,8 @@ export default async function handler(req, res) {
   if (!question) return res.status(400).json({ error: 'Немає питання' })
   if (!PROVIDERS[provider]) return res.status(400).json({ error: 'Невідомий провайдер' })
 
+  let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error' }
+
   try {
     // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
     const routed = routeQuery(question)
@@ -359,6 +362,8 @@ export default async function handler(req, res) {
       cfg = PROVIDERS[provider]
       cost = (aiResult.tokens_in / 1000000) * cfg.pricing.in + (aiResult.tokens_out / 1000000) * cfg.pricing.out
 
+      logData = { ...logData, provider: cfg.name, tokens_in: aiResult.tokens_in, tokens_out: aiResult.tokens_out, cost_usd: cost }
+
       try { parsed = JSON.parse(aiResult.text) }
       catch {
         const m = aiResult.text.match(/\{[\s\S]*\}/)
@@ -367,6 +372,8 @@ export default async function handler(req, res) {
       }
     }
 
+    const safeSql = validateReadOnlySql(parsed.sql)
+
     const r2 = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
       method: 'POST',
       headers: {
@@ -374,7 +381,7 @@ export default async function handler(req, res) {
         'apikey': process.env.SUPABASE_SERVICE_KEY,
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`
       },
-      body: JSON.stringify({ sql_query: parsed.sql.replace(/;\s*$/, '') })
+      body: JSON.stringify({ sql_query: safeSql })
     })
 
     let rows = []
@@ -390,26 +397,11 @@ export default async function handler(req, res) {
       throw new Error(`DB error: ${errText}`)
     }
 
-    // Зберігаємо статистику в БД (await — Vercel завершує функцію до fire&forget)
-    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': process.env.SUPABASE_SERVICE_KEY,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
-        provider: cfg.name,
-        tokens_in: aiResult.tokens_in,
-        tokens_out: aiResult.tokens_out,
-        cost_usd: cost,
-        question: question.slice(0, 200)
-      })
-    }).catch(() => {})
+    // Оновлюємо logData перед успішною відповіддю
+    logData = { ...logData, provider: cfg.name, tokens_in: aiResult.tokens_in, tokens_out: aiResult.tokens_out, cost_usd: cost, status: 'success' }
 
     res.status(200).json({
-      sql: parsed.sql,
+      sql: safeSql,
       explanation: parsed.explanation,
       rows,
       tokens: {
@@ -424,6 +416,19 @@ export default async function handler(req, res) {
       }
     })
   } catch (e) {
+    logData.status = 'error'
     res.status(500).json({ error: e.message })
+  } finally {
+    // Логуємо всі запити (і успішні, і помилкові)
+    fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': process.env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(logData)
+    }).catch(() => {})
   }
 }
