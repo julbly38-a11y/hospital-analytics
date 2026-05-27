@@ -12,7 +12,6 @@ export default async function handler(req, res) {
     return r.json()
   }
 
-  // POST — для аналітики (довільний SQL)
   if (req.method === 'POST') {
     const { sql } = req.body || {}
     if (!sql) return res.status(400).json({ error: 'No SQL' })
@@ -27,12 +26,10 @@ export default async function handler(req, res) {
     }
   }
 
-  // GET — usage_stats для сайдбару
   if (req.method === 'GET') {
     try {
       const data = await supaFetch(`
-        SELECT
-          COUNT(*) as total_requests,
+        SELECT COUNT(*) as total_requests,
           SUM(tokens_in) as total_tokens_in,
           SUM(tokens_out) as total_tokens_out,
           SUM(tokens_in + tokens_out) as total_tokens,
@@ -50,14 +47,4 @@ export default async function handler(req, res) {
   }
 
   res.status(405).end()
-}
-`})
-      }
-    )
-    const data = await r.json()
-    const row = data[0]?.execute_sql?.[0] || {}
-    res.status(200).json(row)
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
 }
