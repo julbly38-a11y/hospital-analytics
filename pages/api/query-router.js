@@ -152,6 +152,10 @@ export function routeQuery(question) {
       return {cached:true,explanation:`Лікарі: ${sp}`,sql:`SELECT emp_name as лікар,department as відділення,position as посада FROM empl WHERE specialization ILIKE '%${sp}%' ORDER BY emp_name`}
     }
 
+  // Діти / вік
+  if (any(t,'дітей','дитин','дітям','дитяч','педіатр')&&any(t,'госпіталізов','скільки','кількість','поступил'))
+    return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
+
   // Топ діагнозів загально
   if (has(t,'топ','діагноз')||has(t,'найчастіш','діагноз'))
     return {cached:true,explanation:'Топ діагнозів',sql:`SELECT icd_code,diagnosis_name,cases as випадків,unique_patients as пацієнтів,letality_percent as летальність FROM v_top_diagnoses ORDER BY cases DESC LIMIT 20`}
