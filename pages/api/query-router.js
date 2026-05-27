@@ -156,7 +156,11 @@ export function routeQuery(question) {
   if (any(t,'дітей','дитин','дітям','дитяч','педіатр')&&any(t,'госпіталізов','скільки','кількість','поступил'))
     return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age::integer < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
 
-  // Топ діагнозів загально
+  if (any(t,'пікові навант','пікове навант','навантаження по год','по годинах доби','поступлення по год'))
+    return {cached:true,explanation:'Пікове навантаження по годинах',sql:`SELECT hour as година, cases as поступлень, deaths as померло FROM v_peak_by_hour ORDER BY година`}
+
+  if (any(t,'пікові навант','пікове навант','навантаження по міс','по місяцях')&&!any(t,'годин','днях','тижня'))
+    return {cached:true,explanation:'Динаміка по місяцях',sql:`SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month ORDER BY місяць`}
   if (has(t,'топ','діагноз')||has(t,'найчастіш','діагноз'))
     return {cached:true,explanation:'Топ діагнозів',sql:`SELECT icd_code,diagnosis_name,cases as випадків,unique_patients as пацієнтів,letality_percent as летальність FROM v_top_diagnoses ORDER BY cases DESC LIMIT 20`}
   if (has(t,'діагноз','відділ')||has(t,'захворюван','відділ'))
