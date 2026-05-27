@@ -17,7 +17,7 @@ function useQuery(sql) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sql })
     }).then(r => r.json()).then(d => { setData(d.rows || []); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setData([]); setLoading(false) })
   }, [])
   return { data, loading }
 }

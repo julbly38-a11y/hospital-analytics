@@ -22,7 +22,8 @@ export default async function handler(req, res) {
       else if (Array.isArray(data)) rows = data
       return res.status(200).json({ rows })
     } catch (e) {
-      return res.status(500).json({ error: e.message })
+      console.error('Analytics SQL error:', e.message, '| SQL:', sql?.slice(0,100))
+      return res.status(500).json({ error: e.message, rows: [] })
     }
   }
 
