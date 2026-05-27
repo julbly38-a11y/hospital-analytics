@@ -402,8 +402,17 @@ export default async function handler(req, res) {
       throw new Error(`DB error: ${errText}`)
     }
 
-    // Оновлюємо logData перед успішною відповіддю
-    logData = { ...logData, provider: cfg.name, tokens_in: aiResult.tokens_in, tokens_out: aiResult.tokens_out, cost_usd: cost, status: 'success' }
+    // Логуємо до відповіді (await — Vercel не чекає finally після res.json)
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': process.env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ ...logData, status: 'success' })
+    }).catch(() => {})
 
     res.status(200).json({
       sql: safeSql,
@@ -422,10 +431,8 @@ export default async function handler(req, res) {
     })
   } catch (e) {
     logData.status = 'error'
-    res.status(500).json({ error: e.message })
-  } finally {
-    // Логуємо всі запити (і успішні, і помилкові)
-    fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+    // Логуємо помилку
+    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -435,5 +442,6 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(logData)
     }).catch(() => {})
+    res.status(500).json({ error: e.message })
   }
 }
