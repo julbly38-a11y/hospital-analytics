@@ -3,6 +3,7 @@ import { detectDoctor, detectYear, detectPeriod } from './doctors.js'
 const n = t => t.toLowerCase().trim()
 const has = (t,...w) => w.every(x=>t.includes(x))
 const any = (t,...w) => w.some(x=>t.includes(x))
+const hasBedDays = t => t.includes('ліжкоден') || t.includes('ліжкодн') // ліжкодень / ліжкоднем / ліжкодня
 
 function doctorSQL(t, doc) {
   const yr = detectYear(t)
@@ -74,7 +75,7 @@ export function routeQuery(question) {
     return {cached:true,explanation:'По відділеннях',sql:`SELECT department as відділення,total_cases as випадків,avg_bed_days as ліжкодень,death_rate_pct as летальність,surgical_activity_pct as хірург_акт FROM v_department_stats ORDER BY total_cases DESC`}
   if (has(t,'летальн','відділ'))
     return {cached:true,explanation:'Летальність по відділеннях',sql:`SELECT department as відділення,total_cases as всього,deaths as померло,death_rate_pct as летальність FROM v_department_stats ORDER BY death_rate_pct DESC`}
-  if (has(t,'ліжкоден','відділ')||has(t,'середн','ліжкоден')||(any(t,'найдовш','найбільш','довг')&&any(t,'ліжкоден','ліжко-ден')))
+  if (hasBedDays(t)&&t.includes('відділ')||has(t,'середн')&&hasBedDays(t)||(any(t,'найдовш','найбільш','довг')&&hasBedDays(t)))
     return {cached:true,explanation:'Ліжкодень по відділеннях',sql:`SELECT department as відділення,avg_bed_days as середній,max_bed_days as макс FROM v_department_stats ORDER BY avg_bed_days DESC`}
   if (has(t,'операц','відділ')||has(t,'хірург','активн'))
     return {cached:true,explanation:'Хірургічна активність',sql:`SELECT department as відділення,operations as операцій,surgical_activity_pct as акт_пр FROM v_department_stats ORDER BY surgical_activity_pct DESC`}
