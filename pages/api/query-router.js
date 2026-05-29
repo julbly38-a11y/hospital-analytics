@@ -181,7 +181,7 @@ export function routeQuery(question) {
   for (const [kws,icd,label] of diags)
     if (kws.every(k=>t.includes(k.trim()))) {
       if (any(t,'скільки','кількість','всього'))
-        return {cached:true,explanation:`Кількість: ${label}`,sql:`SELECT SUM(cases) as випадків, SUM(unique_patients) as пацієнтів, ROUND(AVG(avg_bed_days),1) as ліжкодень, SUM(deaths) as померло FROM v_diagnosis_stats WHERE icd_primary LIKE '${icd}%'`}
+        return {cached:true,explanation:`Кількість: ${label}`,sql:`SELECT SUM(cases) as випадків, SUM(unique_patients) as пацієнтів, ROUND(AVG(avg_bed_days),1) as ліжкодень, SUM(deaths) as померло, ROUND(100.0*SUM(deaths)/NULLIF(SUM(cases),0),2) as летальність_відс FROM v_diagnosis_stats WHERE icd_primary LIKE '${icd}%'`}
       return {cached:true,explanation:`Діагноз: ${label}`,sql:`SELECT d.icd_primary as код,i.diagnosis_level3 as діагноз,d.cases as випадків,d.unique_patients as пацієнтів,d.avg_bed_days as ліжкодень,d.deaths as померло FROM v_diagnosis_stats d LEFT JOIN icd_10 i ON d.icd_primary=i.icd_code WHERE d.icd_primary LIKE '${icd}%' ORDER BY d.cases DESC LIMIT 20`}
     }
 
