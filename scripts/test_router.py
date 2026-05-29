@@ -147,7 +147,7 @@ def main():
             print(f"{prefix} ❌ ERROR   {'':20s} | {q}")
             print(f"         → {err[:80]}")
 
-        time.sleep(0.3)  # щоб не перевантажити Groq
+        time.sleep(3)  # щоб не перевантажити Groq
 
     print(f"\n{'='*70}")
     print(f"РЕЗУЛЬТАТ: ✅ {len(ok)} OK  ⚠️  {len(empty)} порожніх  ❌ {len(errors)} помилок")

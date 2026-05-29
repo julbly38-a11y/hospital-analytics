@@ -162,7 +162,7 @@ export function routeQuery(question) {
 
   // Діти / вік
   if (any(t,'дітей','дитин','дітям','дитяч','педіатр')&&any(t,'госпіталізов','скільки','кількість','поступил'))
-    return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age::integer < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
+    return {cached:true,explanation:'Госпіталізації дітей',sql:`SELECT COUNT(*) as всього, COUNT(DISTINCT patient_id) as пацієнтів, ROUND(AVG(length_of_stay),1) as ліжкодень FROM lsmd WHERE age::text ~ '^[0-9]+$' AND age::integer < 18 ${detectYear(t)?`AND EXTRACT(YEAR FROM admission_date_d)=${detectYear(t)}`:''}`}
 
   if (any(t,'пікові навант','пікове навант','навантаження по год','по годинах доби','поступлення по год'))
     return {cached:true,explanation:'Пікове навантаження по годинах',sql:`SELECT hour as година, cases as поступлень, deaths as померло FROM v_peak_by_hour ORDER BY година`}
@@ -213,6 +213,59 @@ export function routeQuery(question) {
     return {cached:true,explanation:'Стать/вік',sql:`SELECT gender as стать,age_group as вік,cases as випадків,death_rate_pct as летальність FROM v_patient_stats ORDER BY cases DESC`}
   if (any(t,'регіон','район','географ','місцев'))
     return {cached:true,explanation:'За регіонами',sql:`SELECT region as регіон,district as район,cases as випадків,unique_patients as пацієнтів,deaths as померло FROM v_region_stats ORDER BY cases DESC LIMIT 30`}
+
+
+  // Погіршення / без змін / направлення / екстрені операції
+  if (any(t,'погіршен','гіршен'))
+    return {cached:true,explanation:'З погіршенням стану',sql:`SELECT COUNT(*) as випадків, ROUND(100.0*COUNT(*)/(SELECT COUNT(*) FROM lsmd),2) as відсоток FROM lsmd WHERE discharge_status='З погіршенням'`}
+  if (has(t,'без змін'))
+    return {cached:true,explanation:'Без змін після лікування',sql:`SELECT COUNT(*) as випадків, ROUND(100.0*COUNT(*)/(SELECT COUNT(*) FROM lsmd),2) as відсоток FROM lsmd WHERE discharge_status='Без змін'`}
+  if (has(t,'направлен'))
+    return {cached:true,explanation:'Пацієнти з направленням',sql:`SELECT COUNT(*) as всього, SUM(CASE WHEN referral IS NOT NULL AND referral!='' THEN 1 ELSE 0 END) as з_направленням, ROUND(100.0*SUM(CASE WHEN referral IS NOT NULL AND referral!='' THEN 1 ELSE 0 END)/COUNT(*),2) as відсоток FROM lsmd`}
+  if (has(t,'екстрен') && any(t,'операц','хірург'))
+    return {cached:true,explanation:'Екстрені операції',sql:`SELECT COUNT(*) as екстрених_операцій FROM lsmd WHERE admission_type='Екстренна' AND operation_id IS NOT NULL`}
+
+  // Реанімація — поступило / померло
+  if (any(t,'реанімац','інтенсивн') && any(t,'поступил','скільки','кількість'))
+    return {cached:true,explanation:'Поступило в реанімацію',sql:`SELECT всього_поступлень as поступило FROM v_icu_mortality`}
+  if (any(t,'реанімац','інтенсивн') && any(t,'померл','смерт'))
+    return {cached:true,explanation:'Померло в реанімації',sql:`SELECT померло, летальність_pct as летальність FROM v_icu_mortality`}
+  if (any(t,'реанімац','інтенсивн') && hasBedDays(t))
+    return {cached:true,explanation:'Ліжкодень реанімації',sql:`SELECT середній_ліжкодень, ліжкодень_померлих FROM v_icu_mortality`}
+
+  // Вік по відділеннях — avg_age з v_department_stats (не lsmd.age TEXT)
+  if (has(t,'середн') && has(t,'вік') && has(t,'відділ'))
+    return {cached:true,explanation:'Середній вік по відділеннях',sql:`SELECT department as відділення, avg_age as середній_вік FROM v_department_stats ORDER BY avg_age DESC`}
+
+  // Діти по відділеннях — з v_department_stats
+  if (any(t,'дітей','дитин') && has(t,'відділ'))
+    return {cached:true,explanation:'Діти по відділеннях',sql:`SELECT department as відділення, children as дітей, total_cases as всього FROM v_department_stats ORDER BY children DESC`}
+
+  // Літні пацієнти
+  if (any(t,'літн','пенсіон','похил') && any(t,'госпіталізов','скільки','кількість','поступил'))
+    return {cached:true,explanation:'Літні пацієнти (60+)',sql:`SELECT COUNT(*) as всього FROM lsmd WHERE age ~ '^[0-9]+$' AND age::integer >= 60`}
+
+  // Летальність по діагнозах
+  if (has(t,'летальн') && has(t,'діагноз') && !has(t,'відділ'))
+    return {cached:true,explanation:'Летальність по діагнозах',sql:`SELECT icd_primary as код, death_rate_pct as летальність, cases as випадків, deaths as померло FROM v_diagnosis_stats WHERE cases >= 50 ORDER BY death_rate_pct DESC LIMIT 20`}
+
+  // Летальність по статі
+  if (has(t,'летальн') && any(t,'чоловік','жінок','стат'))
+    return {cached:true,explanation:'Летальність по статі',sql:`SELECT gender as стать, cases as випадків, deaths as померло, death_rate_pct as летальність FROM v_patient_stats GROUP BY gender,deaths,cases,death_rate_pct ORDER BY death_rate_pct DESC`}
+
+  // Летальність по віку
+  if (has(t,'летальн') && has(t,'вік'))
+    return {cached:true,explanation:'Летальність по віку',sql:`SELECT age_group as вік, cases as випадків, deaths as померло, death_rate_pct as летальність FROM v_patient_stats GROUP BY age_group,deaths,cases,death_rate_pct ORDER BY death_rate_pct DESC`}
+
+  // Планові / операції / переведені / загальна летальність
+  if (has(t,'планов') && any(t,'скільки','кількість') && !has(t,'відділ') && !has(t,'vs'))
+    return {cached:true,explanation:'Планові госпіталізації',sql:`SELECT planned as планових, urgent as ургентних, urgent_pct as відсоток_ургентних FROM v_hospital_summary`}
+  if (any(t,'операц') && any(t,'скільки','кількість') && !has(t,'відділ') && !has(t,'хірург'))
+    return {cached:true,explanation:'Кількість операцій',sql:`SELECT operations as операцій, surgical_activity_pct as хірург_акт FROM v_hospital_summary`}
+  if (any(t,'переведен') && any(t,'скільки','кількість') && !has(t,'відділ'))
+    return {cached:true,explanation:'Переведені пацієнти',sql:`SELECT transferred as переведених FROM v_hospital_summary`}
+  if (has(t,'загальн') && has(t,'летальн'))
+    return {cached:true,explanation:'Загальна летальність',sql:`SELECT death_rate_pct as летальність_відсоток, deaths as померло, total_cases as всього FROM v_hospital_summary`}
 
   return null
 }
