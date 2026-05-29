@@ -254,11 +254,11 @@ export function routeQuery(question) {
 
   // Летальність по статі
   if (has(t,'летальн') && any(t,'чоловік','жінок','стат'))
-    return {cached:true,explanation:'Летальність по статі',sql:`SELECT gender as стать, cases as випадків, deaths as померло, death_rate_pct as летальність FROM v_patient_stats GROUP BY gender,deaths,cases,death_rate_pct ORDER BY death_rate_pct DESC`}
+    return {cached:true,explanation:'Летальність по статі',sql:`SELECT gender as стать, SUM(cases) as випадків, ROUND(AVG(death_rate_pct),2) as летальність FROM v_patient_stats GROUP BY gender ORDER BY летальність DESC`}
 
   // Летальність по віку
   if (has(t,'летальн') && has(t,'вік'))
-    return {cached:true,explanation:'Летальність по віку',sql:`SELECT age_group as вік, cases as випадків, deaths as померло, death_rate_pct as летальність FROM v_patient_stats GROUP BY age_group,deaths,cases,death_rate_pct ORDER BY death_rate_pct DESC`}
+    return {cached:true,explanation:'Летальність по віку',sql:`SELECT age_group as вік, SUM(cases) as випадків, ROUND(AVG(death_rate_pct),2) as летальність FROM v_patient_stats GROUP BY age_group ORDER BY летальність DESC`}
 
   // Планові / операції / переведені / загальна летальність
   if (has(t,'планов') && any(t,'скільки','кількість') && !has(t,'відділ') && !has(t,'vs'))
