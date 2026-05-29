@@ -351,6 +351,7 @@ export default async function handler(req, res) {
       aiResult = { tokens_in: 0, tokens_out: 0, limits: null }
       cfg = { name: 'Роутер (кеш)', model: '—', pricing: { free: true } }
       cost = 0
+      logData = { ...logData, provider: cfg.name }
     } else {
       // Звичайний шлях через LLM
       const messages = [
