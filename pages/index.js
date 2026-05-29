@@ -3,48 +3,87 @@ import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
 const ALL_EXAMPLES = [
+  // Базові показники
   'Загальна статистика лікарні',
+  'Скільки всього госпіталізацій',
+  'Скільки унікальних пацієнтів',
+  'Середній ліжкодень по лікарні',
+  'Загальна летальність лікарні',
+  'Хірургічна активність лікарні',
+  'Скільки ургентних госпіталізацій',
+  'Скільки планових госпіталізацій',
+  'Скільки операцій виконано',
+  'Скільки переведених пацієнтів',
+  // Відділення
   'Показники по всіх відділеннях',
   'Летальність по відділеннях',
-  'Топ 10 діагнозів за кількістю випадків',
+  'Відділення з найдовшим ліжкоднем',
+  'Хірургічна активність по відділеннях',
+  'Топ відділень за кількістю операцій',
   'Ургентні vs планові по відділеннях',
-  'Розподіл за статтю та віком',
+  'Смертність при ургентних по відділеннях',
+  'Кількість дітей по відділеннях',
+  'Середній вік пацієнтів по відділеннях',
+  // Реанімація
+  'Летальність реанімації',
+  'Скільки поступило в реанімацію',
+  'Скільки померло в реанімації',
+  'Середній ліжкодень реанімації',
+  // Діагнози
+  'Топ 10 діагнозів за кількістю випадків',
+  'Летальність по діагнозах',
+  'Хірургічна активність по діагнозах',
+  'Скільки інсультів пролікувано за 2024 рік',
+  'Скільки інфарктів міокарда за 2024',
+  'Скільки пневмоній пролікувано',
+  'Скільки діабету пролікувано',
+  'Скільки гіпертонічних хворих',
+  'Скільки панкреатитів',
+  'Скільки апендицитів',
+  'Скільки холециститів',
+  // Повторні госпіталізації
   'Повторні госпіталізації 30 і 90 днів',
-  'Статистика за регіонами',
+  'Відсоток повторних госпіталізацій за 30 днів',
+  'Повторні з тим самим діагнозом',
+  // Демографія
+  'Розподіл за статтю та віком',
+  'Скільки дітей госпіталізовано за 2024',
+  'Скільки літніх пацієнтів госпіталізовано',
+  'Летальність по віковим групам',
+  'Летальність чоловіків vs жінок',
+  // Ургентність
+  'Летальність ургентних vs планових',
+  'Операції при ургентних госпіталізаціях',
+  'Середній ліжкодень ургентних vs планових',
+  'Переведення при ургентних',
+  // Пікові навантаження
   'Пікові навантаження по годинах',
   'Навантаження по днях тижня',
   'Динаміка по місяцях',
+  'Навантаження по тижнях 2024',
+  // Вихідні та нічні
   'Вихідні vs робочі дні',
   'Нічні vs денні поступлення',
+  'Нічні поступлення по відділеннях',
+  'Летальність у вихідні vs робочі',
+  'Летальність нічних vs денних',
+  // Географія
+  'Статистика за регіонами',
+  'Скільки пацієнтів з Чернівецької області',
+  'Скільки пацієнтів з Івано-Франківської',
+  'Скільки пацієнтів з Тернопільської',
+  // Лікарі
+  'Скільки пацієнтів пролікував Грабовський за 2023 рік',
+  'Скільки нічних поступлень у Блинду за липень 2024',
   'Скільки вихідних діб в лікаря Грабовського за перше півріччя 2023',
   'Яка спеціалізація у лікаря Арійчука О.І',
-  'Скільки нічних поступлень у Блинду за липень 2024',
-  'Відділення з найдовшим ліжкоднем',
-  'Скільки інсультів пролікувано за 2024 рік',
-  'Топ відділень за кількістю операцій',
-  'Скільки пацієнтів з Чернівецької області',
-  'Скільки дітей госпіталізовано за 2024',
-  'Навантаження по тижнях 2024',
-  'Нічні поступлення по відділеннях',
-  'Скільки пацієнтів пролікував Грабовський за 2023 рік',
-  'Хірургічна активність по відділеннях',
-]
-const PAGE_SIZE = 8
-const ROTATE_MS = 60000
-
-// Спливаючі підказки про доступні VIEW (показуються періодично)
-const VIEW_HINTS = [
-  { view: 'v_hospital_summary', desc: 'загальна статистика лікарні' },
-  { view: 'v_department_stats', desc: 'летальність та активність по відділеннях' },
-  { view: 'v_case_metrics', desc: '35 прапорців кожного випадку' },
-  { view: 'v_urgency_stats', desc: 'ургентні проти планових' },
-  { view: 'v_readmission_metrics', desc: 'повторні госпіталізації 30/90 днів' },
-  { view: 'v_diagnosis_stats', desc: 'статистика по діагнозах МКХ-10' },
-  { view: 'v_patient_stats', desc: 'розподіл за статтю та віком' },
-  { view: 'v_region_stats', desc: 'географія пацієнтів' },
-  { view: 'v_peak_by_hour', desc: 'навантаження по годинах' },
-  { view: 'v_peak_by_weekday', desc: 'навантаження по днях тижня' },
-  { view: 'v_peak_by_month', desc: 'динаміка по місяцях' },
+  // Конкретні відділення
+  'Топ діагнозів неврологічного відділення',
+  'Статистика хірургічного відділення',
+  'Статистика травматологічного відділення',
+  'Летальність гематологічного відділення',
+  'Статистика урологічного відділення',
+  'Статистика гастроентерологічного відділення',
 ]
 
 const COL_LABELS = {
@@ -140,14 +179,10 @@ export default function Home() {
   const [showSql, setShowSql] = useState({})
   const [stats, setStats] = useState({ count: 0, tokensIn: 0, tokensOut: 0, cost: 0 })
   const [limits, setLimits] = useState(null)
-  const [hint, setHint] = useState(null)
-  const [exPage, setExPage] = useState(0)
   const [globalStats, setGlobalStats] = useState(null)
   const [icuStats, setIcuStats] = useState(null)
   const provider = 'groq'
   const bottomRef = useRef(null)
-  const totalPages = Math.ceil(ALL_EXAMPLES.length / PAGE_SIZE)
-  const visibleExamples = ALL_EXAMPLES.slice(exPage * PAGE_SIZE, exPage * PAGE_SIZE + PAGE_SIZE)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -172,18 +207,6 @@ export default function Home() {
   }, [totalPages])
 
 
-  // Спливаючі підказки про VIEW — періодична ротація
-  useEffect(() => {
-    let idx = 0
-    const show = () => {
-      setHint(VIEW_HINTS[idx % VIEW_HINTS.length])
-      idx++
-      setTimeout(() => setHint(null), 4000) // показ 4 сек
-    }
-    const first = setTimeout(show, 3000)      // перша через 3 сек
-    const loop = setInterval(show, 11000)     // потім кожні 11 сек
-    return () => { clearTimeout(first); clearInterval(loop) }
-  }, [])
 
   async function send(question) {
     if (!question.trim() || loading) return
@@ -242,8 +265,8 @@ export default function Home() {
               <p className={styles.sideLabel} style={{margin:0}}>Приклади</p>
               <span style={{fontSize:'10px',color:'var(--text3)',fontFamily:'var(--mono)'}}>{exPage+1}/{totalPages}</span>
             </div>
-            {visibleExamples.map((ex, i) => (
-              <button key={`${exPage}-${i}`} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
+            {ALL_EXAMPLES.map((ex, i) => (
+              <button key={i} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
             ))}
             <div style={{display:'flex',gap:'4px',marginTop:'6px'}}>
               {Array.from({length:totalPages}).map((_,i) => (
@@ -378,25 +401,6 @@ export default function Home() {
       </div>
 
       {/* Спливаюче вікно: періодично показує доступні VIEW */}
-      {hint && (
-        <div
-          onClick={() => send(`Покажи дані з ${hint.view}`)}
-          style={{
-            position: 'fixed', bottom: '24px', right: '24px', zIndex: 50,
-            background: 'var(--surface, #1a1a1a)', border: '1px solid var(--accent, #4ade80)',
-            borderRadius: '10px', padding: '12px 16px', maxWidth: '320px', cursor: 'pointer',
-            boxShadow: '0 8px 28px rgba(0,0,0,0.4)',
-            animation: 'hintIn 0.4s ease', fontFamily: "'IBM Plex Mono', monospace"
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ color: 'var(--accent, #4ade80)', fontSize: '11px', letterSpacing: '0.05em' }}>📊 VIEW</span>
-            <code style={{ color: 'var(--text, #fff)', fontSize: '13px', fontWeight: 500 }}>{hint.view}</code>
-          </div>
-          <p style={{ color: 'var(--text2, #999)', fontSize: '12px', margin: 0, lineHeight: 1.4 }}>{hint.desc}</p>
-          <p style={{ color: 'var(--text3, #666)', fontSize: '10px', margin: '6px 0 0', fontStyle: 'italic' }}>натисни щоб спробувати →</p>
-        </div>
-      )}
 
       <style jsx global>{`
         @keyframes hintIn {
