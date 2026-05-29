@@ -209,11 +209,6 @@ export default function Home() {
       fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {})
   }, [stats.count])
 
-  // Ротація прикладів кожні 12 сек
-  useEffect(() => {
-    const timer = setInterval(() => setExPage(p => (p + 1) % totalPages), ROTATE_MS)
-    return () => clearInterval(timer)
-  }, [totalPages])
 
 
 
@@ -272,18 +267,10 @@ export default function Home() {
           <div className={styles.sideSection}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
               <p className={styles.sideLabel} style={{margin:0}}>Приклади</p>
-              <span style={{fontSize:'10px',color:'var(--text3)',fontFamily:'var(--mono)'}}>{exPage+1}/{totalPages}</span>
             </div>
             {ALL_EXAMPLES.map((ex, i) => (
               <button key={i} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
             ))}
-            <div style={{display:'flex',gap:'4px',marginTop:'6px'}}>
-              {Array.from({length:totalPages}).map((_,i) => (
-                <button key={i} onClick={() => setExPage(i)}
-                  style={{flex:1,height:'3px',border:'none',borderRadius:'2px',cursor:'pointer',
-                    background: i===exPage ? 'var(--accent)' : 'var(--border)'}}/>
-              ))}
-            </div>
           </div>
           <div className={styles.sideFooter}>
             <p>110,206 госпіталізацій</p>
