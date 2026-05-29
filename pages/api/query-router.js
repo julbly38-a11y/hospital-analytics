@@ -110,10 +110,18 @@ export function routeQuery(question) {
 
   // Регіональна захворюваність (Чернівецька, Івано-Франківська тощо)
   const regions=[
-    ['чернівецьк','Чернівецька'],['івано-франківськ','Івано-Франківська'],
+    ['івано-франківськ','Івано-Франківська'],
     ['тернопільськ','Тернопільська'],['хмельницьк','Хмельницька'],
     ['закарпатськ','Закарпатська'],['львівськ','Львівська'],
   ]
+  if (t.includes('чернівецьк'))
+    return {cached:true,explanation:'По районах Чернівецької',
+      sql:`SELECT district as район,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло FROM v_region_stats WHERE region='Чернівецька' ORDER BY cases DESC`}
+
+  if (t.includes('чернівецьк'))
+    return {cached:true,explanation:'По районах Чернівецької',
+      sql:`SELECT district as район,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло FROM v_region_stats WHERE region='Чернівецька' ORDER BY cases DESC`}
+
   for (const [kw,region] of regions) {
     if (!t.includes(kw)) continue
     if (any(t,'топ','діагноз','найчастіш'))
