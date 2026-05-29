@@ -16,3 +16,4 @@ out/
 .netlify/
 scripts/.env
 .env.local
+.vercel
