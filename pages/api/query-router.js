@@ -186,7 +186,7 @@ export function routeQuery(question) {
   if (has(t,'годин')&&any(t,'пік','навантаж','по'))
     return {cached:true,explanation:'По годинах',sql:`SELECT hour as година,admissions as поступлень,urgent as ургентних,planned as планових FROM v_peak_by_hour ORDER BY hour`}
   if (has(t,'тижн')&&any(t,'день','дн')&&!has(t,'статистик'))
-    return {cached:true,explanation:'По днях тижня',sql:`SELECT weekday as день_номер,admissions as поступлень,urgent as ургентних,night_admissions as нічних FROM v_peak_by_weekday ORDER BY weekday`}
+    return {cached:true,explanation:'По днях тижня',sql:`SELECT dow as день_номер,weekday_name as день,cases as поступлень FROM v_peak_by_weekday ORDER BY dow`}
   if (has(t,'місяц')&&any(t,'динамік','по','навантаж'))
     return {cached:true,explanation:'По місяцях',sql:`SELECT month as місяць,admissions as поступлень,deaths as померло,operations as операцій FROM v_peak_by_month ORDER BY month`}
   if (has(t,'тижн')&&any(t,'статистик','навантаж')) {
