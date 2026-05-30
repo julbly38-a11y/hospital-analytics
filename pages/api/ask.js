@@ -404,7 +404,8 @@ export default async function handler(req, res) {
     let routingQuestion = question
     if (role === 'doctor' && empName) {
       const surname = empName.trim().split(/\s+/)[0]  // "Ільніцька О. В." → "Ільніцька"
-      if (/\b(я|мене|мені|мій|моя|мої|моїх|моєму)\b/i.test(question) && surname) {
+      // \b не працює з кирилицею в JS, тому межі через не-літери
+      if (/(^|[^а-яіїєґ'])(я|мене|мені|мій|моя|мої|моїх|моєму|моєї|моїм)([^а-яіїєґ']|$)/i.test(question) && surname) {
         routingQuestion = `${question} ${surname}`
       }
     }
@@ -434,12 +435,22 @@ export default async function handler(req, res) {
 
       logData = { ...logData, provider: cfg.name, tokens_in: aiResult.tokens_in, tokens_out: aiResult.tokens_out, cost_usd: cost }
 
-      try { parsed = JSON.parse(aiResult.text) }
-      catch {
-        const m = aiResult.text.match(/\{[\s\S]*\}/)
-        if (m) parsed = JSON.parse(m[0])
-        else throw new Error('Не вдалось розпарсити відповідь AI')
+      // LLM іноді повертає невалідний JSON (екранований апостроф \' тощо).
+      // Чистимо невалідні escape-послідовності перед парсингом.
+      const cleanJson = (s) => s
+        .replace(/\\'/g, "'")                          // \' → ' (невалідно в JSON)
+        .replace(/\\([^"\\/bfnrtu])/g, '$1')           // інші невалідні \X → X
+      const tryParse = (s) => {
+        try { return JSON.parse(s) } catch {}
+        try { return JSON.parse(cleanJson(s)) } catch {}
+        return null
       }
+      parsed = tryParse(aiResult.text)
+      if (!parsed) {
+        const m = aiResult.text.match(/\{[\s\S]*\}/)
+        if (m) parsed = tryParse(m[0])
+      }
+      if (!parsed) throw new Error('Не вдалось розпарсити відповідь AI')
     }
 
     let safeSql = validateReadOnlySql(parsed.sql)
