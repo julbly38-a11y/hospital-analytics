@@ -428,12 +428,15 @@ export default async function handler(req, res) {
     // Фільтрація для doctor — тільки свої дані з lsmd
     if (role === 'doctor' && empName) {
       const safeName = empName.replace(/'/g, "''")
-      // Фільтруємо тільки якщо запит звертається до таблиці lsmd напряму
       if (/\bfrom\s+lsmd\b/i.test(safeSql)) {
+        // Визначаємо чи є аліас для lsmd (FROM lsmd l або FROM lsmd AS l)
+        const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+        const prefix = aliasMatch ? aliasMatch[1] + '.' : ''
+        const filter = `${prefix}doc_name ILIKE '%${safeName}%'`
         if (/\bwhere\b/i.test(safeSql)) {
-          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE doc_name ILIKE '%${safeName}%' AND `)
+          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE ${filter} AND `)
         } else {
-          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE doc_name ILIKE '%${safeName}%'`)
+          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${filter}`)
         }
       }
     }
