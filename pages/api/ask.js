@@ -13,7 +13,16 @@ async function getUserRole(req, res) {
             return Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value }))
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => res.setHeader('Set-Cookie', `${name}=${value}`))
+            if (!cookiesToSet?.length) return
+            const serialized = cookiesToSet.map(({ name, value, options }) => {
+              let c = `${name}=${value}; Path=${options?.path || '/'}`
+              if (options?.maxAge != null) c += `; Max-Age=${options.maxAge}`
+              if (options?.httpOnly) c += '; HttpOnly'
+              if (options?.sameSite) c += `; SameSite=${options.sameSite}`
+              if (options?.secure) c += '; Secure'
+              return c
+            })
+            res.setHeader('Set-Cookie', serialized)
           },
         },
       }

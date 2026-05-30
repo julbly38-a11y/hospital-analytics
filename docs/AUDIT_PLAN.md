@@ -60,7 +60,7 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 Код використовує і `SUPABASE_URL` (REST у ask/stats/icu), і `NEXT_PUBLIC_SUPABASE_URL` (lib/middleware).
 **Виправлення:** уніфікувати на одну змінну, або задокументувати що потрібні обидві.
 
-### [ ] 9. `getUserRole` ламає cookie при кількох
+### [x] 9. `getUserRole` ламає cookie при кількох
 `setAll` робить `res.setHeader('Set-Cookie', ...)` у циклі — кожна ітерація перезаписує попередню.
 **Виправлення:** збирати масив cookie і ставити одним setHeader.
 
