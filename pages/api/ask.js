@@ -391,7 +391,7 @@ export default async function handler(req, res) {
 
   try {
     // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
-    const routed = routeQuery(question)
+    const routed = (role === 'doctor') ? null : routeQuery(question)
     let parsed, aiResult, cost, cfg
 
     if (routed) {
