@@ -471,6 +471,17 @@ export default async function handler(req, res) {
           error: 'Доступ обмежено: для запитів про власних пацієнтів обʼєднання таблиць (JOIN) недоступне.'
         })
       }
+      if (/\b(union|except|intersect)\b/i.test(safeSql)) {
+        return res.status(403).json({
+          error: 'Доступ обмежено: для ролі лікаря обʼєднання запитів (UNION) недоступне.'
+        })
+      }
+      // Множинне звернення до lsmd (підзапити) — заборонено для лікаря
+      if ((safeSql.toLowerCase().split('lsmd').length - 1) > 1) {
+        return res.status(403).json({
+          error: 'Доступ обмежено: складні запити з кількома зверненнями до даних недоступні для ролі лікаря.'
+        })
+      }
       if (/\bfrom\s+lsmd\b/i.test(safeSql)) {
         const safeName = empName.replace(/'/g, "''")
         const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
