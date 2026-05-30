@@ -1,4 +1,4 @@
-import { routeQuery } from './query-router'
+import { routeQueryWithRole } from './query-router'
 import { validateReadOnlySql } from './sql-guard'
 import { createServerClient } from '@supabase/ssr'
 
@@ -391,7 +391,7 @@ export default async function handler(req, res) {
 
   try {
     // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
-    const routed = (role === 'doctor') ? null : routeQuery(question)
+    const routed = routeQueryWithRole(question, role, empName)
     let parsed, aiResult, cost, cfg
 
     if (routed) {
