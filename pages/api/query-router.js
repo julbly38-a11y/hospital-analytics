@@ -56,19 +56,6 @@ function districtSQL(t, district, region) {
 }
 
 export function routeQuery(question, role, empName) {
-  // Хелпер для додавання фільтра doctor до SQL з lsmd
-  function applyDoctorFilter(sql) {
-    if (role !== 'doctor' || !empName) return sql
-    const safeName = empName.replace(/'/g, "''")
-    if (!/\bfrom\s+lsmd\b/i.test(sql)) return sql
-    const am = sql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
-    const pre = am ? am[1] + '.' : ''
-    const f = `${pre}doc_name ILIKE '%${safeName}%'`
-    if (/\bwhere\b/i.test(sql)) {
-      return sql.replace(/\bwhere\b/i, `WHERE ${f} AND `)
-    }
-    return sql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${f}`)
-  }
   const t = n(question)
 
   // Детектор лікаря
@@ -295,7 +282,9 @@ export function routeQueryWithRole(question, role, empName) {
   let sql = result.sql
   if (/\bfrom\s+lsmd\b/i.test(sql)) {
     const am = sql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
-    const pre = am ? am[1] + '.' : ''
+    const reserved = ['where','group','order','limit','having','join','left','right','inner','on','union','as']
+    const alias = am && !reserved.includes(am[1].toLowerCase()) ? am[1] : null
+    const pre = alias ? alias + '.' : ''
     const f = `${pre}doc_name ILIKE '%${safeName}%'`
     if (/\bwhere\b/i.test(sql)) {
       sql = sql.replace(/\bwhere\b/i, `WHERE ${f} AND `)

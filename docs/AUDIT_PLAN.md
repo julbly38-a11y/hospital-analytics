@@ -15,7 +15,7 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 `validateReadOnlySql`, для ролі doctor — застосовувати той самий фільтр що в ask.js,
 або взагалі заборонити довільний SQL від клієнта (тільки whitelisted-запити).
 
-### [ ] 2. Роль `doctor` бачить дані всієї лікарні через аналітичні VIEW
+### [x] 2. Роль `doctor` бачить дані всієї лікарні через аналітичні VIEW
 Фільтр по `doc_name` застосовується тільки якщо в SQL є `FROM lsmd`. Але роутер
 для більшості запитів повертає готові VIEW (`v_department_stats`, `department_diagnoses`,
 `v_diagnosis_stats`, `v_hospital_summary`), які `lsmd` не містять → фільтр не спрацьовує

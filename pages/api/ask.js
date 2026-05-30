@@ -425,19 +425,26 @@ export default async function handler(req, res) {
 
     let safeSql = validateReadOnlySql(parsed.sql)
 
-    // Фільтрація для doctor — тільки свої дані з lsmd
+    // Фільтрація для doctor — тільки свої дані з lsmd.
+    // Будь-який запит, що НЕ читає lsmd напряму (тобто загальні аналітичні VIEW по
+    // всій лікарні), для doctor заборонений — інакше витік даних інших лікарів.
     if (role === 'doctor' && empName) {
+      if (!/\bfrom\s+lsmd\b/i.test(safeSql)) {
+        return res.status(403).json({
+          error: 'Доступ обмежено: ця статистика стосується всієї лікарні. Як лікар ви можете переглядати лише власні дані. Сформулюйте запит про свою роботу (госпіталізації, нічні чергування, летальність ваших пацієнтів тощо).'
+        })
+      }
       const safeName = empName.replace(/'/g, "''")
-      if (/\bfrom\s+lsmd\b/i.test(safeSql)) {
-        // Визначаємо чи є аліас для lsmd (FROM lsmd l або FROM lsmd AS l)
-        const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
-        const prefix = aliasMatch ? aliasMatch[1] + '.' : ''
-        const filter = `${prefix}doc_name ILIKE '%${safeName}%'`
-        if (/\bwhere\b/i.test(safeSql)) {
-          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE ${filter} AND `)
-        } else {
-          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${filter}`)
-        }
+      // Аліас тільки якщо це справжній ідентифікатор, а не ключове слово SQL
+      const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+      const reserved = ['where','group','order','limit','having','join','left','right','inner','on','union','as']
+      const alias = aliasMatch && !reserved.includes(aliasMatch[1].toLowerCase()) ? aliasMatch[1] : null
+      const prefix = alias ? alias + '.' : ''
+      const filter = `${prefix}doc_name ILIKE '%${safeName}%'`
+      if (/\bwhere\b/i.test(safeSql)) {
+        safeSql = safeSql.replace(/\bwhere\b/i, `WHERE ${filter} AND `)
+      } else {
+        safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${filter}`)
       }
     }
     // Автофікс: неправильні колонки
