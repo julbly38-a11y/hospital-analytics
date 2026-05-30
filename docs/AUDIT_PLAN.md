@@ -52,7 +52,7 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 
 ## 🟡 Невідповідності конфігурації
 
-### [ ] 7. Netlify vs Vercel
+### [x] 7. Netlify vs Vercel
 `netlify.toml` + `@netlify/plugin-nextjs` у репо, але деплой на Vercel (nobodybly.org).
 **Виправлення:** видалити netlify.toml, прибрати netlify-плагін з package якщо є.
 
