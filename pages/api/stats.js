@@ -13,7 +13,7 @@ const QUERIES = {
   icu:         'SELECT всього_поступлень,померло,летальність_pct,середній_ліжкодень FROM v_icu_mortality',
 }
 
-async function isAuthorized(req, res) {
+async function getRole(req) {
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,9 +28,12 @@ async function isAuthorized(req, res) {
       }
     )
     const { data: { user } } = await supabase.auth.getUser()
-    return !!user
+    if (!user) return null
+    const { data: appUser } = await supabase
+      .from('app_users').select('role').eq('auth_user_id', user.id).single()
+    return appUser?.role || 'viewer'
   } catch {
-    return false
+    return null
   }
 }
 
@@ -53,8 +56,13 @@ async function supaFetch(sql) {
 
 export default async function handler(req, res) {
   // Авторизація обовʼязкова для всіх методів
-  if (!(await isAuthorized(req, res))) {
+  const role = await getRole(req)
+  if (!role) {
     return res.status(401).json({ error: 'Не авторизовано' })
+  }
+  // Загальнолікарняна аналітика недоступна ролі doctor
+  if (role === 'doctor') {
+    return res.status(403).json({ error: 'Недоступно для ролі лікаря' })
   }
 
   if (req.method === 'POST') {

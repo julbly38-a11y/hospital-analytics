@@ -390,8 +390,18 @@ export default async function handler(req, res) {
   let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error', sql_query: null, row_count: null, error_message: null }
 
   try {
+    // Для doctor: запит "про себе" (я/мене/мій) → підставляємо прізвище,
+    // щоб роутер пішов гілкою doctorSQL (по lsmd з фільтром), а не загальною VIEW.
+    let routingQuestion = question
+    if (role === 'doctor' && empName) {
+      const surname = empName.trim().split(/\s+/)[0]  // "Ільніцька О. В." → "Ільніцька"
+      if (/\b(я|мене|мені|мій|моя|мої|моїх|моєму)\b/i.test(question) && surname) {
+        routingQuestion = `${question} ${surname}`
+      }
+    }
+
     // 🚀 РОУТЕР: спочатку перевіряємо чи це типовий запит (0 токенів, без LLM)
-    const routed = routeQueryWithRole(question, role, empName)
+    const routed = routeQueryWithRole(routingQuestion, role, empName)
     let parsed, aiResult, cost, cfg
 
     if (routed) {

@@ -1,5 +1,33 @@
+import { createServerClient } from '@supabase/ssr'
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end()
+
+  // Авторизація + перевірка ролі (реанімація = загальнолікарняні дані, не для doctor)
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value }))
+          },
+          setAll() {},
+        },
+      }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return res.status(401).json({ error: 'Не авторизовано' })
+    const { data: appUser } = await supabase
+      .from('app_users').select('role').eq('auth_user_id', user.id).single()
+    if (appUser?.role === 'doctor') {
+      return res.status(403).json({ error: 'Недоступно для ролі лікаря' })
+    }
+  } catch {
+    return res.status(401).json({ error: 'Не авторизовано' })
+  }
+
   try {
     const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
       method: 'POST',

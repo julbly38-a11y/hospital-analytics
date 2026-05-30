@@ -97,6 +97,17 @@ const ALL_EXAMPLES = [
   'Скільки дітей госпіталізовано за 2023',
 ]
 
+// Приклади для ролі doctor — лише про власну роботу (решта блокується бекендом)
+const DOCTOR_EXAMPLES = [
+  'Скільки пацієнтів я пролікував за 2024 рік',
+  'Скільки моїх пацієнтів за перше півріччя 2024',
+  'Скільки нічних поступлень у мене за 2024',
+  'Скільки вихідних діб у мене за 2024',
+  'Летальність моїх пацієнтів',
+  'Скільки операцій у мене',
+  'Скільки моїх пацієнтів з погіршенням стану',
+]
+
 const COL_LABELS = {
   doctor_name: 'Лікар', patient_name: 'Пацієнт', department_name: 'Відділення',
   відділення: 'Відділення', завідувач: 'Завідувач', штат_лікарів: 'Штат',
@@ -200,8 +211,14 @@ export default function Home() {
   const [limits, setLimits] = useState(null)
   const [globalStats, setGlobalStats] = useState(null)
   const [icuStats, setIcuStats] = useState(null)
+  const [role, setRole] = useState(null)
   const provider = 'groq'
   const bottomRef = useRef(null)
+
+  // Зчитуємо роль користувача
+  useEffect(() => {
+    fetch('/api/me').then(r => r.json()).then(d => setRole(d.role)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -278,11 +295,12 @@ export default function Home() {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
               <p className={styles.sideLabel} style={{margin:0}}>Приклади</p>
             </div>
-            {ALL_EXAMPLES.map((ex, i) => (
+            {(role === 'doctor' ? DOCTOR_EXAMPLES : ALL_EXAMPLES).map((ex, i) => (
               <button key={i} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
             ))}
           </div>
           <div className={styles.sideFooter}>
+            {role !== 'doctor' && <>
             <p>110,206 госпіталізацій</p>
             <p>72,293 пацієнти</p>
             <p>20 відділень · 265 лікарів</p>
@@ -314,6 +332,7 @@ export default function Home() {
                 </p>
               </div>
             )}
+            </>}
 
             <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
             <button onClick={handleLogout} style={{
