@@ -79,7 +79,7 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 ---
 ## Виявлено під час виправлення (нові пункти)
 
-### [ ] 10. SSG prerender падає без env-змінних
+### [x] 10. SSG prerender падає без env-змінних
 `createClient()` / `createBrowserClient` викликається на рівні рендера index.js та login.js.
 Під час `next build` (SSG) env-змінних немає → prerender кидає помилку.
 На Vercel працює (env задані), але крихко.
@@ -88,3 +88,8 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 
 ### [ ] 11. /api/icu закрито авторизацією (зроблено разом з #3)
 Був відкритий GET без авторизації — закрито: тепер вимагає логін + блок для doctor.
+
+### [ ] 12. query-router.js та sql-guard.js лежать у pages/api/
+Next.js трактує їх як API-роути (`/api/query-router`, `/api/sql-guard`), хоча це
+допоміжні модулі без handler. Виклик цих URL поверне 500. Не критично (їх ніхто не
+викликає ззовні), але правильно — винести в `lib/` і поправити імпорти.

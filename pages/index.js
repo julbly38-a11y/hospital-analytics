@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Head from 'next/head'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/router'
@@ -196,10 +196,10 @@ function TokenBadge({ tokens }) {
 
 export default function Home() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => (typeof window !== 'undefined' ? createClient() : null), [])
 
   async function handleLogout() {
-    await supabase.auth.signOut()
+    await supabase?.auth.signOut()
     router.push('/login')
   }
 

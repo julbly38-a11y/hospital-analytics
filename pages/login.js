@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Head from 'next/head'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/router'
@@ -9,13 +9,14 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => (typeof window !== 'undefined' ? createClient() : null), [])
 
   async function handleLogin(e) {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
+    if (!supabase) { setLoading(false); return }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
