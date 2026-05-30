@@ -1,5 +1,5 @@
-import { routeQueryWithRole } from './query-router'
-import { validateReadOnlySql } from './sql-guard'
+import { routeQueryWithRole } from '../../lib/query-router'
+import { validateReadOnlySql } from '../../lib/sql-guard'
 import { createServerClient } from '@supabase/ssr'
 
 async function getUserRole(req, res) {
