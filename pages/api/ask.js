@@ -1,5 +1,49 @@
 import { routeQuery } from './query-router'
 import { validateReadOnlySql } from './sql-guard'
+import { createServerClient } from '@supabase/ssr'
+
+async function getUserRole(req, res) {
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value }))
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => res.setHeader('Set-Cookie', `${name}=${value}`))
+          },
+        },
+      }
+    )
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { role: null, empName: null }
+
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('role, empl_name_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!appUser) return { role: 'viewer', empName: null }
+
+    // Якщо doctor — отримуємо emp_name для фільтрації
+    if (appUser.role === 'doctor' && appUser.empl_name_id) {
+      const { data: empl } = await supabase
+        .from('empl')
+        .select('emp_name')
+        .eq('name_id', appUser.empl_name_id)
+        .single()
+      return { role: 'doctor', empName: empl?.emp_name || null }
+    }
+
+    return { role: appUser.role, empName: null }
+  } catch {
+    return { role: null, empName: null }
+  }
+}
 
 const SYSTEM_PROMPT = `Ти SQL асистент для PostgreSQL бази даних лікарні ЛСМД. Відповідаєш українською.
 
@@ -338,6 +382,11 @@ export default async function handler(req, res) {
   if (!question) return res.status(400).json({ error: 'Немає питання' })
   if (!PROVIDERS[provider]) return res.status(400).json({ error: 'Невідомий провайдер' })
 
+  // Перевірка авторизації та ролі
+  const { role, empName } = await getUserRole(req, res)
+  console.log('[auth] role:', role, 'empName:', empName)
+  if (!role) return res.status(401).json({ error: 'Не авторизовано' })
+
   let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error', sql_query: null, row_count: null, error_message: null }
 
   try {
@@ -375,6 +424,18 @@ export default async function handler(req, res) {
     }
 
     let safeSql = validateReadOnlySql(parsed.sql)
+
+    // Фільтрація для doctor — тільки свої дані
+    if (role === 'doctor' && empName) {
+      if (/\blsmd\b/i.test(safeSql)) {
+        // Якщо вже є WHERE — додаємо AND, інакше додаємо WHERE
+        if (/\bwhere\b/i.test(safeSql)) {
+          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE doc_name ILIKE '${empName.replace(/'/g,"\\'")}' AND `)
+        } else {
+          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE doc_name ILIKE '${empName.replace(/'/g,"\\'")}' `)
+        }
+      }
+    }
     // Автофікс: неправильні колонки
     if (/\blsmd\b/i.test(safeSql)) {
       safeSql = safeSql.replace(/(?<![a-z_])department(?!_)/gi, 'admission_department')
