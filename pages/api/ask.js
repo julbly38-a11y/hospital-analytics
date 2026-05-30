@@ -468,7 +468,7 @@ export default async function handler(req, res) {
       safeSql = safeSql.replace(/\bweekday\b(?=\s*[,\s])/gi, 'dow')
     }
 
-    const r2 = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
+    const r2 = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -492,7 +492,7 @@ export default async function handler(req, res) {
     }
 
     // Логуємо до відповіді (await — Vercel не чекає finally після res.json)
-    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+    await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/usage_stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -522,7 +522,7 @@ export default async function handler(req, res) {
     logData.status = 'error'
     logData.error_message = e.message.slice(0, 500)
     // Логуємо помилку
-    await fetch(`${process.env.SUPABASE_URL}/rest/v1/usage_stats`, {
+    await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/usage_stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

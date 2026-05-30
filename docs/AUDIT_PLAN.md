@@ -56,7 +56,7 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 `netlify.toml` + `@netlify/plugin-nextjs` у репо, але деплой на Vercel (nobodybly.org).
 **Виправлення:** видалити netlify.toml, прибрати netlify-плагін з package якщо є.
 
-### [ ] 8. Дві різні env-змінні для одного URL
+### [x] 8. Дві різні env-змінні для одного URL
 Код використовує і `SUPABASE_URL` (REST у ask/stats/icu), і `NEXT_PUBLIC_SUPABASE_URL` (lib/middleware).
 **Виправлення:** уніфікувати на одну змінну, або задокументувати що потрібні обидві.
 

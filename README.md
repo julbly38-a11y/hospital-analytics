@@ -122,3 +122,16 @@ function TypingBubble() {
 }
 
 Object.assign(window, { ResultView, SqlBlock, TokenBadge, UserBubble, AgentBubble, TypingBubble });
+
+## Змінні оточення (Vercel)
+
+Обовʼязкові:
+- `NEXT_PUBLIC_SUPABASE_URL` — URL проєкту Supabase (використовується і клієнтом, і серверними REST-викликами).
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — публічний anon-ключ (auth, middleware).
+- `SUPABASE_SERVICE_KEY` — service_role ключ (серверні виклики `execute_sql`, лише на бекенді).
+
+LLM-провайдери (опційно, для запитів, що не покриває роутер):
+- `GROQ_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`.
+
+> Примітка: код також підтримує застарілу `SUPABASE_URL` як fallback,
+> але канонічна змінна — `NEXT_PUBLIC_SUPABASE_URL`.

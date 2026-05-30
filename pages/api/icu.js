@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/execute_sql`, {
+    const r = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
