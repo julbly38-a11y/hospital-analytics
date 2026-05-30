@@ -401,6 +401,20 @@ export default async function handler(req, res) {
       cfg = { name: 'Роутер (кеш)', model: '—', pricing: { free: true } }
       cost = 0
       logData = { ...logData, provider: cfg.name }
+      // Фільтрація doctor в роутері
+      if (role === 'doctor' && empName) {
+        const safeName = empName.replace(/'/g, "''")
+        if (/\bfrom\s+lsmd\b/i.test(parsed.sql)) {
+          const am = parsed.sql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+          const pre = am ? am[1] + '.' : ''
+          const f = `${pre}doc_name ILIKE '%${safeName}%'`
+          if (/\bwhere\b/i.test(parsed.sql)) {
+            parsed.sql = parsed.sql.replace(/\bwhere\b/i, `WHERE ${f} AND `)
+          } else {
+            parsed.sql = parsed.sql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${f}`)
+          }
+        }
+      }
     } else {
       // Звичайний шлях через LLM
       const messages = [
