@@ -425,14 +425,15 @@ export default async function handler(req, res) {
 
     let safeSql = validateReadOnlySql(parsed.sql)
 
-    // Фільтрація для doctor — тільки свої дані
+    // Фільтрація для doctor — тільки свої дані з lsmd
     if (role === 'doctor' && empName) {
-      if (/\blsmd\b/i.test(safeSql)) {
-        // Якщо вже є WHERE — додаємо AND, інакше додаємо WHERE
+      const safeName = empName.replace(/'/g, "''")
+      // Фільтруємо тільки якщо запит звертається до таблиці lsmd напряму
+      if (/\bfrom\s+lsmd\b/i.test(safeSql)) {
         if (/\bwhere\b/i.test(safeSql)) {
-          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE doc_name ILIKE '${empName.replace(/'/g,"\\'")}' AND `)
+          safeSql = safeSql.replace(/\bwhere\b/i, `WHERE doc_name ILIKE '%${safeName}%' AND `)
         } else {
-          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE doc_name ILIKE '${empName.replace(/'/g,"\\'")}' `)
+          safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE doc_name ILIKE '%${safeName}%'`)
         }
       }
     }
