@@ -399,13 +399,18 @@ export default async function handler(req, res) {
   let logData = { provider: 'unknown', tokens_in: 0, tokens_out: 0, cost_usd: 0, question: question.slice(0, 200), status: 'error', sql_query: null, row_count: null, error_message: null }
 
   try {
-    // Для doctor: запит "про себе" (я/мене/мій) → підставляємо прізвище,
-    // щоб роутер пішов гілкою doctorSQL (по lsmd з фільтром), а не загальною VIEW.
+    // Для ролі doctor запит за замовчуванням стосується ВЛАСНИХ даних.
+    // Підставляємо прізвище, щоб роутер пішов особистою гілкою (lsmd з фільтром),
+    // КРІМ випадків, коли запит явно про всю лікарню (загальні агрегати для порівняння).
     let routingQuestion = question
     if (role === 'doctor' && empName) {
       const surname = empName.trim().split(/\s+/)[0]  // "Ільніцька О. В." → "Ільніцька"
-      // \b не працює з кирилицею в JS, тому межі через не-літери
-      if (/(^|[^а-яіїєґ'])(я|мене|мені|мій|моя|мої|моїх|моєму|моєї|моїм)([^а-яіїєґ']|$)/i.test(question) && surname) {
+      const q = question.toLowerCase()
+      // Явно загальні запити — не підставляємо прізвище (хай іде в агрегатну VIEW)
+      const isGeneral = /(по лікарн|загальн|по відділ|відділенн|по район|по регіон|райони|області|реанімац|топ |найчастіш|по місяц|по днях|по годин|піков|демограф|вік пацієнт|статтю|ургентн|планов|повторн|реадміс|вихідні vs|нічні vs|нічні поступлення по)/i.test(q)
+      // Уже згадано конкретного лікаря — не чіпаємо
+      const mentionsOtherDoctor = false
+      if (surname && !isGeneral && !mentionsOtherDoctor) {
         routingQuestion = `${question} ${surname}`
       }
     }
