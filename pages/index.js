@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Head from 'next/head'
+import { createClient } from '../lib/supabase'
+import { useRouter } from 'next/router'
 import styles from '../styles/Home.module.css'
 
 const ALL_EXAMPLES = [
@@ -182,6 +184,14 @@ function TokenBadge({ tokens }) {
 }
 
 export default function Home() {
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -306,6 +316,13 @@ export default function Home() {
             )}
 
             <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
+            <button onClick={handleLogout} style={{
+              width:'100%', padding:'8px', marginBottom:'12px',
+              background:'transparent', border:'1px solid var(--border)',
+              borderRadius:'6px', color:'var(--text3)', fontSize:'11px',
+              fontFamily:'var(--mono)', cursor:'pointer', textAlign:'left'
+            }}>← вийти</button>
+
               <p style={{color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px'}}>Ця сесія</p>
               <p>Запитів: <strong>{stats.count}</strong></p>
               <p>Токенів ↓: <strong>{formatNum(stats.tokensIn)}</strong></p>
