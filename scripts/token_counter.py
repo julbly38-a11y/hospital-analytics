@@ -75,7 +75,7 @@ def estimate_response(row_count: int, avg_row_size: int = 500, metadata_overhead
         Приблизна кількість токенів
     """
     total_chars = row_count * avg_row_size + metadata_overhead
-    return estimate_tokens(total_chars)
+    return total_chars // 4
 
 
 def extract_table_name(sql: str) -> Optional[str]:
@@ -234,3 +234,5 @@ if __name__ == '__main__':
     suggestions = suggest_optimization("SELECT * FROM lsmd JOIN patients_best USING (patient_id)")
     for i, s in enumerate(suggestions, 1):
         print(f"{i}. {s}")
+
+
