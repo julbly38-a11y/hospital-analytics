@@ -38,14 +38,14 @@ async function getRole(req) {
 }
 
 async function supaFetch(sql) {
-  const r = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql`, {
+  const r = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql_safe`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'apikey': process.env.SUPABASE_SERVICE_KEY,
       'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`
     },
-    body: JSON.stringify({ sql_query: sql })
+    body: JSON.stringify({ sql_query: sql, p_role: 'admin', p_doc_name: null })
   })
   const data = await r.json()
   let rows = []

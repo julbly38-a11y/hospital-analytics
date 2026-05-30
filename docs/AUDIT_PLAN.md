@@ -93,3 +93,26 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 Next.js трактує їх як API-роути (`/api/query-router`, `/api/sql-guard`), хоча це
 допоміжні модулі без handler. Виклик цих URL поверне 500. Не критично (їх ніхто не
 викликає ззовні), але правильно — винести в `lib/` і поправити імпорти.
+
+---
+## Поглиблений захист БД (RLS-альтернатива, варіант B)
+
+### [x] 13. service_role обходив застосунковий захист + execute_sql була публічною
+**Виявлено:** `execute_sql` мала EXECUTE для anon/PUBLIC → будь-хто з браузерним
+anon-ключем міг виконати довільний SELECT напряму через Supabase REST, оминаючи
+весь застосунковий захист. Плюс простий RLS не спрацював би, бо бекенд ходить
+через service_role (обходить RLS за дизайном).
+
+**Зроблено (міграція execute_sql_safe_with_role_guard):**
+- Створено `execute_sql_safe(sql_query, p_role, p_doc_name)` — перевірка ролі
+  ВСЕРЕДИНІ БД (другий рубіж). Для doctor: запит мусить читати lsmd І містити
+  фільтр по власному doc_name, інакше RAISE EXCEPTION. Дублює guard на SELECT-only
+  та single-query на рівні БД.
+- Відкликано EXECUTE на старій `execute_sql` від PUBLIC/anon/authenticated
+  (лишились service_role + postgres).
+- Нова функція доступна тільки service_role.
+- ask.js / stats.js / icu.js переключено на execute_sql_safe з передачею ролі.
+
+**Перевірено (6 тестів):** admin бачить усе ✓; doctor бачить свої дані ✓;
+doctor→загальна VIEW відмова ✓; doctor→чужий лікар відмова ✓;
+viewer→загальна пройшов ✓; multi-query "; DROP" відмова ✓.

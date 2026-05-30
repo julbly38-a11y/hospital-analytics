@@ -29,14 +29,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    const r = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql`, {
+    const r = await fetch(`${(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL)}/rest/v1/rpc/execute_sql_safe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'apikey': process.env.SUPABASE_SERVICE_KEY,
         'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`
       },
-      body: JSON.stringify({ sql_query: `
+      body: JSON.stringify({ p_role: 'admin', p_doc_name: null, sql_query: `
         SELECT
           COUNT(*) AS total_admitted,
           COUNT(*) FILTER (WHERE discharge_status = 'Помер') AS died,
