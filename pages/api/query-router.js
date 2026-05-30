@@ -55,7 +55,20 @@ function districtSQL(t, district, region) {
     sql:`SELECT disease_category as категорія,cases as випадків,unique_patients as пацієнтів,percent_of_district as відс,is_primary as основна FROM district_disease_categories WHERE region='${region}' AND district='${district}' ORDER BY cases DESC`}
 }
 
-export function routeQuery(question) {
+export function routeQuery(question, role, empName) {
+  // Хелпер для додавання фільтра doctor до SQL з lsmd
+  function applyDoctorFilter(sql) {
+    if (role !== 'doctor' || !empName) return sql
+    const safeName = empName.replace(/'/g, "''")
+    if (!/\bfrom\s+lsmd\b/i.test(sql)) return sql
+    const am = sql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+    const pre = am ? am[1] + '.' : ''
+    const f = `${pre}doc_name ILIKE '%${safeName}%'`
+    if (/\bwhere\b/i.test(sql)) {
+      return sql.replace(/\bwhere\b/i, `WHERE ${f} AND `)
+    }
+    return sql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${f}`)
+  }
   const t = n(question)
 
   // Детектор лікаря
@@ -271,4 +284,25 @@ export function routeQuery(question) {
     return {cached:true,explanation:'Загальна летальність',sql:`SELECT death_rate_pct as летальність_відсоток, deaths as померло, total_cases as всього FROM v_hospital_summary`}
 
   return null
+}
+
+// Wrapper що застосовує doctor filter до результату
+export function routeQueryWithRole(question, role, empName) {
+  const result = routeQuery(question, role, empName)
+  if (!result) return null
+  if (role !== 'doctor' || !empName) return result
+  const safeName = empName.replace(/'/g, "''")
+  let sql = result.sql
+  if (/\bfrom\s+lsmd\b/i.test(sql)) {
+    const am = sql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+    const pre = am ? am[1] + '.' : ''
+    const f = `${pre}doc_name ILIKE '%${safeName}%'`
+    if (/\bwhere\b/i.test(sql)) {
+      sql = sql.replace(/\bwhere\b/i, `WHERE ${f} AND `)
+    } else {
+      sql = sql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${f}`)
+    }
+    return { ...result, sql }
+  }
+  return result
 }
