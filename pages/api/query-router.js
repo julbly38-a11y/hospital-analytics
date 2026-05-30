@@ -118,10 +118,6 @@ export function routeQuery(question, role, empName) {
     return {cached:true,explanation:'По районах Чернівецької',
       sql:`SELECT district as район,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло FROM v_region_stats WHERE region='Чернівецька' ORDER BY cases DESC`}
 
-  if (t.includes('чернівецьк'))
-    return {cached:true,explanation:'По районах Чернівецької',
-      sql:`SELECT district as район,cases as випадків,unique_patients as пацієнтів,avg_bed_days as ліжкодень,deaths as померло FROM v_region_stats WHERE region='Чернівецька' ORDER BY cases DESC`}
-
   for (const [kw,region] of regions) {
     if (!t.includes(kw)) continue
     if (any(t,'топ','діагноз','найчастіш'))
@@ -187,11 +183,11 @@ export function routeQuery(question, role, empName) {
 
   // Навантаження
   if (has(t,'годин')&&any(t,'пік','навантаж','по'))
-    return {cached:true,explanation:'По годинах',sql:`SELECT hour as година,admissions as поступлень,urgent as ургентних,planned as планових FROM v_peak_by_hour ORDER BY hour`}
+    return {cached:true,explanation:'По годинах',sql:`SELECT hour as година,cases as поступлень,deaths as померло FROM v_peak_by_hour ORDER BY hour`}
   if (has(t,'тижн')&&any(t,'день','дн')&&!has(t,'статистик'))
     return {cached:true,explanation:'По днях тижня',sql:`SELECT dow as день_номер,weekday_name as день,cases as поступлень FROM v_peak_by_weekday ORDER BY dow`}
   if (has(t,'місяц')&&any(t,'динамік','по','навантаж'))
-    return {cached:true,explanation:'По місяцях',sql:`SELECT month as місяць,admissions as поступлень,deaths as померло,operations as операцій FROM v_peak_by_month ORDER BY month`}
+    return {cached:true,explanation:'По місяцях',sql:`SELECT month as місяць,cases as поступлень,deaths as померло,avg_bed_days as ліжкодень FROM v_peak_by_month ORDER BY month_num`}
   if (has(t,'тижн')&&any(t,'статистик','навантаж')) {
     const y=detectYear(t)||2024
     return {cached:true,explanation:`Тижнева ${y}`,sql:`SELECT week_start as тиждень,admissions as поступлень,deaths as померло FROM v_weekly_admissions WHERE year=${y} ORDER BY week_number DESC LIMIT 20`}

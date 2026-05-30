@@ -33,16 +33,16 @@ POST на `/api/stats` бере `req.body.sql` і виконує його нап
 
 ## 🟠 Поломки (биті SQL-запити)
 
-### [ ] 4. Неіснуючі колонки у VIEW (роутер генерує биті SQL)
+### [x] 4. Неіснуючі колонки у VIEW (роутер генерує биті SQL)
 - `v_peak_by_hour` має `(hour, cases, deaths)`, роутер у 2 місцях бере `admissions, urgent, planned`.
 - `v_admissions_by_weekday` — гілка бере `letality_percent` (звірити наявність).
 - Автофікс `admissions→cases` у ask.js крихкий і працює лише для `v_peak_by`.
 **Виправлення:** привести SQL роутера до реальних колонок VIEW (з аудиту схеми).
 
-### [ ] 5. Дублікат блоку `if (t.includes('чернівецьк'))` у query-router.js
+### [x] 5. Дублікат блоку `if (t.includes('чернівецьк'))` у query-router.js
 Написаний двічі підряд, другий недосяжний. Прибрати.
 
-### [ ] 6. Помилки в SYSTEM_PROMPT (ask.js)
+### [x] 6. Помилки в SYSTEM_PROMPT (ask.js)
 - `EXTRACT(HOUR FROM admission_ts::timestamp, 'hour')` — зайвий аргумент.
 - `TO_CHAR(DAY FROM admission_date_d::timestamp, 'Day')` — невалідний синтаксис.
 - Звірити число рядків icd_10 (промпт: 19,824).

@@ -137,14 +137,14 @@ FROM v_department_stats
 ORDER BY death_rate_pct DESC
 
 📌 "Пікові години госпіталізацій":
-SELECT EXTRACT(HOUR FROM admission_ts::timestamp, 'hour') as година, COUNT(*) as count
+SELECT EXTRACT(HOUR FROM admission_ts::timestamp) as година, COUNT(*) as count
 FROM lsmd
 WHERE admission_ts IS NOT NULL
 GROUP BY година
 ORDER BY count DESC
 
 📌 "Навантаження по днях тижня":
-SELECT TO_CHAR(DAY FROM admission_date_d::timestamp, 'Day') as день, COUNT(*) as count
+SELECT TO_CHAR(admission_date_d::timestamp, 'Day') as день, COUNT(*) as count
 FROM lsmd
 WHERE admission_ts IS NOT NULL
 GROUP BY день
