@@ -19,11 +19,7 @@ export default async function handler(req, res) {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return res.status(401).json({ error: 'Не авторизовано' })
-    const { data: appUser } = await supabase
-      .from('app_users').select('role').eq('auth_user_id', user.id).single()
-    if (appUser?.role === 'doctor') {
-      return res.status(403).json({ error: 'Недоступно для ролі лікаря' })
-    }
+    // Реанімаційні показники — агреговані (без ПІБ), доступні всім авторизованим ролям
   } catch {
     return res.status(401).json({ error: 'Не авторизовано' })
   }

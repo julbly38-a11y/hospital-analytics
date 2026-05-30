@@ -298,12 +298,11 @@ export default function Home() {
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}}>
               <p className={styles.sideLabel} style={{margin:0}}>Приклади</p>
             </div>
-            {(role === 'doctor' ? DOCTOR_EXAMPLES : ALL_EXAMPLES).map((ex, i) => (
+            {(role === 'doctor' ? [...DOCTOR_EXAMPLES, ...ALL_EXAMPLES] : ALL_EXAMPLES).map((ex, i) => (
               <button key={i} className={styles.exBtn} onClick={() => send(ex)}>{ex}</button>
             ))}
           </div>
           <div className={styles.sideFooter}>
-            {role !== 'doctor' && <>
             <p>110,206 госпіталізацій</p>
             <p>72,293 пацієнти</p>
             <p>20 відділень · 265 лікарів</p>
@@ -335,7 +334,6 @@ export default function Home() {
                 </p>
               </div>
             )}
-            </>}
 
             <div style={{marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '10px', lineHeight: '1.8'}}>
             <button onClick={handleLogout} style={{

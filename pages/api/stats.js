@@ -55,14 +55,10 @@ async function supaFetch(sql) {
 }
 
 export default async function handler(req, res) {
-  // Авторизація обовʼязкова для всіх методів
+  // Авторизація обовʼязкова. Загальні агреговані показники (без ПІБ) доступні всім ролям.
   const role = await getRole(req)
   if (!role) {
     return res.status(401).json({ error: 'Не авторизовано' })
-  }
-  // Загальнолікарняна аналітика недоступна ролі doctor
-  if (role === 'doctor') {
-    return res.status(403).json({ error: 'Недоступно для ролі лікаря' })
   }
 
   if (req.method === 'POST') {

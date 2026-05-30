@@ -455,27 +455,39 @@ export default async function handler(req, res) {
 
     let safeSql = validateReadOnlySql(parsed.sql)
 
-    // Фільтрація для doctor — тільки свої дані з lsmd.
-    // Будь-який запит, що НЕ читає lsmd напряму (тобто загальні аналітичні VIEW по
-    // всій лікарні), для doctor заборонений — інакше витік даних інших лікарів.
+    // Модель доступу для doctor:
+    // • lsmd (рядки з ПІБ) — лише з фільтром по власному прізвищу;
+    // • агрегатні VIEW (без ПІБ) — дозволені (для порівняння із загальними показниками);
+    // • інші персональні таблиці (patients_best/patients/encounters) та JOIN — заборонені.
+    // БД (execute_sql_safe) дублює ці перевірки як другий рубіж.
     if (role === 'doctor' && empName) {
-      if (!/\bfrom\s+lsmd\b/i.test(safeSql)) {
+      if (/\b(patients_best|patients|encounters)\b/i.test(safeSql)) {
         return res.status(403).json({
-          error: 'Доступ обмежено: ця статистика стосується всієї лікарні. Як лікар ви можете переглядати лише власні дані. Сформулюйте запит про свою роботу (госпіталізації, нічні чергування, летальність ваших пацієнтів тощо).'
+          error: 'Доступ обмежено: лікарю доступні власні пацієнти (через lsmd) та загальні агреговані показники. Пряме читання таблиць пацієнтів недоступне.'
         })
       }
-      const safeName = empName.replace(/'/g, "''")
-      // Аліас тільки якщо це справжній ідентифікатор, а не ключове слово SQL
-      const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
-      const reserved = ['where','group','order','limit','having','join','left','right','inner','on','union','as']
-      const alias = aliasMatch && !reserved.includes(aliasMatch[1].toLowerCase()) ? aliasMatch[1] : null
-      const prefix = alias ? alias + '.' : ''
-      const filter = `${prefix}doc_name ILIKE '%${safeName}%'`
-      if (/\bwhere\b/i.test(safeSql)) {
-        safeSql = safeSql.replace(/\bwhere\b/i, `WHERE ${filter} AND `)
-      } else {
-        safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${filter}`)
+      if (/\bjoin\b/i.test(safeSql) && /\blsmd\b/i.test(safeSql)) {
+        return res.status(403).json({
+          error: 'Доступ обмежено: для запитів про власних пацієнтів обʼєднання таблиць (JOIN) недоступне.'
+        })
       }
+      if (/\bfrom\s+lsmd\b/i.test(safeSql)) {
+        const safeName = empName.replace(/'/g, "''")
+        const aliasMatch = safeSql.match(/\bfrom\s+lsmd\s+(?:as\s+)?([a-z_]+)/i)
+        const reserved = ['where','group','order','limit','having','join','left','right','inner','on','union','as']
+        const alias = aliasMatch && !reserved.includes(aliasMatch[1].toLowerCase()) ? aliasMatch[1] : null
+        const prefix = alias ? alias + '.' : ''
+        const filter = `${prefix}doc_name ILIKE '%${safeName}%'`
+        // Не дублюємо фільтр, якщо він уже є
+        if (!new RegExp(`doc_name\\s+ilike\\s+'%${safeName.slice(0,6)}`, 'i').test(safeSql)) {
+          if (/\bwhere\b/i.test(safeSql)) {
+            safeSql = safeSql.replace(/\bwhere\b/i, `WHERE ${filter} AND `)
+          } else {
+            safeSql = safeSql.replace(/\bfrom\s+lsmd\b/i, `FROM lsmd WHERE ${filter}`)
+          }
+        }
+      }
+      // інакше — агрегатна VIEW, пропускаємо без змін
     }
     // Автофікс: неправильні колонки
     if (/\blsmd\b/i.test(safeSql)) {
