@@ -8,14 +8,14 @@ import {
 
 const COLORS = ['#1a1917','#6b6760','#9c9890','#c0c0b8','#d8d5cf','#4a9870','#c0392b','#e8a020']
 
-function useQuery(sql) {
+function useQuery(key) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     fetch('/api/stats', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sql })
+      body: JSON.stringify({ key })
     }).then(r => r.json()).then(d => { setData(d.rows || []); setLoading(false) })
       .catch(() => { setData([]); setLoading(false) })
   }, [])
@@ -71,14 +71,14 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function Analytics() {
-  const summary = useQuery('SELECT total_cases,unique_patients,avg_bed_days,death_rate_pct,surgical_activity_pct FROM v_hospital_summary')
-  const deptStats = useQuery('SELECT department as відділення, total_cases as випадків, death_rate_pct as летальність, avg_bed_days as ліжкодень FROM v_department_stats ORDER BY total_cases DESC LIMIT 10')
-  const peakHour = useQuery('SELECT hour as година, cases as поступлень FROM v_peak_by_hour ORDER BY hour')
-  const peakMonth = useQuery('SELECT month as місяць, cases as поступлень, deaths as померло FROM v_peak_by_month WHERE year=2024 ORDER BY month_num')
-  const peakWeekday = useQuery('SELECT dow as день, weekday_name as назва, cases as поступлень FROM v_peak_by_weekday ORDER BY dow')
-  const urgency = useQuery('SELECT department as відділення, urgent as ургентних, planned as планових FROM v_urgency_stats ORDER BY ургентних DESC LIMIT 8')
-  const patStats = useQuery('SELECT age_group as вік, cases as випадків, death_rate_pct as летальність FROM v_patient_stats WHERE gender=\'Ч\' OR gender=\'Ж\' GROUP BY вік,летальність ORDER BY випадків DESC LIMIT 8')
-  const icu = useQuery('SELECT всього_поступлень,померло,летальність_pct,середній_ліжкодень FROM v_icu_mortality')
+  const summary = useQuery('summary')
+  const deptStats = useQuery('deptStats')
+  const peakHour = useQuery('peakHour')
+  const peakMonth = useQuery('peakMonth')
+  const peakWeekday = useQuery('peakWeekday')
+  const urgency = useQuery('urgency')
+  const patStats = useQuery('patStats')
+  const icu = useQuery('icu')
 
   const s = summary.data?.[0] || {}
   const icuRow = icu.data?.[0] || {}
