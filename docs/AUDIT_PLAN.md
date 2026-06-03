@@ -299,3 +299,13 @@ execute_sql_safe (2024: хірургічний 12141/68.88% операцій, т
 (дата, МКХ, відділення, лікар, вислід, ліжкодень). ПІБ витягується regex по словах
 з великої літери. Захист 2 рівні: роутер не дає гілку doctor (NULL);
 execute_sql_safe блокує patients_best для doctor (перевірено — відмова).
+
+### [x] 30. Помилка "column date_of_birth does not exist"
+Причина: у SYSTEM_PROMPT (ask.js) таблиця patients_best була описана з НЕІСНУЮЧОЮ
+колонкою date_of_birth → LLM генерував SQL із нею. Виправлено:
+- опис patients_best у промпті замінено на реальні колонки (full_name, patient_name,
+  age, birthday, gender, phone_num, address, district, region, locality);
+- додано явне правило: використовувати тільки перелічені колонки, не вигадувати
+  англійських назв; дата народження = birthday, вік = age.
+Звірено ВСІ таблиці/VIEW промпту з реальною схемою БД — інших розбіжностей немає
+(peak-view, аналітичні VIEW, empl, icd_10 — усі колонки збігаються).

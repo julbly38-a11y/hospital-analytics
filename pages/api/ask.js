@@ -65,8 +65,9 @@ lsmd (110,206 записів) — госпіталізації:
   icd_primary, discharge_status, length_of_stay, admission_type
   ⚠️ УВАГА: колонки 'department' НЕ ІСНУЄ в lsmd! Тільки admission_department / current_department / discharge_department
 
-patients_best (72,293) — пацієнти:
-  patient_id, full_name, date_of_birth, gender, locality
+patients_best (72,293) — пацієнти (картка):
+  patient_id, full_name (повне ПІБ), patient_name (скорочене), age, birthday (дата народження), gender, phone_num, address, district, region, locality
+  ⚠️ Колонки 'date_of_birth' НЕ ІСНУЄ! Дата народження = birthday. Вік = age.
 
 icd_10 (19,824) — діагнози МКХ-10:
   icd_code, diagnosis_level2, diagnosis_level3
@@ -123,6 +124,7 @@ v_peak_by_weekday — за днями тижня: dow, weekday_name, cases
 v_peak_by_month — за місяцями: month, cases, deaths, avg_bed_days
 
 ПРАВИЛО: для летальності, навантаження, статистики, повторних госпіталізацій — бери з VIEW, не рахуй вручну!
+⚠️ КРИТИЧНО: використовуй ТІЛЬКИ колонки, явно перелічені вище. Якщо колонки немає в списку — НЕ вигадуй її назву (особливо англійські на кшталт date_of_birth, patient_dob тощо). Дата народження пацієнта = patients_best.birthday, вік = age.
 Приклад: "летальність по відділеннях" → SELECT department, death_rate_pct FROM v_department_stats ORDER BY death_rate_pct DESC
 
 ПРИКЛАДИ:
