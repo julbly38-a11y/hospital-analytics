@@ -3,422 +3,388 @@ import Head from 'next/head'
 import { createClient } from '../lib/supabase'
 import { useRouter } from 'next/router'
 
-/* ============================================================
-   Примітиви дизайн-системи «Медична» (інлайн для Next.js)
-   ============================================================ */
-const ICONS = {
-  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
-  users: 'M9 8m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0|M1 21a8 8 0 0 1 16 0|M18 9a4 4 0 0 1 4 4',
-  user: 'M12 8m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0|M4 21a8 8 0 0 1 16 0',
-  chart: 'M3 3v18h18|M7 15l4-6 4 3 5-7',
-  database: 'M12 5m-9 0a9 3 0 1 0 18 0a9 3 0 1 0 -18 0|M3 5v14a9 3 0 0 0 18 0V5|M3 12a9 3 0 0 0 18 0',
-  pill: 'M2 8h20v8H2z|M12 8v8',
-  microscope: 'M6 18h8M3 22h18|M14 22a7 7 0 1 0 0-14h-1|M8 6l4-4 4 4|M12 6v8',
-  search: 'M11 11m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0|M21 21l-4.3-4.3',
-  bell: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9|M13.7 21a2 2 0 0 1-3.4 0',
-  settings: 'M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0|M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
-  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5M21 12H9',
-  send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z',
-  activity: 'M22 12h-4l-3 9L9 3l-3 9H2',
+/* Стилі дашборду (з дизайн-системи ЛСМД, ui_kits/dashboard/dashboard.css) */
+const DASH_CSS = `
+.dashboard { display: flex; height: 100vh; overflow: hidden; }
+.dash-sidebar { width: 248px; min-width: 248px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.dash-sidebar .brand { padding: 20px 20px 18px; border-bottom: 1px solid var(--border); display:flex; align-items:center; gap:10px; cursor:pointer; }
+.dash-sidebar .brand .mark { font-family: var(--mono); font-weight: 300; font-size: 26px; color: var(--brand); line-height: 1; }
+.dash-sidebar .brand .name { font-weight: 500; font-size: 14px; color: var(--text); letter-spacing: 0.02em; }
+.dash-nav { padding: 16px 12px; flex: 1; overflow-y: auto; }
+.dash-nav .group { margin-bottom: 22px; }
+.dash-nav .group-label { font-family: var(--mono); font-weight: 500; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); padding: 0 8px; margin-bottom: 8px; }
+.dash-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 2px; font-size: 13px; color: var(--text2); border-radius: 6px; cursor: pointer; transition: 0.15s; white-space: nowrap; }
+.dash-nav-item .gl { font-family: var(--mono); font-size: 14px; color: var(--text3); width: 16px; text-align: center; }
+.dash-nav-item:hover { background: var(--bg); color: var(--text); }
+.dash-nav-item.active { background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+.dash-nav-item.active .gl { color: var(--brand); }
+.dash-user { padding: 14px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.dash-user .ava { width: 30px; height: 30px; border-radius: 50%; background: var(--bg2); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-weight: 500; font-size: 12px; color: var(--text); flex-shrink:0; }
+.dash-user .who { line-height: 1.2; min-width: 0; flex: 1; }
+.dash-user .name { font-size: 13px; color: var(--text); white-space: nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash-user .role { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+.dash-user .lo { background:none; border:0; cursor:pointer; color:var(--text3); font-family:var(--mono); font-size:11px; }
+.dash-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.dash-header { padding: 20px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--bg); flex-shrink:0; }
+.dash-header h1 { font-family: var(--mono); font-weight: 300; font-size: 24px; color: var(--text); }
+.dash-header .crumbs { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-bottom: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+.dash-content { flex: 1; overflow-y: auto; padding: 28px 32px; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+.kpi .lbl { font-family: var(--mono); font-weight: 500; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+.kpi .val { font-family: var(--mono); font-weight: 300; font-size: 28px; color: var(--text); line-height: 1; }
+.kpi .delta { font-family: var(--mono); font-size: 11px; margin-top: 8px; color: var(--text3); }
+.kpi .delta.down { color: var(--brand); }
+.chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 24px; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.panel-head h3 { font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text2); }
+.panel-head .filter { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.barchart { display: flex; align-items: flex-end; gap: 6px; height: 180px; padding: 8px 0 0; border-bottom: 1px solid var(--border); }
+.barchart .bar { flex: 1; background: var(--text); border-radius: 2px 2px 0 0; transition: 0.2s; }
+.barchart .bar.peak { background: var(--brand); }
+.barchart-x { display: flex; gap: 6px; margin-top: 6px; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+.barchart-x span { flex: 1; text-align: center; }
+.dept-list { display: flex; flex-direction: column; gap: 10px; }
+.dept-row { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 11px; }
+.dept-row .name { flex: 1; color: var(--text); }
+.dept-row .bar-wrap { height: 4px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+.dept-row .bar-fill { height: 100%; background: var(--text); }
+.dept-row .pct { color: var(--text3); text-align: right; }
+.table-wrap { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.dtable { width: 100%; border-collapse: collapse; font-size: 13px; font-family: var(--mono); }
+.dtable th { background: var(--bg2); padding: 10px 14px; text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text2); border-bottom: 1px solid var(--border); }
+.dtable td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+.dtable tr:last-child td { border-bottom: none; }
+.dtable tr:hover td { background: var(--bg); }
+.btn-secondary { padding: 8px 14px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-family: var(--sans); cursor: pointer; }
+.btn-secondary:hover { border-color: var(--text); }
+@media (max-width: 900px) {
+  .dash-sidebar { display: none; }
+  .kpi-row { grid-template-columns: repeat(2,1fr); }
+  .chart-row { grid-template-columns: 1fr; }
 }
+`
 
-function Icon({ name, size = 16, stroke = 1.6, color = 'currentColor', style = {} }) {
-  const d = ICONS[name]
-  if (!d) return null
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
-      strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" style={style}>
-      {d.split('|').map((p, i) => <path key={i} d={p} />)}
-    </svg>
-  )
-}
-
-function Avatar({ name = '', size = 32 }) {
-  const initials = name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
-  const palette = ['#0E4F4F', '#2F6A86', '#3F7A4F', '#B07A18', '#B2412E', '#D96A4A']
-  const pick = palette[(name.charCodeAt(0) || 0) % palette.length]
-  return (
-    <div style={{ width: size, height: size, borderRadius: 999, background: pick, color: '#FAF7F2',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600,
-      fontSize: size * 0.38, flexShrink: 0 }}>{initials}</div>
-  )
-}
-
-function Badge({ tone = 'neutral', children }) {
-  const tones = {
-    positive: { bg: 'var(--positive-soft)', color: '#2F5D3B', dot: 'var(--positive)' },
-    caution: { bg: 'var(--caution-soft)', color: '#7E5712', dot: 'var(--caution)' },
-    critical: { bg: 'var(--critical-soft)', color: '#8F2E1F', dot: 'var(--critical)' },
-    info: { bg: 'var(--info-soft)', color: '#1F4A5E', dot: 'var(--info)' },
-    neutral: { bg: 'var(--paper-3)', color: 'var(--ink-2)', dot: 'var(--ink-3)' },
-    brand: { bg: 'var(--teal-ink-soft)', color: 'var(--teal-ink)', dot: 'var(--teal-ink)' },
-  }
-  const t = tones[tone] || tones.neutral
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 9px',
-      borderRadius: 999, background: t.bg, color: t.color, fontSize: 11, fontWeight: 500, lineHeight: 1.4 }}>
-      <span style={{ width: 6, height: 6, borderRadius: 999, background: t.dot }} />
-      {children}
-    </span>
-  )
-}
-
-function Card({ children, padding = 16, style = {} }) {
-  return (
-    <div style={{ background: 'var(--paper)', border: '1px solid var(--border)', borderRadius: 10,
-      padding, boxShadow: '0 1px 2px rgba(15,30,31,0.06)', ...style }}>{children}</div>
-  )
-}
-
-/* ---------- Приклади (збережено з попередньої версії) ---------- */
-const ALL_EXAMPLES = [
-  'Загальна статистика лікарні','Показники по напрямках (терапевтичний/хірургічний)',
-  'Картка пацієнта (введіть ПІБ)','Скільки всього госпіталізацій','Скільки унікальних пацієнтів',
-  'Середній ліжкодень по лікарні','Загальна летальність лікарні','Хірургічна активність лікарні',
-  'Показники по всіх відділеннях','Летальність по відділеннях','Відділення з найдовшим ліжкоднем',
-  'Топ відділень за кількістю операцій','Летальність реанімації','Топ 10 діагнозів за кількістю випадків',
-  'Летальність по діагнозах','Скільки інсультів пролікувано за 2024 рік','Скільки інфарктів міокарда за 2024',
-  'Повторні госпіталізації 30 і 90 днів','Розподіл за статтю та віком','Летальність по віковим групам',
-  'Пікові навантаження по годинах','Динаміка по місяцях','Нічні vs денні поступлення',
-  'Статистика за регіонами','Скільки пацієнтів з Чернівецької області',
-  'Топ діагнозів неврологічного відділення','Статистика хірургічного відділення',
-  'Скільки лікарів хірургічного напрямку','Покажи всіх хірургів',
+/* Навігація (з дизайну ui_kits/dashboard) */
+const DASH_NAV = [
+  { id: 'overview',    label: 'Загальна',     gl: '◆', group: 'Аналітика' },
+  { id: 'asystent',    label: 'AI Асистент',  gl: '+', group: 'Інструменти' },
 ]
-const DOCTOR_EXAMPLES = [
-  'Скільки пацієнтів я пролікував за 2024 рік','Скільки моїх пацієнтів за перше півріччя 2024',
-  'Скільки нічних поступлень у мене за 2024','Скільки діб чергування у мене за 2024',
-  'Скільки вихідних діб у мене за 2024','Летальність моїх пацієнтів',
-  'Покажи мої випадки інсульту за 2024','Мої пацієнти з епілепсією','Мої випадки розсіяного склерозу',
-  'Мої пацієнти з транзиторною ішемічною атакою',
-]
-const DOCTOR_GENERAL_EXAMPLES = [
-  'Загальна статистика лікарні','Показники по напрямках (терапевтичний/хірургічний)',
-  'Летальність по відділеннях','Топ 10 діагнозів за кількістю випадків','Летальність реанімації',
-  'Пікові навантаження по годинах','Динаміка по місяцях','Летальність по віковим групам',
-]
+/* Майбутні розділи (поки заглушки): Відділення, Діагнози, Лікарі, Пацієнти, Географія, Піки, Нічні, Операції, Звіти, Налаштування */
 
-const COL_LABELS = {
-  doctor_name: 'Лікар', patient_name: 'Пацієнт', відділення: 'Відділення', завідувач: 'Завідувач',
-  bed_days: 'Ліжко-днів', discharge_status: 'Статус', region: 'Регіон', count: 'Кількість',
-}
-
-/* ---------- Формат значень (укр. формат: десятковий розділювач — кома) ---------- */
-function formatValue(key, val) {
-  if (val === null || val === undefined) return '—'
-  if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}[T ]/.test(val))
-    return new Date(val).toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' })
-  if (typeof val === 'number' && !Number.isInteger(val)) return val.toFixed(1).replace('.', ',')
-  if (typeof val === 'number') return val.toLocaleString('uk-UA').replace(/,/g, ' ')
-  return String(val)
-}
-function colLabel(key) { return COL_LABELS[key] || key.replace(/_/g, ' ') }
-function formatNum(n) {
+function fmt(n) {
   if (n === null || n === undefined || n === '') return '—'
-  return Number(n).toLocaleString('uk-UA').replace(/,/g, ' ')
+  const num = Number(n)
+  if (isNaN(num)) return String(n)
+  return num.toLocaleString('uk-UA').replace(/\u00A0/g, ' ').replace(/,/g, ' ')
+}
+const ICD_NAMES = {
+  K: 'Хвороби органів травлення', S: 'Травми та отруєння', I: 'Хвороби системи кровообігу',
+  G: 'Хвороби нервової системи', N: 'Хвороби сечостатевої системи', C: 'Новоутворення',
+  M: "Хвороби кістково-м'язової системи", J: 'Хвороби органів дихання', E: 'Ендокринні хвороби',
+}
+const STATUS_COLOR = {
+  'З поліпшенням': 'var(--green)', 'Помер': 'var(--brand)', 'З погіршенням': 'var(--amber)',
 }
 
-/* ---------- Тон бейджа за статусом/летальністю ---------- */
-function toneForStatus(s) {
-  const v = String(s).toLowerCase()
-  if (v.includes('помер') || v.includes('погірш')) return 'critical'
-  if (v.includes('покращ') || v.includes('одужан') || v.includes('виписан')) return 'positive'
-  if (v.includes('без змін')) return 'caution'
-  return 'neutral'
-}
-function toneForRate(pct) {
-  const n = Number(pct)
-  if (isNaN(n)) return 'neutral'
-  if (n >= 20) return 'critical'
-  if (n >= 5) return 'caution'
-  return 'positive'
-}
-
-/* ============================================================
-   ResultView — відображення результату у стилі «Медична»
-   ============================================================ */
-const LABEL_CSS = { fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em',
-  color: 'var(--ink-3)', fontWeight: 500 }
-
-function ResultView({ rows }) {
-  if (!rows || rows.length === 0) {
-    return <div style={{ padding: 32, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-      Результатів не знайдено</div>
-  }
-  const cols = Object.keys(rows[0])
-  const single = rows.length === 1 && cols.length === 1 && typeof Object.values(rows[0])[0] === 'number'
-  const smallStat = rows.length === 1 && cols.length <= 5
-
-  // Одне число — великий показник (Instrument Serif)
-  if (single) {
-    const key = cols[0]
-    return (
-      <Card padding={24} style={{ display: 'inline-block', minWidth: 220 }}>
-        <div style={LABEL_CSS}>{colLabel(key)}</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 48, lineHeight: 1.1,
-          color: 'var(--ink)', marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
-          {formatValue(key, rows[0][key])}</div>
-      </Card>
-    )
-  }
-
-  // Один рядок, кілька полів — сітка карток-показників
-  if (smallStat) {
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(cols.length, 4)}, 1fr)`, gap: 12 }}>
-        {cols.map(key => {
-          const isRate = /летальн|активн|відс|pct|_пр/.test(key.toLowerCase())
-          return (
-            <Card key={key} padding={16}>
-              <div style={LABEL_CSS}>{colLabel(key)}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 32, lineHeight: 1.1,
-                color: 'var(--ink)', marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
-                {formatValue(key, rows[0][key])}{isRate && typeof rows[0][key] === 'number'
-                  ? <span style={{ fontSize: 14, color: 'var(--ink-3)' }}> %</span> : null}</div>
-            </Card>
-          )
-        })}
-      </div>
-    )
-  }
-
-  // Таблиця — hairline rules, моноширинні цифри, бейджі для статусів
+function Sidebar({ active, setActive, me, role, onLogout }) {
+  const groups = [...new Set(DASH_NAV.map(n => n.group))]
+  const name = me?.name || (role === 'admin' ? 'Адміністратор' : 'Користувач')
+  const subtitle = [me?.position, me?.specialization].filter(Boolean).join(' · ') || (role === 'admin' ? 'повний доступ' : '')
+  const initials = name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
   return (
-    <Card padding={0} style={{ overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
-              {cols.map(c => {
-                const num = typeof rows[0][c] === 'number'
-                return <th key={c} style={{ ...LABEL_CSS, padding: '10px 14px',
-                  textAlign: num ? 'right' : 'left' }}>{colLabel(c)}</th>
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                {cols.map(c => {
-                  const v = row[c]
-                  const num = typeof v === 'number'
-                  const isStatus = /статус|вислід|discharge/.test(c.toLowerCase())
-                  const isRate = /летальн|активн|відс|pct|_пр/.test(c.toLowerCase())
-                  return (
-                    <td key={c} style={{ padding: '10px 14px', textAlign: num ? 'right' : 'left',
-                      fontFamily: num ? 'var(--font-mono)' : 'var(--font-sans)',
-                      fontVariantNumeric: 'tabular-nums', color: 'var(--ink)',
-                      whiteSpace: num ? 'nowrap' : 'normal' }}>
-                      {isStatus && v
-                        ? <Badge tone={toneForStatus(v)}>{v}</Badge>
-                        : isRate && num
-                          ? <span style={{ color: `var(--${toneForRate(v) === 'neutral' ? 'ink' : toneForRate(v)})`,
-                              fontWeight: 500 }}>{formatValue(c, v)}</span>
-                          : formatValue(c, v)}
-                    </td>
-                  )
-                })}
-              </tr>
+    <aside className="dash-sidebar">
+      <div className="brand">
+        <span className="mark">+</span><span className="name">ЛСМД</span>
+      </div>
+      <div className="dash-nav">
+        {groups.map(g => (
+          <div key={g} className="group">
+            <div className="group-label">{g}</div>
+            {DASH_NAV.filter(n => n.group === g).map(n => (
+              <div key={n.id} className={`dash-nav-item${active === n.id ? ' active' : ''}`}
+                onClick={() => setActive(n.id)}>
+                <span className="gl">{n.gl}</span><span>{n.label}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ padding: '8px 14px', ...LABEL_CSS, borderTop: '1px solid var(--border)' }}>
-        {rows.length} {rows.length === 1 ? 'запис' : 'записів'}</div>
-    </Card>
-  )
-}
-
-/* ============================================================
-   Sidebar — навігація «Медична»
-   ============================================================ */
-function Sidebar({ role, me, onLogout, globalStats }) {
-  const nav = [
-    { icon: 'home', label: 'Огляд', active: true },
-    { icon: 'users', label: 'Пацієнти' },
-    { icon: 'database', label: 'Відділення' },
-    { icon: 'chart', label: 'Аналітика' },
-  ]
-  // Реальне ім'я/посада залогіненого користувача (з /api/me → empl)
-  const displayName = me?.name || (role === 'admin' ? 'Адміністратор' : 'Користувач')
-  const subtitle = me?.specialization || me?.position
-    ? [me.position, me.specialization].filter(Boolean).join(' · ')
-    : (role === 'admin' ? 'Повний доступ' : '')
-  return (
-    <aside style={{ width: 232, background: 'var(--paper)', borderRight: '1px solid var(--border)',
-      display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100vh', position: 'sticky', top: 0 }}>
-      <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: '1px solid var(--border)' }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--teal-ink)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="activity" size={16} color="#FAF7F2" /></div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--ink)' }}>Медична</div>
-      </div>
-      <nav style={{ padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <div style={{ ...LABEL_CSS, fontSize: 10, padding: '6px 10px 8px' }}>
-          {role === 'doctor' ? 'Моя робота' : 'Аналітика ЛСМД'}</div>
-        {nav.map((it, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-            borderRadius: 6, fontSize: 13, fontWeight: it.active ? 500 : 400,
-            color: it.active ? 'var(--teal-ink)' : 'var(--ink-2)',
-            background: it.active ? 'var(--teal-ink-soft)' : 'transparent',
-            boxShadow: it.active ? 'inset 2px 0 0 var(--teal-ink)' : 'none', cursor: 'pointer' }}>
-            <Icon name={it.icon} size={15} /><span>{it.label}</span>
           </div>
         ))}
-      </nav>
-      {globalStats && (
-        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', marginTop: 8 }}>
-          <div style={{ ...LABEL_CSS, marginBottom: 8 }}>Лікарня</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 2 }}>
-            <div>{formatNum(globalStats.total_cases || 110206)} госпіталізацій</div>
-            <div>{formatNum(globalStats.unique_patients || 67856)} пацієнтів</div>
-          </div>
+      </div>
+      <div className="dash-user">
+        <div className="ava">{initials}</div>
+        <div className="who">
+          <div className="name">{name}</div>
+          <div className="role">{subtitle}</div>
         </div>
-      )}
-      <div style={{ marginTop: 'auto', padding: 12, borderTop: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Avatar name={displayName} size={32} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden',
-            textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
-          {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden',
-            textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
-        </div>
-        <button onClick={onLogout} title="Вийти" style={{ background: 'transparent', border: 0,
-          cursor: 'pointer', color: 'var(--ink-3)', display: 'flex' }}>
-          <Icon name="logout" size={15} /></button>
+        <button className="lo" onClick={onLogout} title="Вийти">↪</button>
       </div>
     </aside>
   )
 }
 
-/* ============================================================
-   Home — dashboard (логіка збережена з попередньої версії)
-   ============================================================ */
-export default function Home() {
-  const router = useRouter()
-  const supabase = useMemo(() => (typeof window !== 'undefined' ? createClient() : null), [])
-  const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [globalStats, setGlobalStats] = useState(null)
-  const [role, setRole] = useState(null)
-  const [me, setMe] = useState(null)
-  const bottomRef = useRef(null)
+/* ОГЛЯД — живі дані з /api/stats (ключі ovKpi/ovHours/ovStatus/ovIcd) */
+function OverviewPage() {
+  const [kpi, setKpi] = useState(null)
+  const [hours, setHours] = useState([])
+  const [status, setStatus] = useState([])
+  const [icd, setIcd] = useState([])
+  const [err, setErr] = useState(null)
 
-  async function handleLogout() { await supabase?.auth.signOut(); router.push('/login') }
+  useEffect(() => {
+    async function load(key) {
+      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key }) })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      return d.rows || []
+    }
+    Promise.all([load('ovKpi'), load('ovHours'), load('ovStatus'), load('ovIcd')])
+      .then(([k, h, s, i]) => { setKpi(k[0] || null); setHours(h); setStatus(s); setIcd(i) })
+      .catch(e => setErr(e.message))
+  }, [])
 
-  useEffect(() => { fetch('/api/me').then(r => r.json()).then(d => { setRole(d.role); setMe(d) }).catch(() => {}) }, [])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
-  useEffect(() => { fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {}) }, [])
-
-  async function send(question) {
-    if (!question.trim() || loading) return
-    setInput(''); setLoading(true)
-    setMessages(prev => [...prev, { role: 'user', content: question }])
-    try {
-      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
-      const res = await fetch('/api/ask', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, history, provider: 'groq' })
-      })
-      const data = await res.json()
-      if (data.error) setMessages(prev => [...prev, { role: 'assistant', error: data.error }])
-      else setMessages(prev => [...prev, { role: 'assistant', content: question,
-        explanation: data.explanation, rows: data.rows || [] }])
-    } catch (e) { setMessages(prev => [...prev, { role: 'assistant', error: e.message }]) }
-    setLoading(false)
-  }
-
-  const examples = role === 'doctor' ? [...DOCTOR_EXAMPLES, ...DOCTOR_GENERAL_EXAMPLES] : ALL_EXAMPLES
-  const showWelcome = messages.length === 0
+  const maxHour = hours.length ? Math.max(...hours.map(h => h.випадків)) : 1
+  const peakIdx = hours.length ? hours.reduce((mi, h, i, a) => h.випадків > a[mi].випадків ? i : mi, 0) : -1
+  const maxIcd = icd.length ? icd[0].випадків : 1
+  const totalStatus = status.reduce((s, r) => s + Number(r.випадків), 0) || 1
 
   return (
     <>
-      <Head>
-        <title>Медична — Аналітика ЛСМД</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-      </Head>
-      <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper-2)' }}>
-        <Sidebar role={role} me={me} onLogout={handleLogout} globalStats={globalStats} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          {/* TopBar */}
-          <header style={{ padding: '18px 28px 16px', borderBottom: '1px solid var(--border)',
-            background: 'var(--paper)', position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>
-              {role === 'doctor' ? `Клінічна робота · ${me?.specialization || 'Лікар'}` : 'Аналітика · ЛСМД'}</div>
-            <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 400,
-              letterSpacing: '-0.01em', color: 'var(--ink)', lineHeight: 1.1 }}>
-              {role === 'doctor' ? 'Мої показники' : 'Огляд лікарні'}</h1>
-          </header>
+      <div className="dash-header">
+        <div>
+          <div className="crumbs">Аналітика · Огляд</div>
+          <h1>Дашборд лікарні</h1>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-secondary">Період: усі роки ▾</button>
+        </div>
+      </div>
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка завантаження: {err}</div>}
 
-          {/* Контент */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
-            {showWelcome ? (
-              <div style={{ maxWidth: 760 }}>
-                <Card padding={24} style={{ marginBottom: 24 }}>
-                  <h2 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 24,
-                    fontWeight: 400, color: 'var(--ink)' }}>Запитайте про дані лікарні</h2>
-                  <p style={{ margin: '8px 0 0', fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-                    Сформулюйте запит природною мовою — статистика, відділення, діагнози, пацієнти.
-                    Оберіть приклад нижче або введіть власний запит.</p>
-                </Card>
-                <div style={{ ...LABEL_CSS, marginBottom: 12 }}>Приклади запитів</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
-                  {examples.map((ex, i) => (
-                    <button key={i} onClick={() => send(ex)} style={{ textAlign: 'left', padding: '12px 14px',
-                      background: 'var(--paper)', border: '1px solid var(--border)', borderRadius: 8,
-                      fontSize: 13, color: 'var(--ink-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                      transition: 'background 120ms' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--paper-2)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'var(--paper)'}>{ex}</button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div style={{ maxWidth: 980, display: 'flex', flexDirection: 'column', gap: 20 }}>
-                {messages.map((msg, i) => msg.role === 'user' ? (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ background: 'var(--teal-ink)', color: 'var(--paper)', padding: '10px 16px',
-                      borderRadius: 10, fontSize: 14, maxWidth: '70%' }}>{msg.content}</div>
-                  </div>
-                ) : (
-                  <div key={i}>
-                    {msg.error ? (
-                      <Card padding={16} style={{ borderColor: 'var(--critical)', background: 'var(--critical-soft)' }}>
-                        <div style={{ color: 'var(--critical)', fontSize: 13 }}>{msg.error}</div>
-                      </Card>
-                    ) : (
-                      <>
-                        {msg.explanation && <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 10 }}>
-                          {msg.explanation}</div>}
-                        <ResultView rows={msg.rows} />
-                      </>
-                    )}
-                  </div>
-                ))}
-                {loading && <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>Обробка запиту…</div>}
-                <div ref={bottomRef} />
-              </div>
-            )}
+        {/* KPI */}
+        <div className="kpi-row">
+          <div className="kpi"><div className="lbl">Госпіталізацій</div>
+            <div className="val">{kpi ? fmt(kpi.total_cases) : '…'}</div>
+            <div className="delta">{kpi ? `${fmt(kpi.unique_patients)} унікальних пацієнтів` : ''}</div></div>
+          <div className="kpi"><div className="lbl">Летальність</div>
+            <div className="val">{kpi ? `${kpi.death_rate_pct}%` : '…'}</div>
+            <div className="delta down">{kpi ? `${fmt(kpi.deaths)} випадків` : ''}</div></div>
+          <div className="kpi"><div className="lbl">Сер. ліжко-день</div>
+            <div className="val">{kpi ? kpi.avg_bed_days : '…'}</div>
+            <div className="delta">по всій лікарні</div></div>
+          <div className="kpi"><div className="lbl">Хірургічна активність</div>
+            <div className="val">{kpi ? `${kpi.surgical_activity_pct}%` : '…'}</div>
+            <div className="delta">{kpi ? `${fmt(kpi.operations)} операцій` : ''}</div></div>
+        </div>
+
+        {/* Години + тип госпіталізації */}
+        <div className="chart-row">
+          <div className="panel">
+            <div className="panel-head"><h3>Пікові години госпіталізацій</h3><span className="filter">усі роки</span></div>
+            <div className="barchart">
+              {hours.map((h, i) => (
+                <div key={i} className={`bar${i === peakIdx ? ' peak' : ''}`}
+                  style={{ height: `${(h.випадків / maxHour) * 100}%` }}
+                  title={`${String(h.година).padStart(2, '0')}:00 · ${fmt(h.випадків)}`} />
+              ))}
+            </div>
+            <div className="barchart-x">
+              {hours.map((h, i) => <span key={i}>{i % 4 === 0 ? String(h.година).padStart(2, '0') : ''}</span>)}
+            </div>
+            {peakIdx >= 0 && <p style={{ marginTop: 10, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
+              Пік о <strong style={{ color: 'var(--brand)' }}>{String(hours[peakIdx].година).padStart(2, '0')}:00</strong> — {fmt(hours[peakIdx].випадків)} госпіталізацій.</p>}
           </div>
+          <div className="panel">
+            <div className="panel-head"><h3>Тип госпіталізації</h3><span className="filter">{kpi ? fmt(kpi.total_cases) : ''}</span></div>
+            {kpi && [{ l: 'Екстрена', v: kpi.urgent, p: kpi.urgent_pct, c: 'var(--brand)' },
+              { l: 'Планова', v: kpi.planned, p: (100 - Number(kpi.urgent_pct)).toFixed(2), c: 'var(--text)' }].map((row, i) => (
+              <div key={i} style={{ marginTop: i ? 14 : 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 12, marginBottom: 4 }}>
+                  <span>{row.l}</span><span style={{ color: row.c === 'var(--brand)' ? 'var(--brand)' : 'inherit' }}>{row.p}%</span>
+                </div>
+                <div style={{ height: 8, background: 'var(--bg2)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${row.p}%`, height: '100%', background: row.c }} /></div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmt(row.v)} випадків</div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-          {/* Поле вводу */}
-          <div style={{ borderTop: '1px solid var(--border)', background: 'var(--paper)', padding: '16px 28px' }}>
-            <div style={{ maxWidth: 980, margin: '0 auto', display: 'flex', gap: 10 }}>
-              <input value={input} onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && send(input)}
-                placeholder="Запитайте про дані лікарні…"
-                style={{ flex: 1, fontFamily: 'var(--font-sans)', fontSize: 14, padding: '11px 16px',
-                  background: 'var(--paper-2)', border: '1px solid var(--border)', borderRadius: 8,
-                  color: 'var(--ink)', outline: 'none' }} />
-              <button onClick={() => send(input)} disabled={loading || !input.trim()}
-                style={{ background: 'var(--teal-ink)', color: 'var(--paper)', border: 0, borderRadius: 8,
-                  padding: '0 16px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.4 : 1,
-                  display: 'flex', alignItems: 'center' }}>
-                <Icon name="send" size={16} color="#FAF7F2" /></button>
+        {/* Розділи МКХ */}
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel-head"><h3>Розподіл за розділами МКХ-10</h3><span className="filter">топ-7 з 22</span></div>
+          <div className="dept-list">
+            {icd.map(c => (
+              <div key={c.розділ} className="dept-row">
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--brand)', width: 20 }}>{c.розділ}</span>
+                <span className="name" style={{ flex: '1 1 auto' }}>{ICD_NAMES[c.розділ] || 'Інші'}</span>
+                <span className="bar-wrap" style={{ width: 160 }}><span className="bar-fill" style={{ width: `${(c.випадків / maxIcd) * 100}%` }} /></span>
+                <span className="pct" style={{ width: 60 }}>{fmt(c.випадків)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Статуси виписки */}
+        <div className="panel">
+          <div className="panel-head"><h3>Виписки — статус</h3><span className="filter">{fmt(totalStatus)} всього</span></div>
+          <div className="table-wrap">
+            <table className="dtable">
+              <thead><tr><th>Статус</th><th style={{ textAlign: 'right' }}>Випадків</th><th style={{ textAlign: 'right' }}>%</th><th style={{ minWidth: 120 }}>Розподіл</th></tr></thead>
+              <tbody>
+                {status.map((s, i) => (
+                  <tr key={i}>
+                    <td>{s.статус}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(s.випадків)}</td>
+                    <td style={{ textAlign: 'right' }}>{s.відс}%</td>
+                    <td><div style={{ height: 4, background: 'var(--bg2)', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${s.відс}%`, height: '100%', background: STATUS_COLOR[s.статус] || 'var(--text2)' }} /></div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* AI АСИСТЕНТ — робочий чат (логіка збережена) у стилі дашборду */
+const ALL_EXAMPLES = [
+  'Загальна статистика лікарні','Показники по напрямках','Скільки всього госпіталізацій',
+  'Летальність по відділеннях','Топ 10 діагнозів','Летальність реанімації',
+  'Покажи всіх хірургів','Статистика хірургічного відділення','Картка пацієнта (введіть ПІБ)',
+]
+const DOCTOR_EXAMPLES = [
+  'Скільки пацієнтів я пролікував за 2024','Летальність моїх пацієнтів','Мої випадки інсульту за 2024',
+  'Скільки діб чергування у мене за 2024','Загальна статистика лікарні','Топ 10 діагнозів',
+]
+
+function AsystentTab({ role }) {
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef(null)
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+
+  async function send(q) {
+    if (!q.trim() || loading) return
+    setInput(''); setLoading(true)
+    setMessages(prev => [...prev, { role: 'user', content: q }])
+    try {
+      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }))
+      const res = await fetch('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q, history, provider: 'groq' }) })
+      const data = await res.json()
+      if (data.error) setMessages(prev => [...prev, { role: 'assistant', error: data.error }])
+      else setMessages(prev => [...prev, { role: 'assistant', explanation: data.explanation, rows: data.rows || [] }])
+    } catch (e) { setMessages(prev => [...prev, { role: 'assistant', error: e.message }]) }
+    setLoading(false)
+  }
+  const examples = role === 'doctor' ? DOCTOR_EXAMPLES : ALL_EXAMPLES
+
+  return (
+    <>
+      <div className="dash-header">
+        <div><div className="crumbs">Інструменти · AI Асистент</div><h1>Запитайте дані звичайною мовою</h1></div>
+      </div>
+      <div className="dash-content" style={{ display: 'flex', flexDirection: 'column' }}>
+        {messages.length === 0 ? (
+          <div>
+            <div className="panel" style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
+                Сформулюйте запит природною мовою — статистика, відділення, діагнози, пацієнти.</p>
+            </div>
+            <div className="dept-list" style={{ gap: 8 }}>
+              {examples.map((ex, i) => (
+                <button key={i} onClick={() => send(ex)} style={{ textAlign: 'left', padding: '11px 14px',
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6,
+                  fontSize: 13, color: 'var(--text2)', cursor: 'pointer', fontFamily: 'var(--sans)' }}>{ex}</button>
+              ))}
             </div>
           </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
+            {messages.map((m, i) => m.role === 'user' ? (
+              <div key={i} style={{ alignSelf: 'flex-end', background: 'var(--accent-bg)', color: 'var(--accent-text)',
+                padding: '10px 16px', borderRadius: '18px 18px 4px 18px', fontSize: 14, maxWidth: '70%' }}>{m.content}</div>
+            ) : (
+              <div key={i}>
+                {m.error ? (
+                  <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 13 }}>{m.error}</div>
+                ) : (
+                  <>
+                    {m.explanation && <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 8, fontFamily: 'var(--mono)' }}>{m.explanation}</div>}
+                    <ResultTable rows={m.rows} />
+                  </>
+                )}
+              </div>
+            ))}
+            {loading && <div style={{ color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--mono)' }}>обробка…</div>}
+            <div ref={bottomRef} />
+          </div>
+        )}
+      </div>
+      <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)', padding: '16px 32px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send(input)}
+            placeholder="Запитайте про дані лікарні…" style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 14,
+              padding: '11px 16px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', outline: 'none' }} />
+          <button onClick={() => send(input)} disabled={loading || !input.trim()}
+            style={{ background: 'var(--brand)', color: '#fff', border: 0, borderRadius: 8, padding: '0 18px',
+              cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.4 : 1, fontFamily: 'var(--mono)' }}>→</button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* Таблиця результату чату — стиль дашборду */
+function ResultTable({ rows }) {
+  if (!rows || rows.length === 0) return <div style={{ color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--mono)' }}>Немає даних</div>
+  const cols = Object.keys(rows[0])
+  if (rows.length === 1 && cols.length === 1) {
+    return <div className="kpi" style={{ display: 'inline-block', minWidth: 200 }}>
+      <div className="lbl">{cols[0].replace(/_/g, ' ')}</div><div className="val">{fmt(rows[0][cols[0]])}</div></div>
+  }
+  return (
+    <div className="table-wrap">
+      <table className="dtable">
+        <thead><tr>{cols.map(c => { const num = typeof rows[0][c] === 'number'
+          return <th key={c} style={{ textAlign: num ? 'right' : 'left' }}>{c.replace(/_/g, ' ')}</th> })}</tr></thead>
+        <tbody>
+          {rows.map((r, i) => <tr key={i}>{cols.map(c => { const num = typeof r[c] === 'number'
+            return <td key={c} style={{ textAlign: num ? 'right' : 'left' }}>{num ? fmt(r[c]) : (r[c] ?? '—')}</td> })}</tr>)}
+        </tbody>
+      </table>
+      <div style={{ padding: '8px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', borderTop: '1px solid var(--border)' }}>{rows.length} записів</div>
+    </div>
+  )
+}
+
+/* HOME — оболонка дашборду */
+export default function Home() {
+  const router = useRouter()
+  const supabase = useMemo(() => (typeof window !== 'undefined' ? createClient() : null), [])
+  const [active, setActive] = useState('overview')
+  const [role, setRole] = useState(null)
+  const [me, setMe] = useState(null)
+
+  useEffect(() => { fetch('/api/me').then(r => r.json()).then(d => { setRole(d.role); setMe(d) }).catch(() => {}) }, [])
+  async function handleLogout() { await supabase?.auth.signOut(); router.push('/login') }
+
+  return (
+    <>
+      <Head><title>ЛСМД — Дашборд лікарні</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+      <style jsx global>{DASH_CSS}</style>
+      <div className="dashboard">
+        <Sidebar active={active} setActive={setActive} me={me} role={role} onLogout={handleLogout} />
+        <div className="dash-main">
+          {active === 'overview' && <OverviewPage />}
+          {active === 'asystent' && <AsystentTab role={role} />}
         </div>
       </div>
     </>

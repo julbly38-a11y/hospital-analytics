@@ -11,6 +11,11 @@ const QUERIES = {
   urgency:     'SELECT department as відділення, urgent as ургентних, planned as планових FROM v_urgency_stats ORDER BY urgent DESC LIMIT 8',
   patStats:    "SELECT age_group as вік, SUM(cases) as випадків, ROUND(AVG(death_rate_pct),2) as летальність FROM v_patient_stats WHERE gender IN ('Ч','Ж') GROUP BY age_group ORDER BY випадків DESC LIMIT 8",
   icu:         'SELECT всього_поступлень,померло,летальність_pct,середній_ліжкодень FROM v_icu_mortality',
+  // --- Дашборд «Огляд» (живі дані) ---
+  ovKpi:       'SELECT total_cases, unique_patients, death_rate_pct, deaths, avg_bed_days, urgent, planned, urgent_pct, operations, surgical_activity_pct FROM v_hospital_summary',
+  ovHours:     'SELECT hour as година, cases as випадків FROM v_peak_by_hour ORDER BY hour',
+  ovStatus:    "SELECT discharge_status as статус, COUNT(*) as випадків, ROUND(COUNT(*)*100.0/SUM(COUNT(*)) OVER (),2) as відс FROM lsmd WHERE discharge_status IN ('З поліпшенням','Помер','Без змін','Переведений в інший заклад','Лікується','З погіршенням') GROUP BY discharge_status ORDER BY випадків DESC",
+  ovIcd:       "SELECT LEFT(icd_primary,1) as розділ, COUNT(*) as випадків FROM lsmd WHERE icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT 7",
 }
 
 async function getRole(req) {

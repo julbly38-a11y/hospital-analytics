@@ -1,73 +1,63 @@
 /* ============================================================
-   Медична — Design Tokens (інтегровано в hospital-analytics)
-   Повна токен-система бренду + зворотні аліаси для старих стилів.
+   ЛСМД — Colors & Type (з дизайн-системи, експорт Claude Design)
+   Editorial monochrome. Тепле паперове тло, майже-чорний текст,
+   IBM Plex Sans (текст) + IBM Plex Mono (UI/мітки/цифри).
+   Єдиний акцент — медичний червоний #c0392b (ощадно).
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ---------- Neutrals ---------- */
-  --paper:   #FAF7F2;
-  --paper-2: #F3EEE6;
-  --paper-3: #E9E2D6;
-  --ink:     #0F1E1F;
-  --ink-2:   #2B3A3B;
-  --ink-3:   #5E6B6C;
-  --ink-4:   #94A1A1;
-  --border:  #E5DFD2;
-  --border-2:#D6CFC0;
+  /* Surfaces (warm grayscale) */
+  --bg:        #f5f4f0;
+  --bg2:       #eeecea;
+  --surface:   #ffffff;
+  --border:    #d8d5cf;
+  --border-2:  #c4c0b8;
 
-  /* ---------- Brand ---------- */
-  --teal-ink:       #0E4F4F;
-  --teal-ink-hover: #0B3F3F;
-  --teal-ink-soft:  #E4EDEC;
-  --ember:          #D96A4A;
-  --ember-hover:    #BF5B3E;
-  --ember-soft:     #FBE8DF;
+  /* Ink */
+  --text:      #1a1917;
+  --text2:     #6b6760;
+  --text3:     #9c9890;
+  --text-inv:  #f5f4f0;
 
-  /* ---------- Data semantics ---------- */
-  --positive: #3F7A4F; --positive-soft: #E3EDE1;
-  --caution:  #B07A18; --caution-soft:  #F5E9C8;
-  --critical: #B2412E; --critical-soft: #F3DCD4;
-  --info:     #2F6A86; --info-soft:     #DCE8EE;
+  /* Brand accent — медичний червоний (ощадно: CTA, бренд-знак, активна навігація, пік) */
+  --brand:        #c0392b;
+  --brand-hover:  #a93222;
+  --brand-soft:   #fbecea;
 
-  /* ---------- Type ---------- */
-  --font-display: 'Instrument Serif', ui-serif, Georgia, serif;
-  --font-sans:    'IBM Plex Sans', ui-sans-serif, -apple-system, sans-serif;
-  --font-mono:    'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  /* Ink-as-accent (чат лишається монохромним) */
+  --accent:       #1a1917;
+  --accent-bg:    #1a1917;
+  --accent-text:  #f5f4f0;
 
-  /* ---------- Radii / shadow / motion ---------- */
-  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-pill: 999px;
-  --shadow-1: 0 1px 2px rgba(15,30,31,0.06);
-  --shadow-2: 0 2px 8px rgba(15,30,31,0.08);
-  --shadow-3: 0 12px 40px -8px rgba(15,30,31,0.18);
-  --ease: cubic-bezier(0.32,0.72,0,1);
+  /* Semantic */
+  --green:     #16a34a;
+  --red:       #c0392b;
+  --amber:     #b45309;
 
-  /* ---------- Зворотні аліаси (щоб старий Home.module.css не зламався) ---------- */
-  --bg:          var(--paper);
-  --bg2:         var(--paper-2);
-  --surface:     #FFFFFF;
-  --text:        var(--ink);
-  --text2:       var(--ink-3);
-  --text3:       var(--ink-4);
-  --accent:      var(--teal-ink);
-  --accent-bg:   var(--teal-ink);
-  --accent-text: var(--paper);
-  --red:         var(--critical);
-  --mono: var(--font-mono);
-  --sans: var(--font-sans);
+  /* Type */
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Weights */
+  --w-light: 300; --w-regular: 400; --w-medium: 500; --w-semi: 600;
+
+  /* Radii */
+  --r-1: 4px; --r-2: 6px; --r-3: 8px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.4,0,0.2,1);
 }
 
 html, body {
   height: 100%;
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: "ss01","cv05";
 }
-
-::selection { background: var(--ember-soft); color: var(--ink); }
+a { color: inherit; text-decoration: none; }
