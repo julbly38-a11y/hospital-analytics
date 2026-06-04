@@ -359,3 +359,44 @@ full_name, position, specialization. Sidebar і TopBar показують реа
 Перевірено: усі ключі віддають правильні дані (110206, 2.06%, пік 10:00, K/S/I...).
 Решта розділів (Відділення/Лікарі/Діагнози/Пацієнти/Географія/Піки/Нічні) — наступні етапи.
 main НЕ чіпали. Бекенд (роутер/ask/захист) без змін.
+
+### [ ] 36. ДИЗАЙН: точна копія сайту з Claude Design (IN PROGRESS — продовжити в новому чаті)
+МЕТА (за словами користувача): зробити ІДЕНТИЧНИЙ сайт як у Claude Design (усі 13
+розділів + картки), залити на nobodybly.org ЗІ ЗАШИТИМИ даними as-is. Живі дані — ПОТІМ.
+
+ДЖЕРЕЛО ДИЗАЙНУ (актуальне, не плутати зі старим medychna в Downloads):
+/Users/julienblyndu/Library/Mobile Documents/com~apple~CloudDocs/ProCreate/ЛСМД Design System/
+  ui_kits/dashboard/ — index.html, App.jsx, Dashboard.jsx (~879 рядків, ПОВНИЙ),
+  Marketing.jsx, dashboard.css, colors_and_type.css.
+Доступ до iCloud ТІЛЬКИ через Filesystem MCP (bash контейнера НЕ бачить iCloud).
+Інструмент копіювання: Filesystem:copy_file_user_to_claude (path) → кладе на контейнер Клода.
+
+13 розділів навігації (з Dashboard.jsx): Аналітика[Загальна/Огляд, Відділення, Діагнози МКХ,
+Лікарі, Пацієнти(=демографія, БЕЗ ПІБ — безпечно), Географія(Leaflet-карта нп), Піки,
+Нічні зміни, Приймальне, Операції] + Інструменти[AI Асистент(=чат), Звіти, Налаштування].
+Дизайн: монохром #f5f4f0/#1a1917, IBM Plex Sans/Mono, акцент червоний #c0392b, бренд-знак "+".
+Стек дизайну: статичний HTML + React18 UMD + Babel standalone (CDN), JSX-файли, дані ЗАШИТІ в JSX.
+
+ПЛАН (узгоджено): подати ці САМІ файли as-is через Next.js public/, щоб було 1-в-1.
+Поточний стан гілки design-medychna:
+- public/dashboard/ має 6 файлів, АЛЕ Dashboard.jsx ОБРІЗАНИЙ (11КБ, лише DashSidebar+OverviewPage,
+  решти 11 сторінок НЕМАЄ — тому "зовсім не те"). ПОТРІБНО перекопіювати ПОВНИЙ з iCloud.
+- pages/index.js на гілці — переписаний дашборд (Огляд на живих даних + Асистент), лише 2 сторінки.
+
+НАСТУПНІ КРОКИ (новий чат):
+1. Filesystem:copy_file_user_to_claude для всіх 6 файлів з iCloud ui_kits/dashboard → /home/claude.
+2. Скопіювати їх у public/dashboard/ (повні версії).
+3. Варіант подачі: або pages що віддає public/dashboard/index.html, або iframe, або
+   переписати index.html під Next public-флоу (CDN React+Babel працює в браузері as-is).
+   ВАЖЛИВО: babel-standalone у браузері — ок для статики; перевірити CSP/завантаження JSX з /public.
+4. ЗАШИТІ дані лишити як є (демо-числа з дизайну). Узгоджено: спершу копія, потім живі дані.
+5. Залити на nobodybly.org = вмерджити design-medychna в main + переконатися що Vercel
+   зробив НОВИЙ production deploy (минулого разу force-push НЕ тригернув передеплой — прод
+   застряг на старому білді #34; preview гілки був ОК).
+
+ВАЖЛИВО ПРО VERCEL: team_wp8qV3ziHw0eKgh29OchDQ2F, project prj_KavwNImB07wBrDbWxuTr7U13Emco.
+Після зміни main перевіряти Vercel:list_deployments що production target оновився; force-push
+може не тригерити redeploy — можливо тригернути новим комітом або через Vercel deploy.
+
+БЕЗПЕКА: сторінка "Пацієнти" в дизайні = демографія (агрегати вік/стать), БЕЗ реальних ПІБ —
+заливати безпечно. Реальні картки пацієнтів за ПІБ (фіча #29/#31) — ОКРЕМО, лише admin, не в цьому статичному дизайні.
