@@ -231,13 +231,18 @@ function ResultView({ rows }) {
 /* ============================================================
    Sidebar — навігація «Медична»
    ============================================================ */
-function Sidebar({ role, onLogout, globalStats }) {
+function Sidebar({ role, me, onLogout, globalStats }) {
   const nav = [
     { icon: 'home', label: 'Огляд', active: true },
     { icon: 'users', label: 'Пацієнти' },
     { icon: 'database', label: 'Відділення' },
     { icon: 'chart', label: 'Аналітика' },
   ]
+  // Реальне ім'я/посада залогіненого користувача (з /api/me → empl)
+  const displayName = me?.name || (role === 'admin' ? 'Адміністратор' : 'Користувач')
+  const subtitle = me?.specialization || me?.position
+    ? [me.position, me.specialization].filter(Boolean).join(' · ')
+    : (role === 'admin' ? 'Повний доступ' : '')
   return (
     <aside style={{ width: 232, background: 'var(--paper)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100vh', position: 'sticky', top: 0 }}>
@@ -272,12 +277,12 @@ function Sidebar({ role, onLogout, globalStats }) {
       )}
       <div style={{ marginTop: 'auto', padding: 12, borderTop: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Avatar name={role === 'doctor' ? 'Олеся Ільніцька' : 'Адміністратор ЛСМД'} size={32} />
+        <Avatar name={displayName} size={32} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
-            {role === 'doctor' ? 'Олеся Ільніцька' : 'Адміністратор'}</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-            {role === 'doctor' ? 'Невролог' : 'Повний доступ'}</div>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+          {subtitle && <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
         </div>
         <button onClick={onLogout} title="Вийти" style={{ background: 'transparent', border: 0,
           cursor: 'pointer', color: 'var(--ink-3)', display: 'flex' }}>
@@ -298,11 +303,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [globalStats, setGlobalStats] = useState(null)
   const [role, setRole] = useState(null)
+  const [me, setMe] = useState(null)
   const bottomRef = useRef(null)
 
   async function handleLogout() { await supabase?.auth.signOut(); router.push('/login') }
 
-  useEffect(() => { fetch('/api/me').then(r => r.json()).then(d => setRole(d.role)).catch(() => {}) }, [])
+  useEffect(() => { fetch('/api/me').then(r => r.json()).then(d => { setRole(d.role); setMe(d) }).catch(() => {}) }, [])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
   useEffect(() => { fetch('/api/stats').then(r => r.json()).then(setGlobalStats).catch(() => {}) }, [])
 
@@ -334,13 +340,13 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
       <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper-2)' }}>
-        <Sidebar role={role} onLogout={handleLogout} globalStats={globalStats} />
+        <Sidebar role={role} me={me} onLogout={handleLogout} globalStats={globalStats} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           {/* TopBar */}
           <header style={{ padding: '18px 28px 16px', borderBottom: '1px solid var(--border)',
             background: 'var(--paper)', position: 'sticky', top: 0, zIndex: 10 }}>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>
-              {role === 'doctor' ? 'Клінічна робота · Невролог' : 'Аналітика · ЛСМД'}</div>
+              {role === 'doctor' ? `Клінічна робота · ${me?.specialization || 'Лікар'}` : 'Аналітика · ЛСМД'}</div>
             <h1 style={{ margin: 0, fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 400,
               letterSpacing: '-0.01em', color: 'var(--ink)', lineHeight: 1.1 }}>
               {role === 'doctor' ? 'Мої показники' : 'Огляд лікарні'}</h1>
