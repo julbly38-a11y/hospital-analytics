@@ -287,15 +287,20 @@ function PageHead({ crumb, title, right }) {
   )
 }
 
-/* ВІДДІЛЕННЯ */
+/* ВІДДІЛЕННЯ — список з кліком на картку відділення */
 function DepartmentsPage() {
   const { rows, err } = useStat('wDept')
+  const [selected, setSelected] = useState(null)
   const max = rows && rows.length ? Math.max(...rows.map(r => Number(r.випадків))) : 1
+
+  if (selected) return <DeptCard name={selected} onBack={() => setSelected(null)} />
+
   return (
     <>
       <PageHead crumb="Аналітика · Відділення" title="Відділення" />
       <div className="dash-content">
         {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>Клікніть на відділення для детальних показників →</div>
         <div className="table-wrap">
           <table className="dtable">
             <thead><tr>
@@ -311,8 +316,8 @@ function DepartmentsPage() {
             <tbody>
               {!rows && <tr><td colSpan={8} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
               {rows && rows.map((r, i) => (
-                <tr key={i}>
-                  <td style={{ fontFamily: 'var(--sans)' }}>{r.відділення}</td>
+                <tr key={i} onClick={() => setSelected(r.відділення)} style={{ cursor: 'pointer' }}>
+                  <td style={{ fontFamily: 'var(--sans)', color: 'var(--brand)' }}>{r.відділення}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(r.випадків)}</td>
                   <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.унікальних)}</td>
                   <td style={{ textAlign: 'right' }}>{r.ліжкодень}</td>
@@ -326,6 +331,84 @@ function DepartmentsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+    </>
+  )
+}
+
+/* КАРТКА ВІДДІЛЕННЯ — профіль + топ-діагнози (параметризовані запити) */
+function DeptCard({ name, onBack }) {
+  const [prof, setProf] = useState(null)
+  const [diag, setDiag] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    async function load(key) {
+      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, param: name }) })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      return d.rows || []
+    }
+    Promise.all([load('deptProfile'), load('deptDiag')])
+      .then(([p, dg]) => { setProf(p[0] || null); setDiag(dg) })
+      .catch(e => setErr(e.message))
+  }, [name])
+
+  const p = prof || {}
+  const sexTotal = (Number(p.жінки) + Number(p.чоловіки)) || 1
+  const maxDiag = diag && diag.length ? Math.max(...diag.map(d => Number(d.випадків))) : 1
+
+  return (
+    <>
+      <PageHead crumb="Аналітика · Відділення" title={name}
+        right={<button className="btn-secondary" onClick={onBack}>← Усі відділення</button>} />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        {!prof && !err && <div className="panel" style={{ color: 'var(--text3)' }}>завантаження…</div>}
+        {prof && (
+          <>
+            <div className="kpi-row">
+              <div className="kpi"><div className="lbl">Випадків</div><div className="val">{fmt(p.випадків)}</div><div className="delta">{fmt(p.унікальних)} унікальних</div></div>
+              <div className="kpi"><div className="lbl">Летальність</div><div className="val">{p.летальність}%</div><div className="delta down">середній вік {p.середній_вік}</div></div>
+              <div className="kpi"><div className="lbl">Сер. ліжко-день</div><div className="val">{p.ліжкодень}</div><div className="delta">ургентних {p.ургентних_відс}%</div></div>
+              <div className="kpi"><div className="lbl">Хір. активність</div><div className="val">{p.хір_активність}%</div><div className="delta">{fmt(p.операцій)} операцій</div></div>
+            </div>
+            <div className="chart-row">
+              <div className="panel">
+                <div className="panel-head"><h3>Топ-діагнози відділення</h3><span className="filter">з department_diagnoses</span></div>
+                <div className="dept-list">
+                  {!diag && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>завантаження…</div>}
+                  {(diag || []).map((d, i) => (
+                    <div key={i} className="dept-row" style={{ alignItems: 'flex-start' }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--brand)', width: 56 }}>{d.код}</span>
+                      <span className="name" style={{ flex: '1 1 auto', whiteSpace: 'normal', lineHeight: 1.4 }}>{d.діагноз}</span>
+                      <span className="bar-wrap" style={{ width: 90, marginTop: 5 }}><span className="bar-fill" style={{ width: `${(Number(d.випадків) / maxDiag) * 100}%` }} /></span>
+                      <span className="pct" style={{ width: 48, marginTop: 2 }}>{fmt(d.випадків)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="panel">
+                <div className="panel-head"><h3>Стать</h3><span className="filter">{fmt(sexTotal)}</span></div>
+                {[{ l: 'Чоловіки', v: Number(p.чоловіки), c: 'var(--text)' }, { l: 'Жінки', v: Number(p.жінки), c: 'var(--text2)' }].map((row, i) => (
+                  <div key={i} style={{ marginTop: i ? 16 : 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 12, marginBottom: 6 }}>
+                      <span>{row.l}</span><span>{((row.v / sexTotal) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div style={{ height: 10, background: 'var(--bg2)', borderRadius: 5, overflow: 'hidden' }}>
+                      <div style={{ width: `${(row.v / sexTotal) * 100}%`, height: '100%', background: row.c }} /></div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmt(row.v)}</div>
+                  </div>
+                ))}
+                <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text2)', lineHeight: 1.8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Діти</span><span>{fmt(p.діти)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Літні</span><span>{fmt(p.літні)}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>З поліпшенням</span><span>{fmt(p.поліпшення)}</span></div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   )
