@@ -26,6 +26,8 @@ const QUERIES = {
   wDoctors:    'SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.doctor_id = ds.doctor_id ORDER BY ds.total_cases DESC LIMIT 20',
   wNight:      'SELECT time_period as період, cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, deaths as померло, letality_percent as летальність FROM v_night_vs_day_admissions ORDER BY cases DESC',
   wOps:        'SELECT department as відділення, operations as операцій, total_cases as випадків, surgical_activity_pct as хір_активність FROM v_department_stats WHERE operations > 0 ORDER BY operations DESC',
+  // --- Хвиля 3: Географія ---
+  wGeo:        "SELECT region as область, COALESCE(district,'(центр / без деталізації)') as район, SUM(cases) as випадків, SUM(unique_patients) as пацієнтів, ROUND(AVG(avg_bed_days::numeric),1) as ліжкодень, SUM(deaths) as померло FROM v_region_stats GROUP BY region, district ORDER BY випадків DESC LIMIT 25",
 }
 
 async function getRole(req) {

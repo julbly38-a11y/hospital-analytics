@@ -73,11 +73,14 @@ const DASH_NAV = [
   { id: 'diagnoses',   label: 'Діагнози МКХ', gl: '⌘', group: 'Аналітика' },
   { id: 'doctors',     label: 'Лікарі',       gl: '◐', group: 'Аналітика' },
   { id: 'patients',    label: 'Пацієнти',     gl: '○', group: 'Аналітика' },
+  { id: 'geography',   label: 'Географія',    gl: '◯', group: 'Аналітика' },
   { id: 'peaks',       label: 'Піки',         gl: '⌃', group: 'Аналітика' },
   { id: 'night',       label: 'Нічні зміни',  gl: '◗', group: 'Аналітика' },
   { id: 'urgency',     label: 'Ургентність',  gl: '✚', group: 'Аналітика' },
   { id: 'operations',  label: 'Операції',     gl: '⌖', group: 'Аналітика' },
   { id: 'asystent',    label: 'AI Асистент',  gl: '+', group: 'Інструменти' },
+  { id: 'reports',     label: 'Звіти',        gl: 'Σ', group: 'Інструменти' },
+  { id: 'settings',    label: 'Налаштування', gl: '⚙', group: 'Інструменти' },
 ]
 /* Хвиля 1 додала: Відділення, Пацієнти, Піки, Ургентність (живі дані).
    Майбутні (наступні хвилі): Діагнози, Лікарі, Географія, Нічні, Приймальне, Операції, Звіти, Налаштування */
@@ -628,6 +631,104 @@ function OperationsPage() {
   )
 }
 
+/* ГЕОГРАФІЯ — топ районів за пацієнтами (живі дані v_region_stats) */
+function GeographyPage() {
+  const { rows, err } = useStat('wGeo')
+  const max = rows && rows.length ? Math.max(...rows.map(r => Number(r.пацієнтів))) : 1
+  const totalPat = rows ? rows.reduce((s, r) => s + Number(r.пацієнтів), 0) : 0
+  return (
+    <>
+      <PageHead crumb="Аналітика · Географія" title="Звідки пацієнти" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="panel">
+          <div className="panel-head"><h3>Топ-25 районів за кількістю пацієнтів</h3><span className="filter">{fmt(totalPat)} у вибірці</span></div>
+          <div className="table-wrap" style={{ border: 'none', borderRadius: 0 }}>
+            <table className="dtable">
+              <thead><tr>
+                <th>Область</th>
+                <th>Район</th>
+                <th style={{ textAlign: 'right' }}>Пацієнтів</th>
+                <th style={{ textAlign: 'right' }}>Випадків</th>
+                <th style={{ textAlign: 'right' }}>Ліжко-день</th>
+                <th style={{ minWidth: 120 }}>Обсяг</th>
+              </tr></thead>
+              <tbody>
+                {!rows && <tr><td colSpan={6} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+                {(rows || []).map((r, i) => {
+                  const cher = r.область === 'Чернівецька'
+                  return (
+                    <tr key={i}>
+                      <td style={{ fontFamily: 'var(--sans)', color: cher ? 'var(--text)' : 'var(--text2)' }}>{r.область}</td>
+                      <td style={{ fontFamily: 'var(--sans)', color: 'var(--text2)' }}>{r.район}</td>
+                      <td style={{ textAlign: 'right' }}>{fmt(r.пацієнтів)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.випадків)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{r.ліжкодень}</td>
+                      <td><div style={{ height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(Number(r.пацієнтів) / max) * 100}%`, height: '100%', background: cher ? 'var(--brand)' : 'var(--text)' }} /></div></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="panel" style={{ marginTop: 16, padding: 16, background: 'var(--bg2)' }}>
+          <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6 }}>
+            Дані з <code style={{ fontFamily: 'var(--mono)' }}>v_region_stats</code> (область + район). Інтерактивна карта з геокодуванням населених пунктів — у наступній ітерації.</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ЗВІТИ — інформаційна сторінка */
+function ReportsPage() {
+  return (
+    <>
+      <PageHead crumb="Інструменти · Звіти" title="Звіти" />
+      <div className="dash-content">
+        <div className="panel" style={{ padding: 40, textAlign: 'center' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 24, color: 'var(--text3)', marginBottom: 10 }}>Σ</div>
+          <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6, maxWidth: 460, margin: '0 auto' }}>
+            Експорт у CSV/PDF, шаблони МОЗ та заплановані звіти на пошту — у розробці. Поки що звіти можна формувати через <strong>AI Асистент</strong> природною мовою.</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* НАЛАШТУВАННЯ — інфраструктура (з реального стану) */
+function SettingsPage() {
+  const rows = [
+    ['Supabase PostgreSQL', 'підключено', 'таблиці + аналітичні view · eu-west-1'],
+    ['AI Асистент', 'активний', 'Groq (безкоштовно) · Gemini · OpenAI · Anthropic'],
+    ['Авторизація', 'увімкнено', 'Supabase Auth · ролі через app_users'],
+    ['Хостинг', 'Vercel', 'гілка design-medychna (preview)'],
+  ]
+  return (
+    <>
+      <PageHead crumb="Інструменти · Налаштування" title="Інфраструктура" />
+      <div className="dash-content">
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr><th>Компонент</th><th>Статус</th><th>Опис</th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontWeight: 500 }}>{r[0]}</td>
+                  <td><span style={{ display: 'inline-block', padding: '2px 8px', background: 'var(--brand-soft)', color: 'var(--brand)', borderRadius: 4, fontSize: 10, fontWeight: 500, letterSpacing: '0.05em', fontFamily: 'var(--mono)' }}>{r[1]}</span></td>
+                  <td style={{ color: 'var(--text2)' }}>{r[2]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
 /* AI АСИСТЕНТ — робочий чат (логіка збережена) у стилі дашборду */
 const ALL_EXAMPLES = [
   'Загальна статистика лікарні','Показники по напрямках','Скільки всього госпіталізацій',
@@ -764,10 +865,13 @@ export default function Home() {
           {active === 'diagnoses' && <DiagnosesPage />}
           {active === 'doctors' && <DoctorsPage />}
           {active === 'patients' && <PatientsPage />}
+          {active === 'geography' && <GeographyPage />}
           {active === 'peaks' && <PeaksPage />}
           {active === 'night' && <NightPage />}
           {active === 'urgency' && <UrgencyPage />}
           {active === 'operations' && <OperationsPage />}
+          {active === 'reports' && <ReportsPage />}
+          {active === 'settings' && <SettingsPage />}
           {active === 'asystent' && <AsystentTab role={role} />}
         </div>
       </div>
