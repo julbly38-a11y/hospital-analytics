@@ -70,9 +70,13 @@ const DASH_CSS = `
 const DASH_NAV = [
   { id: 'overview',    label: 'Загальна',     gl: '◆', group: 'Аналітика' },
   { id: 'departments', label: 'Відділення',   gl: '▦', group: 'Аналітика' },
+  { id: 'diagnoses',   label: 'Діагнози МКХ', gl: '⌘', group: 'Аналітика' },
+  { id: 'doctors',     label: 'Лікарі',       gl: '◐', group: 'Аналітика' },
   { id: 'patients',    label: 'Пацієнти',     gl: '○', group: 'Аналітика' },
   { id: 'peaks',       label: 'Піки',         gl: '⌃', group: 'Аналітика' },
+  { id: 'night',       label: 'Нічні зміни',  gl: '◗', group: 'Аналітика' },
   { id: 'urgency',     label: 'Ургентність',  gl: '✚', group: 'Аналітика' },
+  { id: 'operations',  label: 'Операції',     gl: '⌖', group: 'Аналітика' },
   { id: 'asystent',    label: 'AI Асистент',  gl: '+', group: 'Інструменти' },
 ]
 /* Хвиля 1 додала: Відділення, Пацієнти, Піки, Ургентність (живі дані).
@@ -462,6 +466,168 @@ function UrgencyPage() {
   )
 }
 
+/* ДІАГНОЗИ МКХ — топ-20 кодів */
+function DiagnosesPage() {
+  const { rows, err } = useStat('wDiag')
+  const max = rows && rows.length ? Math.max(...rows.map(r => Number(r.випадків))) : 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Діагнози МКХ-10" title="Топ діагнозів" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="panel">
+          <div className="panel-head"><h3>Топ-20 кодів МКХ-10</h3><span className="filter">за всі роки</span></div>
+          <div className="dept-list">
+            {!rows && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>завантаження…</div>}
+            {(rows || []).map((r, i) => (
+              <div key={i} className="dept-row" style={{ alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--brand)', width: 64 }}>{r.код}</span>
+                <span className="name" style={{ flex: '1 1 auto', whiteSpace: 'normal', lineHeight: 1.4 }}>{r.діагноз}</span>
+                <span className="bar-wrap" style={{ width: 120, marginTop: 5 }}><span className="bar-fill" style={{ width: `${(Number(r.випадків) / max) * 100}%` }} /></span>
+                <span className="pct" style={{ width: 56, marginTop: 2 }}>{fmt(r.випадків)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ЛІКАРІ — топ-20 за обсягом */
+function DoctorsPage() {
+  const { rows, err } = useStat('wDoctors')
+  return (
+    <>
+      <PageHead crumb="Аналітика · Лікарі" title="Топ лікарів за обсягом" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr>
+              <th>Лікар</th>
+              <th style={{ textAlign: 'right' }}>Випадків</th>
+              <th style={{ textAlign: 'right' }}>Унік.</th>
+              <th style={{ textAlign: 'right' }}>З поліпш.</th>
+              <th style={{ textAlign: 'right' }}>Померло</th>
+              <th style={{ textAlign: 'right' }}>Сер. ЛД</th>
+            </tr></thead>
+            <tbody>
+              {!rows && <tr><td colSpan={6} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+              {(rows || []).map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontFamily: 'var(--sans)', fontWeight: 500 }}>{r.лікар}</td>
+                  <td style={{ textAlign: 'right' }}>{fmt(r.випадків)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.унікальних)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--green)' }}>{fmt(r.поліпшення)}</td>
+                  <td style={{ textAlign: 'right', color: Number(r.померло) > 50 ? 'var(--brand)' : 'var(--text2)' }}>{fmt(r.померло)}</td>
+                  <td style={{ textAlign: 'right' }}>{r.ліжкодень}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* НІЧНІ ЗМІНИ — день vs ніч */
+function NightPage() {
+  const { rows, err } = useStat('wNight')
+  const total = rows ? rows.reduce((s, r) => s + Number(r.випадків), 0) : 0
+  return (
+    <>
+      <PageHead crumb="Аналітика · Нічні зміни" title="Денні vs нічні" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        {!rows && <div className="panel" style={{ color: 'var(--text3)' }}>завантаження…</div>}
+        {rows && (
+          <>
+            <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+              {rows.map((r, i) => (
+                <div key={i} className="kpi">
+                  <div className="lbl">{r.період}</div>
+                  <div className="val">{fmt(r.випадків)}</div>
+                  <div className={`delta${r.період === 'Ніч' ? ' down' : ''}`}>{total ? ((Number(r.випадків) / total) * 100).toFixed(1) : 0}% · летальність {r.летальність}%</div>
+                </div>
+              ))}
+              <div className="kpi">
+                <div className="lbl">Контраст летальності</div>
+                <div className="val" style={{ color: 'var(--brand)' }}>
+                  {rows.length === 2 ? `×${(Number(rows.find(r => r.період === 'Ніч')?.летальність || 0) / Number(rows.find(r => r.період === 'День')?.летальність || 1)).toFixed(1)}` : '—'}
+                </div>
+                <div className="delta">ніч проти дня</div>
+              </div>
+            </div>
+            <div className="panel">
+              <div className="panel-head"><h3>Розподіл за змінами</h3><span className="filter">{fmt(total)} всього</span></div>
+              {rows.map((r, i) => {
+                const pct = total ? (Number(r.випадків) / total) * 100 : 0
+                return (
+                  <div key={i} style={{ marginTop: i ? 16 : 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 13, marginBottom: 6 }}>
+                      <span style={{ color: r.період === 'Ніч' ? 'var(--brand)' : 'var(--text)', fontWeight: 500 }}>{r.період}</span>
+                      <span>{pct.toFixed(1)}%</span>
+                    </div>
+                    <div style={{ height: 12, background: 'var(--bg2)', borderRadius: 6, overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: r.період === 'Ніч' ? 'var(--brand)' : 'var(--text)' }} /></div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>{fmt(r.випадків)} випадків · ліжко-день {r.ліжкодень} · померло {fmt(r.померло)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* ОПЕРАЦІЇ — обсяг по відділеннях */
+function OperationsPage() {
+  const { rows, err } = useStat('wOps')
+  const totalOps = rows ? rows.reduce((s, r) => s + Number(r.операцій), 0) : 0
+  const max = rows && rows.length ? Math.max(...rows.map(r => Number(r.операцій))) : 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Операції" title="Операційна активність" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <div className="kpi"><div className="lbl">Операційних кейсів</div><div className="val">{fmt(totalOps)}</div><div className="delta">по всіх відділеннях</div></div>
+          <div className="kpi"><div className="lbl">Хір. відділень</div><div className="val">{rows ? rows.length : '…'}</div><div className="delta">з операціями</div></div>
+          <div className="kpi"><div className="lbl">Лідер</div><div className="val" style={{ fontSize: 18 }}>{rows && rows[0] ? rows[0].відділення.split(' ').slice(0, 2).join(' ') : '…'}</div><div className="delta">{rows && rows[0] ? `${fmt(rows[0].операцій)} операцій` : ''}</div></div>
+        </div>
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr>
+              <th>Відділення</th>
+              <th style={{ textAlign: 'right' }}>Операцій</th>
+              <th style={{ textAlign: 'right' }}>Випадків</th>
+              <th style={{ textAlign: 'right' }}>Хір. активність</th>
+              <th style={{ minWidth: 110 }}>Обсяг</th>
+            </tr></thead>
+            <tbody>
+              {!rows && <tr><td colSpan={5} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+              {(rows || []).map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontFamily: 'var(--sans)' }}>{r.відділення}</td>
+                  <td style={{ textAlign: 'right' }}>{fmt(r.операцій)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.випадків)}</td>
+                  <td style={{ textAlign: 'right' }}>{r.хір_активність}%</td>
+                  <td><div style={{ height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${(Number(r.операцій) / max) * 100}%`, height: '100%', background: 'var(--text)' }} /></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
 /* AI АСИСТЕНТ — робочий чат (логіка збережена) у стилі дашборду */
 const ALL_EXAMPLES = [
   'Загальна статистика лікарні','Показники по напрямках','Скільки всього госпіталізацій',
@@ -595,9 +761,13 @@ export default function Home() {
         <div className="dash-main">
           {active === 'overview' && <OverviewPage />}
           {active === 'departments' && <DepartmentsPage />}
+          {active === 'diagnoses' && <DiagnosesPage />}
+          {active === 'doctors' && <DoctorsPage />}
           {active === 'patients' && <PatientsPage />}
           {active === 'peaks' && <PeaksPage />}
+          {active === 'night' && <NightPage />}
           {active === 'urgency' && <UrgencyPage />}
+          {active === 'operations' && <OperationsPage />}
           {active === 'asystent' && <AsystentTab role={role} />}
         </div>
       </div>
