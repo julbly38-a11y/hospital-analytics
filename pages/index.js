@@ -414,8 +414,129 @@ function DeptCard({ name, onBack }) {
   )
 }
 
+/* ПОШУК ПАЦІЄНТА — лише admin (персональні дані) */
+function PatientSearch() {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr] = useState(null)
+  const [picked, setPicked] = useState(null)
+
+  async function search() {
+    if (q.trim().length < 2) return
+    setLoading(true); setErr(null); setResults(null)
+    try {
+      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'patSearch', param: q.trim() }) })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      setResults(d.rows || [])
+    } catch (e) { setErr(e.message) }
+    setLoading(false)
+  }
+
+  if (picked) return <PatientCard pid={picked} onBack={() => setPicked(null)} />
+
+  return (
+    <div className="panel" style={{ marginBottom: 20 }}>
+      <div className="panel-head"><h3>Пошук пацієнта за ПІБ</h3><span className="filter">admin · персональні дані</span></div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: results ? 14 : 0 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()}
+          placeholder="Прізвище або частина ПІБ…" style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 14,
+            padding: '10px 14px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', outline: 'none' }} />
+        <button onClick={search} disabled={loading || q.trim().length < 2} className="btn-secondary"
+          style={{ opacity: loading || q.trim().length < 2 ? 0.4 : 1 }}>{loading ? '…' : 'Знайти'}</button>
+      </div>
+      {err && <div style={{ color: 'var(--brand)', fontSize: 13, fontFamily: 'var(--mono)' }}>{err}</div>}
+      {results && results.length === 0 && <div style={{ color: 'var(--text3)', fontSize: 13, fontFamily: 'var(--mono)' }}>Нічого не знайдено</div>}
+      {results && results.length > 0 && (
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr><th>ПІБ</th><th style={{ textAlign: 'right' }}>Вік</th><th>Стать</th><th>Населений пункт</th></tr></thead>
+            <tbody>
+              {results.map((r, i) => (
+                <tr key={i} onClick={() => setPicked(r.patient_id)} style={{ cursor: 'pointer' }}>
+                  <td style={{ fontFamily: 'var(--sans)', fontWeight: 500, color: 'var(--brand)' }}>{r.піб}</td>
+                  <td style={{ textAlign: 'right' }}>{r.вік ?? '—'}</td>
+                  <td style={{ color: 'var(--text2)' }}>{r.стать || '—'}</td>
+                  <td style={{ color: 'var(--text2)' }}>{r.нп || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* КАРТКА ПАЦІЄНТА — профіль + історія госпіталізацій (admin) */
+function PatientCard({ pid, onBack }) {
+  const [card, setCard] = useState(null)
+  const [hist, setHist] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    async function load(key) {
+      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, param: String(pid) }) })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      return d.rows || []
+    }
+    Promise.all([load('patCard'), load('patHistory')])
+      .then(([c, h]) => { setCard(c[0] || null); setHist(h) })
+      .catch(e => setErr(e.message))
+  }, [pid])
+  const c = card || {}
+  return (
+    <div className="panel" style={{ marginBottom: 20, borderColor: 'var(--brand)' }}>
+      <div className="panel-head">
+        <h3>Картка пацієнта</h3>
+        <button className="btn-secondary" onClick={onBack} style={{ padding: '4px 10px' }}>← Пошук</button>
+      </div>
+      {err && <div style={{ color: 'var(--brand)', fontSize: 13, fontFamily: 'var(--mono)' }}>{err}</div>}
+      {!card && !err && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 13 }}>завантаження…</div>}
+      {card && (
+        <>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 20, color: 'var(--text)', marginBottom: 8 }}>{c.піб}</div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text2)', lineHeight: 1.9 }}>
+              <span style={{ marginRight: 18 }}>Вік: {c.вік ?? '—'}</span>
+              <span style={{ marginRight: 18 }}>Стать: {c.стать || '—'}</span>
+              <span style={{ marginRight: 18 }}>Нар.: {c.дата_нар || '—'}</span>
+              <span>Тел.: {c.телефон || '—'}</span><br />
+              <span>{[c.нп, c.район, c.область].filter(Boolean).join(' · ') || '—'}</span>
+            </div>
+          </div>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            Історія госпіталізацій {hist ? `(${hist.length})` : ''}
+          </div>
+          <div className="table-wrap">
+            <table className="dtable">
+              <thead><tr><th>Поступив</th><th>Виписаний</th><th>Діагноз</th><th>Відділення</th><th>Статус</th><th style={{ textAlign: 'right' }}>ЛД</th></tr></thead>
+              <tbody>
+                {!hist && <tr><td colSpan={6} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+                {(hist || []).map((h, i) => (
+                  <tr key={i}>
+                    <td>{h.поступив}</td>
+                    <td style={{ color: 'var(--text2)' }}>{h.виписаний || '—'}</td>
+                    <td style={{ fontWeight: 500, color: 'var(--brand)' }}>{h.діагноз}</td>
+                    <td style={{ fontFamily: 'var(--sans)', color: 'var(--text2)' }}>{h.відділення}</td>
+                    <td style={{ color: h.статус === 'Помер' ? 'var(--brand)' : 'var(--text2)' }}>{h.статус}</td>
+                    <td style={{ textAlign: 'right' }}>{h.ліжкодень ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 /* ПАЦІЄНТИ — демографія за статтю і віком */
-function PatientsPage() {
+function PatientsPage({ role }) {
   const { rows, err } = useStat('wPat')
   const byAge = useMemo(() => {
     if (!rows) return []
@@ -435,6 +556,7 @@ function PatientsPage() {
     <>
       <PageHead crumb="Аналітика · Пацієнти" title="Демографія пацієнтів" />
       <div className="dash-content">
+        {role === 'admin' && <PatientSearch />}
         {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
         <div className="chart-row">
           <div className="panel">
@@ -583,11 +705,14 @@ function DiagnosesPage() {
 /* ЛІКАРІ — топ-20 за обсягом */
 function DoctorsPage() {
   const { rows, err } = useStat('wDoctors')
+  const [selected, setSelected] = useState(null)
+  if (selected) return <DocCard name={selected} onBack={() => setSelected(null)} />
   return (
     <>
       <PageHead crumb="Аналітика · Лікарі" title="Топ лікарів за обсягом" />
       <div className="dash-content">
         {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>Клікніть на лікаря для детальної картки →</div>
         <div className="table-wrap">
           <table className="dtable">
             <thead><tr>
@@ -601,8 +726,8 @@ function DoctorsPage() {
             <tbody>
               {!rows && <tr><td colSpan={6} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
               {(rows || []).map((r, i) => (
-                <tr key={i}>
-                  <td style={{ fontFamily: 'var(--sans)', fontWeight: 500 }}>{r.лікар}</td>
+                <tr key={i} onClick={() => setSelected(r.лікар)} style={{ cursor: 'pointer' }}>
+                  <td style={{ fontFamily: 'var(--sans)', fontWeight: 500, color: 'var(--brand)' }}>{r.лікар}</td>
                   <td style={{ textAlign: 'right' }}>{fmt(r.випадків)}</td>
                   <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.унікальних)}</td>
                   <td style={{ textAlign: 'right', color: 'var(--green)' }}>{fmt(r.поліпшення)}</td>
@@ -613,6 +738,61 @@ function DoctorsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+    </>
+  )
+}
+
+/* КАРТКА ЛІКАРЯ — профіль + топ-діагнози */
+function DocCard({ name, onBack }) {
+  const [prof, setProf] = useState(null)
+  const [diag, setDiag] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    async function load(key) {
+      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, param: name }) })
+      const d = await r.json()
+      if (d.error) throw new Error(d.error)
+      return d.rows || []
+    }
+    Promise.all([load('docProfile'), load('docDiag')])
+      .then(([p, dg]) => { setProf(p[0] || null); setDiag(dg) })
+      .catch(e => setErr(e.message))
+  }, [name])
+  const p = prof || {}
+  const maxDiag = diag && diag.length ? Math.max(...diag.map(d => Number(d.випадків))) : 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Лікарі" title={name}
+        right={<button className="btn-secondary" onClick={onBack}>← Усі лікарі</button>} />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        {!prof && !err && <div className="panel" style={{ color: 'var(--text3)' }}>завантаження…</div>}
+        {prof && (
+          <>
+            <div className="kpi-row">
+              <div className="kpi"><div className="lbl">Випадків</div><div className="val">{fmt(p.випадків)}</div><div className="delta">{fmt(p.унікальних)} унікальних</div></div>
+              <div className="kpi"><div className="lbl">З поліпшенням</div><div className="val">{fmt(p.поліпшення)}</div><div className="delta">померло {fmt(p.померло)}</div></div>
+              <div className="kpi"><div className="lbl">Сер. ліжко-день</div><div className="val">{p.ліжкодень}</div><div className="delta">денних {fmt(p.денних)} · нічних {fmt(p.нічних)}</div></div>
+              <div className="kpi"><div className="lbl">Вихідних</div><div className="val">{fmt(p.вихідних)}</div><div className="delta">{p.перший} → {p.останній}</div></div>
+            </div>
+            <div className="panel">
+              <div className="panel-head"><h3>Топ-діагнози лікаря</h3><span className="filter">з doctor_diagnoses</span></div>
+              <div className="dept-list">
+                {!diag && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>завантаження…</div>}
+                {(diag || []).map((d, i) => (
+                  <div key={i} className="dept-row" style={{ alignItems: 'flex-start' }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--brand)', width: 56 }}>{d.код}</span>
+                    <span className="name" style={{ flex: '1 1 auto', whiteSpace: 'normal', lineHeight: 1.4 }}>{d.діагноз}</span>
+                    <span className="bar-wrap" style={{ width: 90, marginTop: 5 }}><span className="bar-fill" style={{ width: `${(Number(d.випадків) / maxDiag) * 100}%` }} /></span>
+                    <span className="pct" style={{ width: 48, marginTop: 2 }}>{fmt(d.випадків)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </>
   )
@@ -947,7 +1127,7 @@ export default function Home() {
           {active === 'departments' && <DepartmentsPage />}
           {active === 'diagnoses' && <DiagnosesPage />}
           {active === 'doctors' && <DoctorsPage />}
-          {active === 'patients' && <PatientsPage />}
+          {active === 'patients' && <PatientsPage role={role} />}
           {active === 'geography' && <GeographyPage />}
           {active === 'peaks' && <PeaksPage />}
           {active === 'night' && <NightPage />}
