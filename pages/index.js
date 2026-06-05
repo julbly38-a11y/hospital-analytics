@@ -69,9 +69,14 @@ const DASH_CSS = `
 /* Навігація (з дизайну ui_kits/dashboard) */
 const DASH_NAV = [
   { id: 'overview',    label: 'Загальна',     gl: '◆', group: 'Аналітика' },
+  { id: 'departments', label: 'Відділення',   gl: '▦', group: 'Аналітика' },
+  { id: 'patients',    label: 'Пацієнти',     gl: '○', group: 'Аналітика' },
+  { id: 'peaks',       label: 'Піки',         gl: '⌃', group: 'Аналітика' },
+  { id: 'urgency',     label: 'Ургентність',  gl: '✚', group: 'Аналітика' },
   { id: 'asystent',    label: 'AI Асистент',  gl: '+', group: 'Інструменти' },
 ]
-/* Майбутні розділи (поки заглушки): Відділення, Діагнози, Лікарі, Пацієнти, Географія, Піки, Нічні, Операції, Звіти, Налаштування */
+/* Хвиля 1 додала: Відділення, Пацієнти, Піки, Ургентність (живі дані).
+   Майбутні (наступні хвилі): Діагнози, Лікарі, Географія, Нічні, Приймальне, Операції, Звіти, Налаштування */
 
 function fmt(n) {
   if (n === null || n === undefined || n === '') return '—'
@@ -252,6 +257,211 @@ function OverviewPage() {
   )
 }
 
+/* ── Хвиля 1: спільний хук завантаження ── */
+function useStat(key) {
+  const [rows, setRows] = useState(null)
+  const [err, setErr] = useState(null)
+  useEffect(() => {
+    fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }) })
+      .then(r => r.json())
+      .then(d => { if (d.error) throw new Error(d.error); setRows(d.rows || []) })
+      .catch(e => setErr(e.message))
+  }, [key])
+  return { rows, err }
+}
+
+function PageHead({ crumb, title, right }) {
+  return (
+    <div className="dash-header">
+      <div><div className="crumbs">{crumb}</div><h1>{title}</h1></div>
+      {right && <div style={{ display: 'flex', gap: 8 }}>{right}</div>}
+    </div>
+  )
+}
+
+/* ВІДДІЛЕННЯ */
+function DepartmentsPage() {
+  const { rows, err } = useStat('wDept')
+  const max = rows && rows.length ? Math.max(...rows.map(r => Number(r.випадків))) : 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Відділення" title="Відділення" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr>
+              <th>Відділення</th>
+              <th style={{ textAlign: 'right' }}>Випадків</th>
+              <th style={{ textAlign: 'right' }}>Унік.</th>
+              <th style={{ textAlign: 'right' }}>Ліжко-день</th>
+              <th style={{ textAlign: 'right' }}>Летальність</th>
+              <th style={{ textAlign: 'right' }}>Операцій</th>
+              <th style={{ textAlign: 'right' }}>Хір. активність</th>
+              <th style={{ minWidth: 110 }}>Обсяг</th>
+            </tr></thead>
+            <tbody>
+              {!rows && <tr><td colSpan={8} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+              {rows && rows.map((r, i) => (
+                <tr key={i}>
+                  <td style={{ fontFamily: 'var(--sans)' }}>{r.відділення}</td>
+                  <td style={{ textAlign: 'right' }}>{fmt(r.випадків)}</td>
+                  <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(r.унікальних)}</td>
+                  <td style={{ textAlign: 'right' }}>{r.ліжкодень}</td>
+                  <td style={{ textAlign: 'right', color: Number(r.летальність) > 2 ? 'var(--brand)' : 'var(--text2)' }}>{r.летальність}%</td>
+                  <td style={{ textAlign: 'right' }}>{fmt(r.операцій)}</td>
+                  <td style={{ textAlign: 'right' }}>{r.хір_активність}%</td>
+                  <td><div style={{ height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${(Number(r.випадків) / max) * 100}%`, height: '100%', background: 'var(--text)' }} /></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ПАЦІЄНТИ — демографія за статтю і віком */
+function PatientsPage() {
+  const { rows, err } = useStat('wPat')
+  const byAge = useMemo(() => {
+    if (!rows) return []
+    const m = {}
+    rows.forEach(r => { m[r.вік] = (m[r.вік] || 0) + Number(r.випадків) })
+    return Object.entries(m).map(([вік, n]) => ({ вік, n })).sort((a, b) => a.вік.localeCompare(b.вік))
+  }, [rows])
+  const maxAge = byAge.length ? Math.max(...byAge.map(a => a.n)) : 1
+  const totals = useMemo(() => {
+    if (!rows) return { ч: 0, ж: 0 }
+    let ч = 0, ж = 0
+    rows.forEach(r => { if (r.стать === 'Ч') ч += Number(r.випадків); if (r.стать === 'Ж') ж += Number(r.випадків) })
+    return { ч, ж }
+  }, [rows])
+  const totalSex = (totals.ч + totals.ж) || 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Пацієнти" title="Демографія пацієнтів" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="chart-row">
+          <div className="panel">
+            <div className="panel-head"><h3>Розподіл за віком</h3><span className="filter">випадків</span></div>
+            <div className="dept-list">
+              {!rows && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>завантаження…</div>}
+              {byAge.map(a => (
+                <div key={a.вік} className="dept-row">
+                  <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--text)', width: 64 }}>{a.вік}</span>
+                  <span className="bar-wrap" style={{ flex: 1 }}><span className="bar-fill" style={{ width: `${(a.n / maxAge) * 100}%`, background: a.n === maxAge ? 'var(--brand)' : 'var(--text)' }} /></span>
+                  <span className="pct" style={{ width: 64 }}>{fmt(a.n)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="panel">
+            <div className="panel-head"><h3>Стать</h3><span className="filter">{fmt(totalSex)}</span></div>
+            {[{ l: 'Чоловіча', v: totals.ч, c: 'var(--text)' }, { l: 'Жіноча', v: totals.ж, c: 'var(--text2)' }].map((row, i) => (
+              <div key={i} style={{ marginTop: i ? 18 : 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--mono)', fontSize: 12, marginBottom: 6 }}>
+                  <span>{row.l}</span><span>{((row.v / totalSex) * 100).toFixed(1)}%</span>
+                </div>
+                <div style={{ height: 10, background: 'var(--bg2)', borderRadius: 5, overflow: 'hidden' }}>
+                  <div style={{ width: `${(row.v / totalSex) * 100}%`, height: '100%', background: row.c }} /></div>
+                <div style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{fmt(row.v)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ПІКИ — години + дні тижня */
+function PeaksPage() {
+  const { rows: hours } = useStat('ovHours')
+  const { rows: dow } = useStat('wWeekday')
+  const maxH = hours && hours.length ? Math.max(...hours.map(h => Number(h.випадків))) : 1
+  const peakH = hours && hours.length ? hours.reduce((mi, h, i, a) => Number(h.випадків) > Number(a[mi].випадків) ? i : mi, 0) : -1
+  const maxD = dow && dow.length ? Math.max(...dow.map(d => Number(d.поступлень))) : 1
+  return (
+    <>
+      <PageHead crumb="Аналітика · Піки навантаження" title="Коли надходять пацієнти" />
+      <div className="dash-content">
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <div className="panel-head"><h3>За годинами доби</h3>{peakH >= 0 && <span className="filter">пік {String(hours[peakH].година).padStart(2, '0')}:00</span>}</div>
+          <div className="barchart">
+            {(hours || []).map((h, i) => (
+              <div key={i} className={`bar${i === peakH ? ' peak' : ''}`} style={{ height: `${(Number(h.випадків) / maxH) * 100}%` }}
+                title={`${String(h.година).padStart(2, '0')}:00 · ${fmt(h.випадків)}`} />
+            ))}
+          </div>
+          <div className="barchart-x">{(hours || []).map((h, i) => <span key={i}>{i % 4 === 0 ? String(h.година).padStart(2, '0') : ''}</span>)}</div>
+        </div>
+        <div className="panel">
+          <div className="panel-head"><h3>За днями тижня</h3><span className="filter">випадків</span></div>
+          <div className="dept-list">
+            {!dow && <div style={{ color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>завантаження…</div>}
+            {(dow || []).map(d => (
+              <div key={d.день} className="dept-row">
+                <span style={{ fontFamily: 'var(--mono)', fontWeight: 500, color: 'var(--text)', width: 90 }}>{d.назва}</span>
+                <span className="bar-wrap" style={{ flex: 1 }}><span className="bar-fill" style={{ width: `${(Number(d.поступлень) / maxD) * 100}%`, background: Number(d.поступлень) === maxD ? 'var(--brand)' : 'var(--text)' }} /></span>
+                <span className="pct" style={{ width: 64 }}>{fmt(d.поступлень)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* УРГЕНТНІСТЬ — екстрені vs планові по відділеннях */
+function UrgencyPage() {
+  const { rows, err } = useStat('wUrgency')
+  return (
+    <>
+      <PageHead crumb="Аналітика · Ургентність" title="Екстрені vs планові" />
+      <div className="dash-content">
+        {err && <div className="panel" style={{ borderColor: 'var(--brand)', color: 'var(--brand)', marginBottom: 16 }}>Помилка: {err}</div>}
+        <div className="table-wrap">
+          <table className="dtable">
+            <thead><tr>
+              <th>Відділення</th>
+              <th style={{ textAlign: 'right' }}>Екстрених</th>
+              <th style={{ textAlign: 'right' }}>Планових</th>
+              <th style={{ minWidth: 160 }}>Частка екстрених</th>
+            </tr></thead>
+            <tbody>
+              {!rows && <tr><td colSpan={4} style={{ color: 'var(--text3)' }}>завантаження…</td></tr>}
+              {rows && rows.map((r, i) => {
+                const u = Number(r.ургентних), p = Number(r.планових), tot = (u + p) || 1
+                const pct = (u / tot) * 100
+                return (
+                  <tr key={i}>
+                    <td style={{ fontFamily: 'var(--sans)' }}>{r.відділення}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(u)}</td>
+                    <td style={{ textAlign: 'right', color: 'var(--text2)' }}>{fmt(p)}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: 'var(--bg2)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--brand)' }} /></div>
+                        <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', width: 44, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
+}
+
 /* AI АСИСТЕНТ — робочий чат (логіка збережена) у стилі дашборду */
 const ALL_EXAMPLES = [
   'Загальна статистика лікарні','Показники по напрямках','Скільки всього госпіталізацій',
@@ -384,6 +594,10 @@ export default function Home() {
         <Sidebar active={active} setActive={setActive} me={me} role={role} onLogout={handleLogout} />
         <div className="dash-main">
           {active === 'overview' && <OverviewPage />}
+          {active === 'departments' && <DepartmentsPage />}
+          {active === 'patients' && <PatientsPage />}
+          {active === 'peaks' && <PeaksPage />}
+          {active === 'urgency' && <UrgencyPage />}
           {active === 'asystent' && <AsystentTab role={role} />}
         </div>
       </div>
