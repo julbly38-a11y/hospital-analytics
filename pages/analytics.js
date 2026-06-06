@@ -5,6 +5,7 @@ import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
+import { deptIcon } from '../lib/dept-icons'
 
 const COLORS = ['#1a1917','#6b6760','#9c9890','#c0c0b8','#d8d5cf','#4a9870','#c0392b','#e8a020']
 
@@ -253,12 +254,12 @@ export default function Analytics() {
           {/* KPI Row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
             {[
-              { rawV: s.total_cases,      fmtV: s.total_cases?.toLocaleString('uk'),                    l: 'Госпіталізацій',       s: 'всього' },
-              { rawV: s.unique_patients,  fmtV: s.unique_patients?.toLocaleString('uk'),                l: 'Унікальних пацієнтів', s: '' },
-              { rawV: null,               fmtV: s.avg_bed_days ? Number(s.avg_bed_days).toFixed(1) : '—', l: 'Середній ліжкодень',   s: 'днів' },
-              { rawV: null,               fmtV: s.death_rate_pct ? Number(s.death_rate_pct).toFixed(2) + '%' : '—', l: 'Летальність', s: 'загальна' },
+              { rawV: s.total_cases,      fmtV: s.total_cases?.toLocaleString('uk'),                    l: '✚ Госпіталізацій',       s: 'всього' },
+              { rawV: s.unique_patients,  fmtV: s.unique_patients?.toLocaleString('uk'),                l: '◉ Унікальних пацієнтів', s: '' },
+              { rawV: null,               fmtV: s.avg_bed_days ? Number(s.avg_bed_days).toFixed(1) : '—', l: '≋ Середній ліжкодень',   s: 'днів' },
+              { rawV: null,               fmtV: s.death_rate_pct ? Number(s.death_rate_pct).toFixed(2) + '%' : '—', l: '♡ Летальність', s: 'загальна' },
               { rawV: null,               fmtV: icuRow.летальність_pct ? Number(icuRow.летальність_pct).toFixed(1) + '%' : '—',
-                l: 'Летальність реанімації', s: `${icuRow.померло || '—'} / ${icuRow.всього_поступлень?.toLocaleString('uk') || '—'}` },
+                l: '◎ Летальність реанімації', s: `${icuRow.померло || '—'} / ${icuRow.всього_поступлень?.toLocaleString('uk') || '—'}` },
             ].map((kpi, i) => (
               <Card key={i} delay={i * 0.07}>
                 {summary.loading || icu.loading ? <Loader /> : (
@@ -270,15 +271,19 @@ export default function Analytics() {
 
           {/* Row 2: Відділення + Ургентні */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
-            <Card title="Топ відділень за кількістю випадків" delay={0.1}>
+            <Card title="⊞ Топ відділень за кількістю випадків" delay={0.1}>
               {deptStats.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={deptStats.data} layout="vertical" margin={{ left: 8, right: 24 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 11, fontFamily: 'var(--mono)' }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="відділення" width={200}
+                    <YAxis type="category" dataKey="відділення" width={210}
                       tick={{ fontSize: 10, fontFamily: 'var(--mono)', fill: 'var(--text2)' }}
-                      tickFormatter={v => v.length > 28 ? v.slice(0,26)+'…' : v}
+                      tickFormatter={v => {
+                        const icon = deptIcon(v)
+                        const label = v.length > 25 ? v.slice(0,23)+'…' : v
+                        return `${icon} ${label}`
+                      }}
                       axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="випадків" fill="var(--accent)" radius={[0,3,3,0]}
@@ -288,7 +293,7 @@ export default function Analytics() {
               )}
             </Card>
 
-            <Card title="Ургентні vs Планові" delay={0.2}>
+            <Card title="⚡ Ургентні vs Планові" delay={0.2}>
               {urgency.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={urgency.data} margin={{ left: 0, right: 8 }}>
@@ -310,7 +315,7 @@ export default function Analytics() {
 
           {/* Row 3: Години + Дні тижня */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-            <Card title="Поступлення по годинах доби" delay={0.1}>
+            <Card title="↑ Поступлення по годинах доби" delay={0.1}>
               {peakHour.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={peakHour.data} margin={{ left: 0, right: 8 }}>
@@ -326,7 +331,7 @@ export default function Analytics() {
               )}
             </Card>
 
-            <Card title="Поступлення по днях тижня" delay={0.2}>
+            <Card title="☾ Поступлення по днях тижня" delay={0.2}>
               {peakWeekday.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={peakWeekday.data}>
@@ -344,7 +349,7 @@ export default function Analytics() {
 
           {/* Row 4: Динаміка по місяцях */}
           <div style={{ marginBottom: 24 }}>
-            <Card title="Динаміка по місяцях" span={2} delay={0.15}>
+            <Card title="≋ Динаміка по місяцях" span={2} delay={0.15}>
               {peakMonth.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={220}>
                   <LineChart data={peakMonth.data} margin={{ left: 0, right: 24 }}>

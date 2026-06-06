@@ -68,19 +68,19 @@ const DASH_CSS = `
 
 /* Навігація (з дизайну ui_kits/dashboard) */
 const DASH_NAV = [
-  { id: 'overview',    label: 'Загальна',     gl: '◆', group: 'Аналітика' },
-  { id: 'departments', label: 'Відділення',   gl: '▦', group: 'Аналітика' },
-  { id: 'diagnoses',   label: 'Діагнози МКХ', gl: '⌘', group: 'Аналітика' },
-  { id: 'doctors',     label: 'Лікарі',       gl: '◐', group: 'Аналітика' },
-  { id: 'patients',    label: 'Пацієнти',     gl: '○', group: 'Аналітика' },
-  { id: 'geography',   label: 'Географія',    gl: '◯', group: 'Аналітика' },
-  { id: 'peaks',       label: 'Піки',         gl: '⌃', group: 'Аналітика' },
-  { id: 'night',       label: 'Нічні зміни',  gl: '◗', group: 'Аналітика' },
-  { id: 'urgency',     label: 'Ургентність',  gl: '✚', group: 'Аналітика' },
-  { id: 'operations',  label: 'Операції',     gl: '⌖', group: 'Аналітика' },
-  { id: 'asystent',    label: 'AI Асистент',  gl: '+', group: 'Інструменти' },
-  { id: 'reports',     label: 'Звіти',        gl: 'Σ', group: 'Інструменти' },
-  { id: 'settings',    label: 'Налаштування', gl: '⚙', group: 'Інструменти' },
+  { id: 'overview',    label: 'Загальна',     gl: '⊕', group: 'Аналітика' },  // медичний хрест у колі
+  { id: 'departments', label: 'Відділення',   gl: '⊞', group: 'Аналітика' },  // сітка відділень
+  { id: 'diagnoses',   label: 'Діагнози МКХ', gl: '℞', group: 'Аналітика' },  // символ рецепту Rx
+  { id: 'doctors',     label: 'Лікарі',       gl: '⚕', group: 'Аналітика' },  // жезл Ескулапа
+  { id: 'patients',    label: 'Пацієнти',     gl: '♡', group: 'Аналітика' },  // серце
+  { id: 'geography',   label: 'Географія',    gl: '◎', group: 'Аналітика' },  // ціль / локація
+  { id: 'peaks',       label: 'Піки',         gl: '↑', group: 'Аналітика' },  // стрілка вгору
+  { id: 'night',       label: 'Нічні зміни',  gl: '☾', group: 'Аналітика' },  // місяць
+  { id: 'urgency',     label: 'Ургентність',  gl: '⚡', group: 'Аналітика' },  // блискавка = екстрено
+  { id: 'operations',  label: 'Операції',     gl: '✂', group: 'Аналітика' },  // ножиці = хірургія
+  { id: 'asystent',    label: 'AI Асистент',  gl: '✦', group: 'Інструменти' }, // зірка
+  { id: 'reports',     label: 'Звіти',        gl: '≡', group: 'Інструменти' }, // документ
+  { id: 'settings',    label: 'Налаштування', gl: '⚙', group: 'Інструменти' }, // шестерня
 ]
 /* Хвиля 1 додала: Відділення, Пацієнти, Піки, Ургентність (живі дані).
    Майбутні (наступні хвилі): Діагнози, Лікарі, Географія, Нічні, Приймальне, Операції, Звіти, Налаштування */
@@ -177,16 +177,16 @@ function OverviewPage() {
 
         {/* KPI */}
         <div className="kpi-row">
-          <div className="kpi"><div className="lbl">Госпіталізацій</div>
+          <div className="kpi"><div className="lbl">✚ Госпіталізацій</div>
             <div className="val">{kpi ? fmt(kpi.total_cases) : '…'}</div>
             <div className="delta">{kpi ? `${fmt(kpi.unique_patients)} унікальних пацієнтів` : ''}</div></div>
-          <div className="kpi"><div className="lbl">Летальність</div>
+          <div className="kpi"><div className="lbl">♡ Летальність</div>
             <div className="val">{kpi ? `${kpi.death_rate_pct}%` : '…'}</div>
             <div className="delta down">{kpi ? `${fmt(kpi.deaths)} випадків` : ''}</div></div>
-          <div className="kpi"><div className="lbl">Сер. ліжко-день</div>
+          <div className="kpi"><div className="lbl">≋ Сер. ліжко-день</div>
             <div className="val">{kpi ? kpi.avg_bed_days : '…'}</div>
             <div className="delta">по всій лікарні</div></div>
-          <div className="kpi"><div className="lbl">Хірургічна активність</div>
+          <div className="kpi"><div className="lbl">✂ Хірургічна активність</div>
             <div className="val">{kpi ? `${kpi.surgical_activity_pct}%` : '…'}</div>
             <div className="delta">{kpi ? `${fmt(kpi.operations)} операцій` : ''}</div></div>
         </div>
