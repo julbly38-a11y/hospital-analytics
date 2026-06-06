@@ -238,6 +238,15 @@ export default function Analytics() {
             <span style={{ color: 'var(--border)' }}>|</span>
             <span style={{ fontSize: 12, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>Аналітичний дашборд</span>
           </div>
+          <Link href="/glow" style={{
+            fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)',
+            textDecoration: 'none', padding: '6px 12px', borderRadius: 6,
+            border: '1px solid var(--border)',
+            transition: 'border-color .15s ease, color .15s ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#00e5ff'; e.currentTarget.style.color = '#00e5ff' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text2)' }}
+          >✦ Гло-графіки</Link>
           <Link href="/" style={{
             fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)',
             textDecoration: 'none', padding: '6px 12px', borderRadius: 6,
