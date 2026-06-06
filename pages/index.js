@@ -79,6 +79,8 @@ const DASH_NAV = [
   { id: 'urgency',     label: 'Ургентність',  gl: '⚡', group: 'Аналітика' },  // блискавка = екстрено
   { id: 'operations',  label: 'Операції',     gl: '✂', group: 'Аналітика' },  // ножиці = хірургія
   { id: 'org',         label: 'Структура',    gl: '⊞', group: 'Інструменти', url: '/org' },
+  { id: 'cabinet',     label: 'Кабінет лікаря',     gl: '⚕', group: 'Інструменти', url: '/cabinet' },
+  { id: 'admit',       label: 'Госпіталізація пацієнта', gl: '+', group: 'Інструменти', url: '/admit' },
   { id: 'asystent',    label: 'AI Асистент',  gl: '✦', group: 'Інструменти' }, // зірка
   { id: 'reports',     label: 'Звіти',        gl: '≡', group: 'Інструменти' }, // документ
   { id: 'settings',    label: 'Налаштування', gl: '⚙', group: 'Інструменти' }, // шестерня
@@ -143,19 +145,33 @@ function OverviewPage() {
   const [status, setStatus] = useState([])
   const [icd, setIcd] = useState([])
   const [err, setErr] = useState(null)
+  const [years, setYears] = useState([])
+  const [year, setYear] = useState('all')
 
+  async function load(key, param) {
+    const body = param !== undefined ? { key, param } : { key }
+    const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body) })
+    const d = await r.json()
+    if (d.error) throw new Error(d.error)
+    return d.rows || []
+  }
+
+  // Список доступних років для селектора (раз при завантаженні)
   useEffect(() => {
-    async function load(key) {
-      const r = await fetch('/api/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }) })
-      const d = await r.json()
-      if (d.error) throw new Error(d.error)
-      return d.rows || []
-    }
-    Promise.all([load('ovKpi'), load('ovHours'), load('ovStatus'), load('ovIcd')])
-      .then(([k, h, s, i]) => { setKpi(k[0] || null); setHours(h); setStatus(s); setIcd(i) })
-      .catch(e => setErr(e.message))
+    load('ovYears').then(rows => setYears(rows.map(r => r.рік).filter(Boolean))).catch(() => {})
   }, [])
+
+  // Дані огляду — або за весь час, або відфільтровані по обраному року
+  useEffect(() => {
+    const isAll = year === 'all'
+    const tasks = isAll
+      ? [load('ovKpi'), load('ovHours'), load('ovStatus'), load('ovIcd')]
+      : [load('ovKpiYear', String(year)), load('ovHoursYear', String(year)), load('ovStatusYear', String(year)), load('ovIcdYear', String(year))]
+    Promise.all(tasks)
+      .then(([k, h, s, i]) => { setKpi(k[0] || null); setHours(h); setStatus(s); setIcd(i); setErr(null) })
+      .catch(e => setErr(e.message))
+  }, [year])
 
   const maxHour = hours.length ? Math.max(...hours.map(h => h.випадків)) : 1
   const peakIdx = hours.length ? hours.reduce((mi, h, i, a) => h.випадків > a[mi].випадків ? i : mi, 0) : -1
@@ -170,7 +186,11 @@ function OverviewPage() {
           <h1>Дашборд лікарні</h1>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-secondary">Період: усі роки ▾</button>
+          <select className="btn-secondary" value={year} onChange={e => setYear(e.target.value)}
+            style={{ cursor: 'pointer', fontFamily: 'var(--mono)' }}>
+            <option value="all">Період: усі роки</option>
+            {years.map(y => <option key={y} value={y}>Рік: {y}</option>)}
+          </select>
         </div>
       </div>
       <div className="dash-content">
@@ -195,7 +215,7 @@ function OverviewPage() {
         {/* Години + тип госпіталізації */}
         <div className="chart-row">
           <div className="panel">
-            <div className="panel-head"><h3>Пікові години госпіталізацій</h3><span className="filter">усі роки</span></div>
+            <div className="panel-head"><h3>Пікові години госпіталізацій</h3><span className="filter">{year === 'all' ? 'усі роки' : year}</span></div>
             <div className="barchart">
               {hours.map((h, i) => (
                 <div key={i} className={`bar${i === peakIdx ? ' peak' : ''}`}
