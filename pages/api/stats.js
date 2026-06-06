@@ -45,6 +45,8 @@ const PARAM_QUERIES = {
   docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.doctor_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
   docDiag: (p) => `SELECT COALESCE(dd.diagnosis, dd.icd_code) as діагноз, dd.icd_code as код, dd.cases as випадків, dd.deaths as померло FROM doctor_diagnoses dd JOIN lsmd_doctors ld ON ld.doctor_id = dd.doctor_id WHERE ld.doc_name = '${esc(p)}' ORDER BY dd.cases DESC LIMIT 10`,
+  // Пошук МКХ-10 за кодом або назвою (для форми додавання пацієнта)
+  icdSearch: (p) => `SELECT icd_code as код, COALESCE(diagnosis_level3, diagnosis_level2, category_level1) as назва FROM icd_10 WHERE icd_code ILIKE '${esc(p)}%' OR diagnosis_level3 ILIKE '%${esc(p)}%' OR diagnosis_level2 ILIKE '%${esc(p)}%' ORDER BY usage_count DESC NULLS LAST LIMIT 8`,
 }
 
 // Запити лише для admin (персональні дані пацієнтів).
