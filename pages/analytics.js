@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
 import {
@@ -179,6 +180,7 @@ export default function Analytics() {
   const urgency    = useQuery('urgency')
   const icu        = useQuery('icu')
 
+  const router = useRouter()
   const s = summary.data?.[0] || {}
   const icuRow = icu.data?.[0] || {}
 
@@ -280,7 +282,7 @@ export default function Analytics() {
 
           {/* Row 2: Відділення + Ургентні */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 24 }}>
-            <Card title="⊞ Топ відділень за кількістю випадків" delay={0.1}>
+            <Card title="⊞ Топ відділень · клікни → структура" delay={0.1}>
               {deptStats.loading ? <Loader /> : (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={deptStats.data} layout="vertical" margin={{ left: 8, right: 24 }}>
@@ -296,7 +298,9 @@ export default function Analytics() {
                       axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="випадків" fill="var(--accent)" radius={[0,3,3,0]}
-                      isAnimationActive animationDuration={1200} animationEasing="ease-out" />
+                      isAnimationActive animationDuration={1200} animationEasing="ease-out"
+                      cursor="pointer"
+                      onClick={(d) => d?.відділення && router.push('/org?dept=' + encodeURIComponent(d.відділення))} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

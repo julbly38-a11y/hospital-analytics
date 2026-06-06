@@ -1005,11 +1005,18 @@ const DOCTOR_EXAMPLES = [
 ]
 
 function AsystentTab({ role }) {
+  const router = useRouter()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef(null)
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+
+  // Pre-fill from URL ?q= param (перехресне посилання з /org)
+  useEffect(() => {
+    const q = router.query?.q
+    if (q && messages.length === 0) setInput(decodeURIComponent(q))
+  }, [router.query?.q])
 
   async function send(q) {
     if (!q.trim() || loading) return

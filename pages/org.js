@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
 import { deptIcon } from '../lib/dept-icons'
@@ -108,25 +109,39 @@ function DeptCard({ dept, cfg, active, hasDoc, onClick }) {
       {head && (
         <div style={{ fontSize: 10, color: cfg.color, marginBottom: 5, fontFamily: 'var(--mono)' }}>↳ {head}</div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
         <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dept.лікарів} лікарів</span>
-        {hasDoc && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{active ? '▲' : '▼'}</span>}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <a href={'/analytics'} onClick={e => e.stopPropagation()}
+            title="Аналітика відділення"
+            style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', textDecoration: 'none',
+              padding: '1px 4px', border: '1px solid var(--border)', borderRadius: 3 }}>📊</a>
+          {hasDoc && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{active ? '▲' : '▼'}</span>}
+        </div>
       </div>
     </div>
   )
 }
 
 /* ── Doctor chip ──────────────────────────────────── */
-function DocChip({ doc, cfg }) {
+function DocChip({ doc, cfg, onAsk }) {
   const isHead = doc.посада?.toLowerCase().includes('завідувач')
   const ini = initials(doc.лікар || '')
+  const clickable = !doc.лікар?.startsWith('+')
   return (
-    <div style={{
+    <div onClick={clickable ? onAsk : undefined}
+      title={clickable ? `Запитати AI про ${doc.лікар}` : ''}
+      style={{
       display: 'flex', alignItems: 'center', gap: 8,
       padding: '5px 10px 5px 5px',
       border: '1px solid var(--border)', borderRadius: 8,
       background: 'var(--surface)',
-    }}>
+      cursor: clickable ? 'pointer' : 'default',
+      transition: 'border-color .15s, background .15s',
+    }}
+    onMouseEnter={e => { if (clickable) { e.currentTarget.style.borderColor = cfg.color; e.currentTarget.style.background = 'var(--bg2)' } }}
+    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface)' }}
+    >
       <div style={{
         width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
         background: isHead ? cfg.color : 'var(--bg2)',
@@ -149,6 +164,9 @@ function DocChip({ doc, cfg }) {
           fontFamily: 'var(--mono)', flexShrink: 0
         }}>завід.</div>
       )}
+      {clickable && (
+        <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', flexShrink: 0 }}>→AI</div>
+      )}
     </div>
   )
 }
@@ -165,6 +183,7 @@ function SectionLabel({ text }) {
 
 /* ── Main page ────────────────────────────────────── */
 export default function OrgPage() {
+  const router = useRouter()
   const [depts, setDepts]   = useState([])
   const [docs, setDocs]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -176,6 +195,15 @@ export default function OrgPage() {
       .then(([d, dc]) => { setDepts(d); setDocs(dc); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
+
+  // Auto-expand dept + block from URL param (?dept=...)
+  useEffect(() => {
+    const deptParam = router.query?.dept
+    if (!deptParam || loading || !blocks.length) return
+    setSelDept(deptParam)
+    const blk = blocks.find(b => b.depts.some(d => d.відділення === deptParam))
+    if (blk) setSelBlock(blk.id)
+  }, [router.query?.dept, loading, blocks])
 
   // Group depts by block → add head doctor name
   const blocks = useMemo(() => {
@@ -281,7 +309,12 @@ export default function OrgPage() {
               <SectionLabel text={`Лікарський склад · ${selDept}`} />
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {selDeptDocs.map((d, i) => (
-                  <DocChip key={i} doc={d} cfg={cfg} />
+                  <DocChip key={i} doc={d} cfg={cfg}
+                    onAsk={() => {
+                      const surname = (d.лікар || '').split(' ')[0]
+                      router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + surname))
+                    }}
+                  />
                 ))}
               </div>
             </div>
