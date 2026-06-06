@@ -196,16 +196,7 @@ export default function OrgPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  // Auto-expand dept + block from URL param (?dept=...)
-  useEffect(() => {
-    const deptParam = router.query?.dept
-    if (!deptParam || loading || !blocks.length) return
-    setSelDept(deptParam)
-    const blk = blocks.find(b => b.depts.some(d => d.відділення === deptParam))
-    if (blk) setSelBlock(blk.id)
-  }, [router.query?.dept, loading, blocks])
-
-  // Group depts by block → add head doctor name
+  // useMemo ПЕРЕД useEffect що від нього залежить — уникаємо TDZ ReferenceError
   const blocks = useMemo(() => {
     const headMap = {}
     docs.forEach(d => {
@@ -222,11 +213,19 @@ export default function OrgPage() {
     return BLOCK_ORDER.map(b => ({ id: b, depts: grouped[b] || [] })).filter(b => b.depts.length > 0)
   }, [depts, docs])
 
-  // Docs for selected dept
   const selDeptDocs = useMemo(() => {
     if (!selDept) return []
     return docs.filter(d => d.відділення === selDept)
   }, [docs, selDept])
+
+  // Auto-expand dept + block from URL param (?dept=...)
+  useEffect(() => {
+    const deptParam = router.query?.dept
+    if (!deptParam || loading || !blocks.length) return
+    setSelDept(deptParam)
+    const blk = blocks.find(b => b.depts.some(d => d.відділення === deptParam))
+    if (blk) setSelBlock(blk.id)
+  }, [router.query?.dept, loading, blocks])
 
   // Stats
   const totalDocs  = depts.reduce((s, d) => s + (Number(d.лікарів) || 0), 0)
