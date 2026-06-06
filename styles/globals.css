@@ -54,8 +54,8 @@ a { color: inherit; text-decoration: none; }
    ============================================================ */
 
 @keyframes floatY {
-  0%   { transform: translateY(0px)   rotate(0deg);  opacity: 0.22; }
-  100% { transform: translateY(-22px) rotate(12deg); opacity: 0.52; }
+  0%   { transform: translateY(0px)   rotate(0deg);  opacity: 0.38; }
+  100% { transform: translateY(-28px) rotate(15deg); opacity: 0.72; }
 }
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(22px); }

@@ -64,18 +64,18 @@ function useCountUp(target, enabled = true, duration = 1400) {
 
 function FloatingBg() {
   const items = [
-    { x: '4%',  y: '7%',  size: 16, dur: 7,   delay: 0    },
-    { x: '14%', y: '70%', size: 12, dur: 8.5,  delay: 1.3  },
-    { x: '26%', y: '33%', size: 22, dur: 6.5,  delay: 0.6  },
-    { x: '39%', y: '87%', size: 14, dur: 9,    delay: 2.1  },
-    { x: '53%', y: '14%', size: 20, dur: 7.5,  delay: 0.9  },
-    { x: '66%', y: '57%', size: 16, dur: 8,    delay: 1.7  },
-    { x: '76%', y: '27%', size: 24, dur: 6.8,  delay: 0.4  },
-    { x: '86%', y: '76%', size: 18, dur: 7.2,  delay: 2.6  },
-    { x: '94%', y: '44%', size: 12, dur: 9.2,  delay: 1.1  },
-    { x: '48%', y: '64%', size: 20, dur: 8.3,  delay: 3.2  },
-    { x: '20%', y: '48%', size: 14, dur: 7.8,  delay: 1.8  },
-    { x: '61%', y: '91%', size: 18, dur: 6.2,  delay: 0.2  },
+    { x: '4%',  y: '7%',  size: 22, dur: 7,   delay: 0    },
+    { x: '14%', y: '70%', size: 18, dur: 8.5, delay: 1.3  },
+    { x: '26%', y: '33%', size: 28, dur: 6.5, delay: 0.6  },
+    { x: '39%', y: '87%', size: 20, dur: 9,   delay: 2.1  },
+    { x: '53%', y: '14%', size: 26, dur: 7.5, delay: 0.9  },
+    { x: '66%', y: '57%', size: 22, dur: 8,   delay: 1.7  },
+    { x: '76%', y: '27%', size: 32, dur: 6.8, delay: 0.4  },
+    { x: '86%', y: '76%', size: 24, dur: 7.2, delay: 2.6  },
+    { x: '94%', y: '44%', size: 18, dur: 9.2, delay: 1.1  },
+    { x: '48%', y: '64%', size: 26, dur: 8.3, delay: 3.2  },
+    { x: '20%', y: '48%', size: 20, dur: 7.8, delay: 1.8  },
+    { x: '61%', y: '91%', size: 24, dur: 6.2, delay: 0.2  },
   ]
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 0 }}>
@@ -83,7 +83,7 @@ function FloatingBg() {
         <span key={i} style={{
           position: 'absolute', left: item.x, top: item.y,
           fontFamily: 'var(--mono)', fontSize: item.size,
-          color: 'var(--border)', userSelect: 'none', lineHeight: 1,
+          color: 'var(--text3)', userSelect: 'none', lineHeight: 1,
           animation: `floatY ${item.dur}s ease-in-out ${item.delay}s infinite alternate`,
         }}>+</span>
       ))}
@@ -195,8 +195,8 @@ export default function Analytics() {
           30%{opacity:1;transform:scale(1)}
         }
         @keyframes floatY {
-          0%   { transform: translateY(0px)   rotate(0deg);  opacity: 0.22; }
-          100% { transform: translateY(-22px) rotate(12deg); opacity: 0.52; }
+          0%   { transform: translateY(0px)   rotate(0deg);  opacity: 0.38; }
+          100% { transform: translateY(-28px) rotate(15deg); opacity: 0.72; }
         }
         @keyframes fadeInDown {
           from { opacity: 0; transform: translateY(-14px); }
@@ -221,7 +221,7 @@ export default function Analytics() {
 
       <FloatingBg />
 
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', position: 'relative', zIndex: 1 }}>
+      <div style={{ minHeight: '100vh', position: 'relative' }}>
 
         {/* Header */}
         <header style={{
