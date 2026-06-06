@@ -118,9 +118,14 @@ export default function Admit() {
     if (q.length < 2) { setIcdResults([]); return }
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(`/api/stats?key=icdSearch&param=${encodeURIComponent(q)}`)
+        const r = await fetch('/api/stats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key: 'icdSearch', param: q }),
+        })
         const data = await r.json()
-        setIcdResults(Array.isArray(data) ? data.slice(0, 8) : [])
+        const rows = Array.isArray(data) ? data : Array.isArray(data?.rows) ? data.rows : []
+        setIcdResults(rows.slice(0, 8))
       } catch { setIcdResults([]) }
     }, 350)
     return () => clearTimeout(t)
