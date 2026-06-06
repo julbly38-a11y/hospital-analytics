@@ -147,6 +147,9 @@ function OverviewPage() {
   const [err, setErr] = useState(null)
   const [years, setYears] = useState([])
   const [year, setYear] = useState('all')
+  // Налаштування діаграм: яку метрику показувати на графіку годин і скільки розділів МКХ виводити
+  const [hourMetric, setHourMetric] = useState('випадків')
+  const [icdTopN, setIcdTopN] = useState(7)
 
   async function load(key, param) {
     const body = param !== undefined ? { key, param } : { key }
@@ -162,19 +165,22 @@ function OverviewPage() {
     load('ovYears').then(rows => setYears(rows.map(r => r.рік).filter(Boolean))).catch(() => {})
   }, [])
 
-  // Дані огляду — або за весь час, або відфільтровані по обраному року
+  // Дані огляду — фільтровані по року, з урахуванням налаштувань діаграм (метрика годин, к-сть розділів МКХ)
   useEffect(() => {
-    const isAll = year === 'all'
-    const tasks = isAll
-      ? [load('ovKpi'), load('ovHours'), load('ovStatus'), load('ovIcd')]
-      : [load('ovKpiYear', String(year)), load('ovHoursYear', String(year)), load('ovStatusYear', String(year)), load('ovIcdYear', String(year))]
+    const yp = year === 'all' ? 'all' : String(year)
+    const tasks = [
+      load('ovKpiYear', yp),
+      load('ovHoursYear', yp),
+      load('ovStatusYear', yp),
+      load('ovIcdYear', `${yp}|${icdTopN}`),
+    ]
     Promise.all(tasks)
       .then(([k, h, s, i]) => { setKpi(k[0] || null); setHours(h); setStatus(s); setIcd(i); setErr(null) })
       .catch(e => setErr(e.message))
-  }, [year])
+  }, [year, icdTopN])
 
-  const maxHour = hours.length ? Math.max(...hours.map(h => h.випадків)) : 1
-  const peakIdx = hours.length ? hours.reduce((mi, h, i, a) => h.випадків > a[mi].випадків ? i : mi, 0) : -1
+  const maxHour = hours.length ? Math.max(...hours.map(h => Number(h[hourMetric]) || 0)) : 1
+  const peakIdx = hours.length ? hours.reduce((mi, h, i, a) => (Number(h[hourMetric]) || 0) > (Number(a[mi][hourMetric]) || 0) ? i : mi, 0) : -1
   const maxIcd = icd.length ? icd[0].випадків : 1
   const totalStatus = status.reduce((s, r) => s + Number(r.випадків), 0) || 1
 
@@ -215,19 +221,29 @@ function OverviewPage() {
         {/* Години + тип госпіталізації */}
         <div className="chart-row">
           <div className="panel">
-            <div className="panel-head"><h3>Пікові години госпіталізацій</h3><span className="filter">{year === 'all' ? 'усі роки' : year}</span></div>
+            <div className="panel-head">
+              <h3>Пікові години госпіталізацій</h3>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <select className="btn-secondary" value={hourMetric} onChange={e => setHourMetric(e.target.value)}
+                  style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 11, padding: '4px 8px' }}>
+                  <option value="випадків">Метрика: випадків</option>
+                  <option value="померло">Метрика: померло</option>
+                </select>
+                <span className="filter">{year === 'all' ? 'усі роки' : year}</span>
+              </span>
+            </div>
             <div className="barchart">
               {hours.map((h, i) => (
                 <div key={i} className={`bar${i === peakIdx ? ' peak' : ''}`}
-                  style={{ height: `${(h.випадків / maxHour) * 100}%` }}
-                  title={`${String(h.година).padStart(2, '0')}:00 · ${fmt(h.випадків)}`} />
+                  style={{ height: `${maxHour ? (Number(h[hourMetric]) || 0) / maxHour * 100 : 0}%` }}
+                  title={`${String(h.година).padStart(2, '0')}:00 · ${fmt(h[hourMetric])} (${hourMetric})`} />
               ))}
             </div>
             <div className="barchart-x">
               {hours.map((h, i) => <span key={i}>{i % 4 === 0 ? String(h.година).padStart(2, '0') : ''}</span>)}
             </div>
             {peakIdx >= 0 && <p style={{ marginTop: 10, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)', lineHeight: 1.5 }}>
-              Пік о <strong style={{ color: 'var(--brand)' }}>{String(hours[peakIdx].година).padStart(2, '0')}:00</strong> — {fmt(hours[peakIdx].випадків)} госпіталізацій.</p>}
+              Пік о <strong style={{ color: 'var(--brand)' }}>{String(hours[peakIdx].година).padStart(2, '0')}:00</strong> — {fmt(hours[peakIdx][hourMetric])} {hourMetric === 'померло' ? 'смертей' : 'госпіталізацій'}.</p>}
           </div>
           <div className="panel">
             <div className="panel-head"><h3>Тип госпіталізації</h3><span className="filter">{kpi ? fmt(kpi.total_cases) : ''}</span></div>
@@ -247,7 +263,16 @@ function OverviewPage() {
 
         {/* Розділи МКХ */}
         <div className="panel" style={{ marginBottom: 16 }}>
-          <div className="panel-head"><h3>Розподіл за розділами МКХ-10</h3><span className="filter">топ-7 з 22</span></div>
+          <div className="panel-head">
+            <h3>Розподіл за розділами МКХ-10</h3>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select className="btn-secondary" value={icdTopN} onChange={e => setIcdTopN(Number(e.target.value))}
+                style={{ cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: 11, padding: '4px 8px' }}>
+                {[5, 7, 10, 15].map(n => <option key={n} value={n}>Топ-{n}</option>)}
+              </select>
+              <span className="filter">топ-{icdTopN} з 22</span>
+            </span>
+          </div>
           <div className="dept-list">
             {icd.map(c => (
               <div key={c.розділ} className="dept-row">

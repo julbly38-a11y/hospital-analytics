@@ -13,7 +13,7 @@ const QUERIES = {
   icu:         'SELECT всього_поступлень,померло,летальність_pct,середній_ліжкодень FROM v_icu_mortality',
   // --- Дашборд «Огляд» (живі дані) ---
   ovKpi:       'SELECT total_cases, unique_patients, death_rate_pct, deaths, avg_bed_days, urgent, planned, urgent_pct, operations, surgical_activity_pct FROM v_hospital_summary',
-  ovHours:     'SELECT hour as година, cases as випадків FROM v_peak_by_hour ORDER BY hour',
+  ovHours:     'SELECT hour as година, cases as випадків, deaths as померло FROM v_peak_by_hour ORDER BY hour',
   ovStatus:    "SELECT discharge_status as статус, COUNT(*) as випадків, ROUND(COUNT(*)*100.0/SUM(COUNT(*)) OVER (),2) as відс FROM lsmd WHERE discharge_status IN ('З поліпшенням','Помер','Без змін','Переведений в інший заклад','Лікується','З погіршенням') GROUP BY discharge_status ORDER BY випадків DESC",
   ovIcd:       "SELECT LEFT(icd_primary,1) as розділ, COUNT(*) as випадків FROM lsmd WHERE icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT 7",
   ovYears:     "SELECT DISTINCT EXTRACT(year FROM admission_date_d)::int as рік FROM lsmd WHERE admission_date_d IS NOT NULL ORDER BY рік DESC",
@@ -57,16 +57,22 @@ const PARAM_QUERIES = {
       SUM((operation_id IS NOT NULL)::int) as operations,
       ROUND(100.0*SUM((operation_id IS NOT NULL)::int)::numeric/NULLIF(COUNT(*),0)::numeric,2) as surgical_activity_pct
     FROM lsmd WHERE ${yearFilter(p)}`,
-  ovHoursYear: (p) => `SELECT EXTRACT(hour FROM admission_ts)::integer as година, COUNT(*) as випадків
+  ovHoursYear: (p) => `SELECT EXTRACT(hour FROM admission_ts)::integer as година, COUNT(*) as випадків,
+      COUNT(*) FILTER (WHERE discharge_status = 'Помер') as померло
     FROM lsmd WHERE admission_ts IS NOT NULL AND ${yearFilter(p)}
     GROUP BY EXTRACT(hour FROM admission_ts)::integer ORDER BY година`,
   ovStatusYear: (p) => `SELECT discharge_status as статус, COUNT(*) as випадків,
       ROUND(COUNT(*)*100.0/SUM(COUNT(*)) OVER (),2) as відс
     FROM lsmd WHERE discharge_status IN ('З поліпшенням','Помер','Без змін','Переведений в інший заклад','Лікується','З погіршенням') AND ${yearFilter(p)}
     GROUP BY discharge_status ORDER BY випадків DESC`,
-  ovIcdYear: (p) => `SELECT LEFT(icd_primary,1) as розділ, COUNT(*) as випадків
-    FROM lsmd WHERE icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' AND ${yearFilter(p)}
-    GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT 7`,
+  // param формату "рік|кількість" — напр. "2024|10" або "all|7"; кількість обмежена 3-15
+  ovIcdYear: (p) => {
+    const [yPart, nPart] = String(p).split('|')
+    const n = Math.min(15, Math.max(3, parseInt(nPart, 10) || 7))
+    return `SELECT LEFT(icd_primary,1) as розділ, COUNT(*) as випадків
+      FROM lsmd WHERE icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' AND ${yearFilter(yPart)}
+      GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT ${n}`
+  },
   // Профіль одного відділення
   deptProfile: (p) => `SELECT department as відділення, total_cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, death_rate_pct as летальність, urgent_pct as ургентних_відс, operations as операцій, surgical_activity_pct as хір_активність, avg_age as середній_вік, women as жінки, men as чоловіки, children as діти, elderly as літні, improved as поліпшення FROM v_department_stats WHERE department = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози одного відділення
