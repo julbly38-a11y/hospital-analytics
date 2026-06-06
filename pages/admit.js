@@ -126,12 +126,23 @@ export default function Admit() {
     return () => clearTimeout(t)
   }, [icdQuery])
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  const set = (k) => (e) => {
+    const v = e.target.value
+    setForm((f) => ({ ...f, [k]: v }))
+    if ((k === 'admission_department' || k === 'admission_date' || k === 'admission_time') ) {
+      setResult((r) => (r?.error ? null : r))
+    }
+  }
 
   const pickIcd = (row) => {
     setForm((f) => ({ ...f, icd_primary: row['код'], icd_label: row['назва'] }))
     setIcdQuery('')
     setIcdResults([])
+    setResult((r) => (r?.error ? null : r))
+  }
+
+  const clearIcd = () => {
+    setForm((f) => ({ ...f, icd_primary: '', icd_label: '' }))
   }
 
   const submit = async (e) => {
@@ -247,7 +258,7 @@ export default function Admit() {
               {form.icd_primary ? (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', ...inputStyle }}>
                   <span><strong style={{ color: 'var(--accent)' }}>{form.icd_primary}</strong> — {form.icd_label}</span>
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, icd_primary: '', icd_label: '' }))} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+                  <button type="button" onClick={clearIcd} style={{ background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: '13px' }}>✕</button>
                 </div>
               ) : (
                 <div style={{ position: 'relative' }}>
