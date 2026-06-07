@@ -182,6 +182,71 @@ function SectionLabel({ text }) {
   )
 }
 
+/* ── SVG Line Chart ───────────────────────────────── */
+const CHART_COLORS = ['#e74c3c', '#3b82f6', '#f59e0b']
+
+function SvgLineChart({ rows, xKey }) {
+  if (!rows?.length) return (
+    <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)', padding: '10px 0' }}>Даних немає</div>
+  )
+  const W = 560, H = 110, PL = 30, PR = 8, PT = 8, PB = 24
+  const cW = W - PL - PR, cH = H - PT - PB
+  const xVals = [...new Set(rows.map(r => r[xKey]))].sort()
+  const codes  = [...new Set(rows.map(r => r.код))]
+  const lookup = {}
+  rows.forEach(r => { lookup[`${r[xKey]}_${r.код}`] = Number(r.випадків) || 0 })
+  const maxY = Math.max(...rows.map(r => Number(r.випадків) || 0), 1)
+  const px = i => PL + (xVals.length > 1 ? (i / (xVals.length - 1)) * cW : cW / 2)
+  const py = v => PT + cH - Math.min((v / maxY) * cH, cH)
+  const step = Math.max(1, Math.ceil(xVals.length / 8))
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 6 }}>
+        {codes.map((c, ci) => {
+          const label = rows.find(r => r.код === c)?.діагноз || ''
+          return (
+            <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 18, height: 2, background: CHART_COLORS[ci % 3], borderRadius: 1 }} />
+              <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                {c}{label ? ` · ${label.slice(0, 32)}` : ''}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
+        {[0, 0.5, 1].map(f => (
+          <line key={f} x1={PL} x2={W - PR} y1={py(maxY * f)} y2={py(maxY * f)}
+            stroke="var(--border)" strokeWidth={0.5} strokeDasharray={f < 1 ? '3,3' : undefined} />
+        ))}
+        {[0, Math.round(maxY / 2), maxY].map(v => (
+          <text key={v} x={PL - 3} y={py(v) + 3.5} textAnchor="end" fontSize={7} fill="var(--text3)" fontFamily="monospace">{v}</text>
+        ))}
+        {xVals.map((x, i) => i % step === 0 && (
+          <text key={x} x={px(i)} y={H - 4} textAnchor="middle" fontSize={7} fill="var(--text3)" fontFamily="monospace">
+            {xKey === 'день' ? x : x.slice(5)}
+          </text>
+        ))}
+        {codes.map((c, ci) => {
+          const color = CHART_COLORS[ci % 3]
+          const pts = xVals.map((x, i) => [px(i), py(lookup[`${x}_${c}`] || 0)])
+          return (
+            <g key={c}>
+              <polyline
+                points={pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ')}
+                fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round"
+              />
+              {pts.map(([cx2, cy2], i) => (lookup[`${xVals[i]}_${c}`] || 0) > 0 && (
+                <circle key={i} cx={cx2} cy={cy2} r={2.5} fill={color} stroke="var(--surface)" strokeWidth={1.5} />
+              ))}
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 /* ── Main page ────────────────────────────────────── */
 export default function OrgPage() {
   const router = useRouter()
@@ -192,6 +257,8 @@ export default function OrgPage() {
   const [selDept,  setSelDept]  = useState(null)
   const [deptProfile, setDeptProfile] = useState(null)
   const [deptDiag,    setDeptDiag]    = useState([])
+  const [deptTrend,   setDeptTrend]   = useState([])
+  const [deptTrendM,  setDeptTrendM]  = useState([])
 
   useEffect(() => {
     Promise.all([fetchStats('orgDepts'), fetchStats('orgDocs')])
@@ -230,16 +297,20 @@ export default function OrgPage() {
     if (blk) setSelBlock(blk.id)
   }, [router.query?.dept, loading, blocks])
 
-  // Підгрузка профілю і діагнозів відділення при виборі
+  // Підгрузка профілю, діагнозів і трендів відділення при виборі
   useEffect(() => {
-    if (!selDept) { setDeptProfile(null); setDeptDiag([]); return }
-    setDeptProfile(null); setDeptDiag([])
+    if (!selDept) { setDeptProfile(null); setDeptDiag([]); setDeptTrend([]); setDeptTrendM([]); return }
+    setDeptProfile(null); setDeptDiag([]); setDeptTrend([]); setDeptTrendM([])
     Promise.all([
       fetchStats('deptProfile', selDept),
       fetchStats('deptDiag', selDept),
-    ]).then(([prof, diag]) => {
+      fetchStats('deptTrend12m', selDept),
+      fetchStats('deptTrendMonth', selDept),
+    ]).then(([prof, diag, trend, trendM]) => {
       setDeptProfile(prof[0] || null)
       setDeptDiag(diag)
+      setDeptTrend(trend)
+      setDeptTrendM(trendM)
     })
   }, [selDept])
 
@@ -430,6 +501,31 @@ export default function OrgPage() {
               )}
               {deptDiag.length === 0 && deptProfile && (
                 <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Діагнози не знайдено</div>
+              )}
+
+              {/* Лінійні графіки трендів */}
+              {(deptTrend.length > 0 || deptTrendM.length > 0) && (
+                <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 14 }}>
+                    Тренд госпіталізацій · топ-3 діагнози
+                  </div>
+
+                  {/* Річний тренд (помісячно) */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 6, letterSpacing: '0.04em' }}>
+                      12 місяців (помісячно)
+                    </div>
+                    <SvgLineChart rows={deptTrend} xKey="місяць" />
+                  </div>
+
+                  {/* Поточний місяць (по днях) */}
+                  <div>
+                    <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 6, letterSpacing: '0.04em' }}>
+                      Поточний місяць (по днях)
+                    </div>
+                    <SvgLineChart rows={deptTrendM} xKey="день" />
+                  </div>
+                </div>
               )}
 
             </div>
