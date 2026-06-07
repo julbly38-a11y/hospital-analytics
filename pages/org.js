@@ -13,10 +13,11 @@ const BLOCK_CFG = {
 }
 const BLOCK_ORDER = ['хірургічний', 'терапевтичний', 'інтенсивна_терапія', 'параклінічний']
 
-async function fetchStats(key) {
+async function fetchStats(key, param) {
+  const body = param !== undefined ? { key, param } : { key }
   const r = await fetch('/api/stats', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key })
+    body: JSON.stringify(body)
   })
   const d = await r.json()
   return d.rows || []
@@ -189,6 +190,8 @@ export default function OrgPage() {
   const [loading, setLoading] = useState(true)
   const [selBlock, setSelBlock] = useState(null)
   const [selDept,  setSelDept]  = useState(null)
+  const [deptProfile, setDeptProfile] = useState(null)
+  const [deptDiag,    setDeptDiag]    = useState([])
 
   useEffect(() => {
     Promise.all([fetchStats('orgDepts'), fetchStats('orgDocs')])
@@ -226,6 +229,19 @@ export default function OrgPage() {
     const blk = blocks.find(b => b.depts.some(d => d.відділення === deptParam))
     if (blk) setSelBlock(blk.id)
   }, [router.query?.dept, loading, blocks])
+
+  // Підгрузка профілю і діагнозів відділення при виборі
+  useEffect(() => {
+    if (!selDept) { setDeptProfile(null); setDeptDiag([]); return }
+    setDeptProfile(null); setDeptDiag([])
+    Promise.all([
+      fetchStats('deptProfile', selDept),
+      fetchStats('deptDiag', selDept),
+    ]).then(([prof, diag]) => {
+      setDeptProfile(prof[0] || null)
+      setDeptDiag(diag)
+    })
+  }, [selDept])
 
   // Stats
   const totalDocs  = depts.reduce((s, d) => s + (Number(d.лікарів) || 0), 0)
@@ -300,21 +316,102 @@ export default function OrgPage() {
           )
         })()}
 
-        {/* Doctors */}
-        {selDept && selDeptDocs.length > 0 && (() => {
+        {/* Dept detail panel */}
+        {selDept && (() => {
           const cfg = BLOCK_CFG[selBlock] || { icon: '⊞', color: '#6b6760', label: selBlock }
+
+          // Склад за посадами
+          const byPosition = {}
+          selDeptDocs.forEach(d => {
+            const pos = d.посада || 'Інше'
+            if (!byPosition[pos]) byPosition[pos] = []
+            byPosition[pos].push(d)
+          })
+
+          const kpis = deptProfile ? [
+            { l: 'Випадків',   v: deptProfile.випадків?.toLocaleString('uk') },
+            { l: 'Ліжкодень',  v: deptProfile.ліжкодень },
+            { l: 'Летальність',v: deptProfile.летальність != null ? deptProfile.летальність + '%' : null },
+            { l: 'Ургентних',  v: deptProfile.ургентних_відс != null ? deptProfile.ургентних_відс + '%' : null },
+            { l: 'Операцій',   v: deptProfile.операцій?.toLocaleString('uk') },
+            { l: 'Серед. вік', v: deptProfile.середній_вік },
+          ].filter(k => k.v != null) : []
+
           return (
-            <div>
-              <SectionLabel text={`Лікарський склад · ${selDept}`} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {selDeptDocs.map((d, i) => (
-                  <DocChip key={i} doc={d} cfg={cfg}
-                    onAsk={() => {
-                      const surname = (d.лікар || '').split(' ')[0]
-                      router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + surname))
-                    }}
-                  />
-                ))}
+            <div style={{
+              border: `1px solid ${cfg.color}33`,
+              borderLeft: `3px solid ${cfg.color}`,
+              borderRadius: 8, padding: '16px 20px',
+              marginBottom: 24, background: 'var(--surface)'
+            }}>
+              {/* Заголовок */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{selDept}</div>
+                <button onClick={() => setSelDept(null)} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)' }}>✕</button>
+              </div>
+
+              {/* KPI показники */}
+              {kpis.length > 0 && (
+                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                  {kpis.map(k => (
+                    <div key={k.l}>
+                      <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
+                      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
+                    </div>
+                  ))}
+                  {!deptProfile && <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', alignSelf: 'center' }}>завантаження…</div>}
+                </div>
+              )}
+              {!deptProfile && kpis.length === 0 && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 14 }}>завантаження показників…</div>
+              )}
+
+              {/* Дві колонки: склад + діагнози */}
+              <div style={{ display: 'grid', gridTemplateColumns: deptDiag.length > 0 ? '1fr 1fr' : '1fr', gap: 24 }}>
+
+                {/* Склад за посадами */}
+                <div>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Склад</div>
+                  {Object.entries(byPosition).length > 0
+                    ? Object.entries(byPosition).map(([pos, pdocs]) => (
+                        <div key={pos} style={{ marginBottom: 10 }}>
+                          <div style={{ fontSize: 10, color: cfg.color, fontFamily: 'var(--mono)', marginBottom: 5 }}>
+                            {pos} <span style={{ color: 'var(--text3)' }}>({pdocs.length})</span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {pdocs.map((d, i) => (
+                              <DocChip key={i} doc={d} cfg={cfg}
+                                onAsk={() => {
+                                  const surname = (d.лікар || '').split(' ')[0]
+                                  router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + surname))
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    : <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Дані відсутні</div>
+                  }
+                </div>
+
+                {/* Топ діагнози */}
+                {deptDiag.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Топ діагнози МКХ-10</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {deptDiag.map((d, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <span style={{ fontFamily: 'var(--mono)', color: cfg.color, fontSize: 10, minWidth: 34, paddingTop: 1 }}>{d.код}</span>
+                          <span style={{ color: 'var(--text2)', flex: 1, fontSize: 11, lineHeight: 1.4 }}>{d.діагноз}</span>
+                          <span style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: 10, whiteSpace: 'nowrap', paddingTop: 1 }}>
+                            {Number(d.випадків).toLocaleString('uk')}{d.відс ? ` · ${d.відс}%` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             </div>
           )
