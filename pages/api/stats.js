@@ -24,7 +24,7 @@ const QUERIES = {
   wUrgency:    'SELECT department as відділення, urgent as ургентних, planned as планових FROM v_urgency_stats ORDER BY urgent DESC',
   // --- Хвиля 2: Діагнози / Лікарі / Нічні / Операції ---
   wDiag:       'SELECT icd_code as код, diagnosis_name as діагноз, cases as випадків, unique_patients as унікальних, letality_percent as летальність FROM v_top_diagnoses ORDER BY cases DESC LIMIT 20',
-  wDoctors:    'SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.doctor_id = ds.doctor_id ORDER BY ds.total_cases DESC LIMIT 20',
+  wDoctors:    'SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.empl_name_id = ds.doctor_id ORDER BY ds.total_cases DESC LIMIT 20',
   wNight:      'SELECT time_period as період, cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, deaths as померло, letality_percent as летальність FROM v_night_vs_day_admissions ORDER BY cases DESC',
   wOps:        'SELECT department as відділення, operations as операцій, total_cases as випадків, surgical_activity_pct as хір_активність FROM v_department_stats WHERE operations > 0 ORDER BY operations DESC',
   // --- Організаційна ієрархія ---
@@ -78,7 +78,7 @@ const PARAM_QUERIES = {
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,
   // Профіль лікаря (param = doc_name)
-  docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.doctor_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
+  docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.empl_name_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
   docDiag: (p) => `SELECT COALESCE(dd.diagnosis, dd.icd_code) as діагноз, dd.icd_code as код, dd.cases as випадків, dd.deaths as померло FROM doctor_diagnoses dd JOIN lsmd_doctors ld ON ld.empl_name_id = dd.doctor_id WHERE ld.doc_name = '${esc(p)}' ORDER BY dd.cases DESC LIMIT 10`,
   // Пошук МКХ-10 за кодом або назвою (для форми додавання пацієнта)
