@@ -319,22 +319,23 @@ export default function OrgPage() {
         {/* Dept detail panel */}
         {selDept && (() => {
           const cfg = BLOCK_CFG[selBlock] || { icon: '⊞', color: '#6b6760', label: selBlock }
+          const isNeuro = /невро|нейро/i.test(selDept)
 
-          // Склад за посадами
-          const byPosition = {}
-          selDeptDocs.forEach(d => {
-            const pos = d.посада || 'Інше'
-            if (!byPosition[pos]) byPosition[pos] = []
-            byPosition[pos].push(d)
-          })
+          const head   = selDeptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'))
+          const others = selDeptDocs.filter(d => !d.посада?.toLowerCase().includes('завідувач'))
+
+          const top7 = deptDiag.slice(0, 7)
+          const maxPct = top7.reduce((m, d) => Math.max(m, Number(d.відс) || 0), 0) || 1
 
           const kpis = deptProfile ? [
-            { l: 'Випадків',   v: deptProfile.випадків?.toLocaleString('uk') },
-            { l: 'Ліжкодень',  v: deptProfile.ліжкодень },
-            { l: 'Летальність',v: deptProfile.летальність != null ? deptProfile.летальність + '%' : null },
-            { l: 'Ургентних',  v: deptProfile.ургентних_відс != null ? deptProfile.ургентних_відс + '%' : null },
-            { l: 'Операцій',   v: deptProfile.операцій?.toLocaleString('uk') },
-            { l: 'Серед. вік', v: deptProfile.середній_вік },
+            { l: 'Випадків',    v: deptProfile.випадків?.toLocaleString('uk') },
+            { l: 'Унікальних',  v: deptProfile.унікальних?.toLocaleString('uk') },
+            { l: 'Ліжкодень',   v: deptProfile.ліжкодень },
+            { l: 'Летальність', v: deptProfile.летальність != null ? deptProfile.летальність + '%' : null },
+            { l: 'Смерть день1',v: deptProfile.смерть_день1 != null ? String(deptProfile.смерть_день1) : null },
+            ...(!isNeuro && deptProfile.повторні != null
+              ? [{ l: 'Повторні госп.', v: Number(deptProfile.повторні).toLocaleString('uk') }]
+              : []),
           ].filter(k => k.v != null) : []
 
           return (
@@ -345,74 +346,92 @@ export default function OrgPage() {
               marginBottom: 24, background: 'var(--surface)'
             }}>
               {/* Заголовок */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{selDept}</div>
                 <button onClick={() => setSelDept(null)} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)' }}>✕</button>
               </div>
 
-              {/* KPI показники */}
-              {kpis.length > 0 && (
-                <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-                  {kpis.map(k => (
-                    <div key={k.l}>
-                      <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
+              {/* Завідувач */}
+              {head && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 6 }}>Завідувач</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: cfg.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 500, flexShrink: 0 }}>
+                      {initials(head.лікар)}
                     </div>
-                  ))}
-                  {!deptProfile && <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', alignSelf: 'center' }}>завантаження…</div>}
-                </div>
-              )}
-              {!deptProfile && kpis.length === 0 && (
-                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 14 }}>завантаження показників…</div>
-              )}
-
-              {/* Дві колонки: склад + діагнози */}
-              <div style={{ display: 'grid', gridTemplateColumns: deptDiag.length > 0 ? '1fr 1fr' : '1fr', gap: 24 }}>
-
-                {/* Склад за посадами */}
-                <div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Склад</div>
-                  {Object.entries(byPosition).length > 0
-                    ? Object.entries(byPosition).map(([pos, pdocs]) => (
-                        <div key={pos} style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 10, color: cfg.color, fontFamily: 'var(--mono)', marginBottom: 5 }}>
-                            {pos} <span style={{ color: 'var(--text3)' }}>({pdocs.length})</span>
-                          </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {pdocs.map((d, i) => (
-                              <DocChip key={i} doc={d} cfg={cfg}
-                                onAsk={() => {
-                                  const surname = (d.лікар || '').split(' ')[0]
-                                  router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + surname))
-                                }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      ))
-                    : <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Дані відсутні</div>
-                  }
-                </div>
-
-                {/* Топ діагнози */}
-                {deptDiag.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Топ діагнози МКХ-10</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {deptDiag.map((d, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          <span style={{ fontFamily: 'var(--mono)', color: cfg.color, fontSize: 10, minWidth: 34, paddingTop: 1 }}>{d.код}</span>
-                          <span style={{ color: 'var(--text2)', flex: 1, fontSize: 11, lineHeight: 1.4 }}>{d.діагноз}</span>
-                          <span style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: 10, whiteSpace: 'nowrap', paddingTop: 1 }}>
-                            {Number(d.випадків).toLocaleString('uk')}{d.відс ? ` · ${d.відс}%` : ''}
-                          </span>
-                        </div>
-                      ))}
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{head.лікар}</div>
+                      {!isNeuro && head.спеціалізація && head.спеціалізація !== '—' && (
+                        <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{head.спеціалізація}</div>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
-              </div>
+              {/* Ординатори */}
+              {others.length > 0 && (
+                <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 8 }}>
+                    Ординатори <span style={{ color: cfg.color }}>({others.length})</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
+                    {others.map((d, i) => (
+                      <div key={i}
+                        onClick={() => router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + (d.лікар || '').split(' ')[0]))}
+                        style={{ fontSize: 12, color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onMouseEnter={e => e.currentTarget.style.color = cfg.color}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
+                      >
+                        {isNeuro
+                          ? <span><span style={{ color: 'var(--text3)', fontSize: 10 }}>{d.посада || 'Ординатор'} </span>{d.лікар}</span>
+                          : <span>{d.лікар}{d.спеціалізація && d.спеціалізація !== '—' ? <span style={{ color: 'var(--text3)', fontSize: 10, fontFamily: 'var(--mono)' }}> · {d.спеціалізація}</span> : ''}</span>
+                        }
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* KPI показники */}
+              {!deptProfile
+                ? <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>завантаження показників…</div>
+                : kpis.length > 0 && (
+                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                    {kpis.map(k => (
+                      <div key={k.l}>
+                        <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }
+
+              {/* Топ-7 діагнозів МКХ-10 — горизонтальні бари */}
+              {top7.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Топ діагнози МКХ-10</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {top7.map((d, i) => (
+                      <div key={i}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                          <span style={{ fontFamily: 'var(--mono)', color: cfg.color, fontSize: 10, minWidth: 36, flexShrink: 0 }}>{d.код}</span>
+                          <span style={{ color: 'var(--text2)', flex: 1, fontSize: 11, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.діагноз}</span>
+                          <span style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: 10, flexShrink: 0 }}>{d.відс}%</span>
+                        </div>
+                        <div style={{ height: 3, background: 'var(--border)', borderRadius: 2 }}>
+                          <div style={{ width: `${Math.round((Number(d.відс) / maxPct) * 100)}%`, height: '100%', background: cfg.color + 'cc', borderRadius: 2, transition: 'width .5s' }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {deptDiag.length === 0 && deptProfile && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Діагнози не знайдено</div>
+              )}
+
             </div>
           )
         })()}

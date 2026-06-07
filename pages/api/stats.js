@@ -74,7 +74,10 @@ const PARAM_QUERIES = {
       GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT ${n}`
   },
   // Профіль одного відділення
-  deptProfile: (p) => `SELECT department as відділення, total_cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, death_rate_pct as летальність, urgent_pct as ургентних_відс, operations as операцій, surgical_activity_pct as хір_активність, avg_age as середній_вік, women as жінки, men as чоловіки, children as діти, elderly as літні, improved as поліпшення FROM v_department_stats WHERE department = '${esc(p)}' LIMIT 1`,
+  deptProfile: (p) => `SELECT department as відділення, total_cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, death_rate_pct as летальність, urgent_pct as ургентних_відс, operations as операцій, surgical_activity_pct as хір_активність, avg_age as середній_вік, women as жінки, men as чоловіки, children as діти, elderly as літні, improved as поліпшення,
+    (SELECT COUNT(*) FROM lsmd WHERE admission_department = '${esc(p)}' AND discharge_status = 'Помер' AND COALESCE(length_of_stay,999) <= 1) as смерть_день1,
+    (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd WHERE admission_department = '${esc(p)}' GROUP BY patient_id HAVING COUNT(*) > 1) t) as повторні
+    FROM v_department_stats WHERE department = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,
   // Профіль лікаря (param = doc_name)
