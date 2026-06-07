@@ -259,6 +259,9 @@ export default function OrgPage() {
   const [deptDiag,    setDeptDiag]    = useState([])
   const [deptTrend,   setDeptTrend]   = useState([])
   const [deptTrendM,  setDeptTrendM]  = useState([])
+  const [selDoc,      setSelDoc]      = useState(null)
+  const [selDocProf,  setSelDocProf]  = useState(null)
+  const [selDocDiag,  setSelDocDiag]  = useState([])
 
   useEffect(() => {
     Promise.all([fetchStats('orgDepts'), fetchStats('orgDocs')])
@@ -299,6 +302,7 @@ export default function OrgPage() {
 
   // Підгрузка профілю, діагнозів і трендів відділення при виборі
   useEffect(() => {
+    setSelDoc(null); setSelDocProf(null); setSelDocDiag([])
     if (!selDept) { setDeptProfile(null); setDeptDiag([]); setDeptTrend([]); setDeptTrendM([]); return }
     setDeptProfile(null); setDeptDiag([]); setDeptTrend([]); setDeptTrendM([])
     Promise.all([
@@ -313,6 +317,19 @@ export default function OrgPage() {
       setDeptTrendM(trendM)
     })
   }, [selDept])
+
+  // Підгрузка профілю лікаря при виборі
+  useEffect(() => {
+    if (!selDoc) { setSelDocProf(null); setSelDocDiag([]); return }
+    setSelDocProf(null); setSelDocDiag([])
+    Promise.all([
+      fetchStats('docProfile', selDoc),
+      fetchStats('docDiag', selDoc),
+    ]).then(([prof, diag]) => {
+      setSelDocProf(prof[0] || null)
+      setSelDocDiag(diag)
+    })
+  }, [selDoc])
 
   // Stats
   const totalDocs  = depts.reduce((s, d) => s + (Number(d.лікарів) || 0), 0)
@@ -418,20 +435,97 @@ export default function OrgPage() {
             }}>
               {/* Заголовок */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{selDept}</div>
-                <button onClick={() => setSelDept(null)} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)' }}>✕</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  {selDoc
+                    ? <>
+                        <button onClick={() => setSelDoc(null)} style={{ fontSize: 12, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)', padding: 0 }}>← {selDept}</button>
+                        <span style={{ color: 'var(--border)' }}>›</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{selDoc}</span>
+                      </>
+                    : <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', fontFamily: 'var(--mono)' }}>{selDept}</div>
+                  }
+                </div>
+                <button onClick={() => { setSelDept(null); setSelDoc(null) }} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--mono)' }}>✕</button>
               </div>
 
+              {/* ── Картка лікаря ── */}
+              {selDoc ? (() => {
+                const docInfo = selDeptDocs.find(d => d.лікар === selDoc)
+                const top7d   = selDocDiag.slice(0, 7)
+                const maxPctD = top7d.reduce((m, d) => Math.max(m, Number(d.відс) || 0), 0) || 1
+                return (
+                  <div>
+                    {/* Посада / спеціалізація */}
+                    {docInfo && (
+                      <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                        {docInfo.посада && <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{docInfo.посада}</div>}
+                        {!isNeuro && docInfo.спеціалізація && docInfo.спеціалізація !== '—' && (
+                          <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{docInfo.спеціалізація}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* KPI */}
+                    {!selDocProf
+                      ? <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>завантаження…</div>
+                      : <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                          {[
+                            { l: 'Випадків',    v: selDocProf.випадків?.toLocaleString('uk') },
+                            { l: 'Унікальних',  v: selDocProf.унікальних?.toLocaleString('uk') },
+                            { l: 'Ліжкодень',   v: selDocProf.ліжкодень },
+                            { l: 'Летальність', v: selDocProf.летальність != null ? selDocProf.летальність + '%' : null },
+                          ].filter(k => k.v != null).map(k => (
+                            <div key={k.l}>
+                              <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
+                              <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
+                            </div>
+                          ))}
+                        </div>
+                    }
+
+                    {/* Топ діагнози */}
+                    {top7d.length > 0 && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Топ діагнози МКХ-10</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {top7d.map((d, i) => (
+                            <div key={i}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                                <span style={{ fontFamily: 'var(--mono)', color: cfg.color, fontSize: 10, minWidth: 36, flexShrink: 0 }}>{d.код}</span>
+                                <span style={{ color: 'var(--text2)', flex: 1, fontSize: 11, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.діагноз}</span>
+                                <span style={{ fontFamily: 'var(--mono)', color: 'var(--text3)', fontSize: 10, flexShrink: 0 }}>{d.відс}%</span>
+                              </div>
+                              <div style={{ height: 3, background: 'var(--border)', borderRadius: 2 }}>
+                                <div style={{ width: `${Math.round((Number(d.відс) / maxPctD) * 100)}%`, height: '100%', background: cfg.color + 'cc', borderRadius: 2, transition: 'width .5s' }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {selDocDiag.length === 0 && selDocProf && (
+                      <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>Діагнози не знайдено</div>
+                    )}
+                  </div>
+                )
+              })() : null}
+
               {/* Завідувач */}
-              {head && (
+              {!selDoc && head && (
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 6 }}>Завідувач</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: cfg.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 500, flexShrink: 0 }}>
+                    <div
+                      onClick={() => setSelDoc(head.лікар)}
+                      style={{ width: 30, height: 30, borderRadius: '50%', background: cfg.color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 500, flexShrink: 0, cursor: 'pointer' }}
+                    >
                       {initials(head.лікар)}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{head.лікар}</div>
+                      <div onClick={() => setSelDoc(head.лікар)} style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', cursor: 'pointer' }}
+                        onMouseEnter={e => e.currentTarget.style.color = cfg.color}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text)'}
+                      >{head.лікар}</div>
                       {!isNeuro && head.спеціалізація && head.спеціалізація !== '—' && (
                         <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{head.спеціалізація}</div>
                       )}
@@ -441,7 +535,7 @@ export default function OrgPage() {
               )}
 
               {/* Ординатори */}
-              {others.length > 0 && (
+              {!selDoc && others.length > 0 && (
                 <div style={{ marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 8 }}>
                     Ординатори <span style={{ color: cfg.color }}>({others.length})</span>
@@ -449,7 +543,7 @@ export default function OrgPage() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
                     {others.map((d, i) => (
                       <div key={i}
-                        onClick={() => router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + (d.лікар || '').split(' ')[0]))}
+                        onClick={() => setSelDoc(d.лікар)}
                         style={{ fontSize: 12, color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
                         onMouseEnter={e => e.currentTarget.style.color = cfg.color}
                         onMouseLeave={e => e.currentTarget.style.color = 'var(--text2)'}
@@ -465,22 +559,23 @@ export default function OrgPage() {
               )}
 
               {/* KPI показники */}
-              {!deptProfile
-                ? <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>завантаження показників…</div>
-                : kpis.length > 0 && (
-                  <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
-                    {kpis.map(k => (
-                      <div key={k.l}>
-                        <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
-                      </div>
-                    ))}
-                  </div>
-                )
-              }
+              {!selDoc && (
+                !deptProfile
+                  ? <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>завантаження показників…</div>
+                  : kpis.length > 0 && (
+                    <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border)' }}>
+                      {kpis.map(k => (
+                        <div key={k.l}>
+                          <div style={{ fontSize: 18, fontWeight: 300, fontFamily: 'var(--mono)', color: cfg.color, lineHeight: 1.1 }}>{k.v}</div>
+                          <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)', marginTop: 2 }}>{k.l}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+              )}
 
               {/* Топ-7 діагнозів МКХ-10 — горизонтальні бари */}
-              {top7.length > 0 && (
+              {!selDoc && top7.length > 0 && (
                 <div>
                   <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10 }}>Топ діагнози МКХ-10</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -499,12 +594,12 @@ export default function OrgPage() {
                   </div>
                 </div>
               )}
-              {deptDiag.length === 0 && deptProfile && (
+              {!selDoc && deptDiag.length === 0 && deptProfile && (
                 <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>Діагнози не знайдено</div>
               )}
 
               {/* Лінійні графіки трендів */}
-              {(deptTrend.length > 0 || deptTrendM.length > 0) && (
+              {!selDoc && (deptTrend.length > 0 || deptTrendM.length > 0) && (
                 <div style={{ marginTop: 20, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 14 }}>
                     Тренд госпіталізацій · топ-3 діагнози
