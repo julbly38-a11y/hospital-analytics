@@ -506,6 +506,18 @@ export default function OrgPage() {
                     {selDocDiag.length === 0 && selDocProf && (
                       <div style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 16 }}>Діагнози не знайдено</div>
                     )}
+
+                    {/* Посилання на кабінет */}
+                    {selDocProf && (
+                      <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                        <button
+                          onClick={() => router.push('/doctors?name=' + encodeURIComponent(selDoc))}
+                          style={{ fontSize: 11, fontFamily: 'var(--mono)', color: cfg.color, background: 'none', border: `1px solid ${cfg.color}55`, borderRadius: 6, padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.04em' }}
+                        >
+                          Відкрити кабінет →
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })() : null}
