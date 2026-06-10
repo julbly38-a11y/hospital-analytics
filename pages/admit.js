@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { useEffect, useState } from 'react'
 import { createClient } from '../lib/supabase'
 
 const DEPARTMENTS = [
@@ -102,7 +103,10 @@ export default function Admit() {
   const [result, setResult] = useState(null) // { ok, error, case }
 
   useEffect(() => {
-    fetch('/api/me').then(r => r.json()).then(setMe).catch(() => setMe({ role: null }))
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(d => { setMe(d); if (d?.role !== 'admin') router.replace('/') })
+      .catch(() => router.replace('/login'))
   }, [])
 
   useEffect(() => {
