@@ -117,7 +117,10 @@ export default function ImportPage() {
   const [working, setWorking] = useState(false)
 
   useEffect(() => {
-    fetch('/api/me').then((r) => r.json()).then(setMe).catch(() => setMe({ role: null }))
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(d => { setMe(d); if (d?.role !== 'admin') router.replace('/') })
+      .catch(() => router.replace('/login'))
   }, [])
 
   const cfg = IMPORT_TABLES[table]

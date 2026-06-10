@@ -80,7 +80,7 @@ const DASH_NAV = [
   { id: 'operations',  label: 'Операції',     gl: '✂', group: 'Аналітика' },  // ножиці = хірургія
   { id: 'org',         label: 'Структура',    gl: '⊞', group: 'Інструменти', url: '/org' },
   { id: 'cabinet',     label: 'Кабінет лікаря',     gl: '⚕', group: 'Інструменти', url: '/cabinet' },
-  { id: 'admit',       label: 'Госпіталізація пацієнта', gl: '+', group: 'Інструменти', url: '/admit' },
+  { id: 'admit',       label: 'Госпіталізація пацієнта', gl: '+', group: 'Інструменти', url: '/admit', adminOnly: true },
   { id: 'asystent',    label: 'AI Асистент',  gl: '✦', group: 'Інструменти' }, // зірка
   { id: 'reports',     label: 'Звіти',        gl: '≡', group: 'Інструменти' }, // документ
   { id: 'settings',    label: 'Налаштування', gl: '⚙', group: 'Інструменти' }, // шестерня
@@ -117,7 +117,7 @@ function Sidebar({ active, setActive, me, role, onLogout }) {
         {groups.map(g => (
           <div key={g} className="group">
             <div className="group-label">{g}</div>
-            {DASH_NAV.filter(n => n.group === g).map(n => (
+            {DASH_NAV.filter(n => n.group === g && (!n.adminOnly || role === 'admin')).map(n => (
               <div key={n.id} className={`dash-nav-item${active === n.id ? ' active' : ''}`}
                 onClick={() => n.url ? (window.location.href = n.url) : setActive(n.id)}>
                 <span className="gl">{n.gl}</span><span>{n.label}</span>
