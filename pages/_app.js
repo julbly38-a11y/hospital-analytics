@@ -6,7 +6,7 @@ import '../styles/globals.css'
 const PUBLIC = ['/login']
 
 /* Сторінки тільки для адміна */
-const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics']
+const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics', '/dept']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
@@ -42,9 +42,9 @@ export default function App({ Component, pageProps }) {
     return null
   }
 
-  /* Не адмін намагається зайти на адмін-сторінку → на головну */
+  /* Не адмін намагається зайти на адмін-сторінку → на кабінет (якщо лікар) або логін */
   if (ADMIN_ONLY.includes(path) && auth.role !== 'admin') {
-    if (typeof window !== 'undefined') router.replace('/')
+    if (typeof window !== 'undefined') router.replace(auth.role === 'doctor' ? '/cabinet' : '/')
     return null
   }
 
