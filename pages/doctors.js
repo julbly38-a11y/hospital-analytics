@@ -159,13 +159,11 @@ export default function DoctorPage() {
 
               {/* KPI */}
               <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', marginBottom: 24, paddingBottom: 20, borderBottom: '1px solid var(--border)' }}>
-                <Kpi label="Випадків"   value={profile.випадків?.toLocaleString('uk')}  color={accentColor} />
-                <Kpi label="Унікальних" value={profile.унікальних?.toLocaleString('uk')} color={accentColor} />
-                <Kpi label="Ліжкодень"  value={profile.ліжкодень}                        color={accentColor} />
-                <Kpi label="Летальність" value={letPct + '%'}                             color={accentColor} />
-                {improvePct !== null && (
-                  <Kpi label="Поліпшення" value={improvePct + '%'} color={accentColor} />
-                )}
+                <Kpi label="Госпіталізацій" value={profile.випадків?.toLocaleString('uk')}   color={accentColor} />
+                <Kpi label="Пацієнтів"      value={profile.унікальних?.toLocaleString('uk')}  color={accentColor} />
+                <Kpi label="Летальність"    value={letPct + '%'}                               color={accentColor} />
+                <Kpi label="Середній вік"   value={profile.середній_вік ?? '—'}               color={accentColor} />
+                <Kpi label="Ліжко-день"     value={profile.ліжкодень}                         color={accentColor} />
               </div>
 
               {/* Додаткова статистика */}
