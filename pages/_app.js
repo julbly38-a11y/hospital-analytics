@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import '../styles/globals.css'
 
 /* Сторінки без авторизації */
-const PUBLIC = ['/login']
+const PUBLIC = ['/login', '/auth/reset-password']
 
 /* Сторінки тільки для адміна */
 const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics', '/dept']
@@ -42,7 +42,7 @@ export default function App({ Component, pageProps }) {
     return null
   }
 
-  /* Не адмін намагається зайти на адмін-сторінку → на кабінет (якщо лікар) або логін */
+  /* Не адмін намагається зайти на адмін-сторінку → на кабінет (якщо лікар) або головну */
   if (ADMIN_ONLY.includes(path) && auth.role !== 'admin') {
     if (typeof window !== 'undefined') router.replace(auth.role === 'doctor' ? '/cabinet' : '/')
     return null
