@@ -160,10 +160,18 @@ async function supaFetch(sql) {
   return rows
 }
 
+// Публічні запити — доступні без авторизації (тільки агреговані дані, без ПІБ)
+const PUBLIC_KEYS = new Set([
+  'ovKpiYear', 'doctorCount', 'deptProfile',
+  'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly',
+])
+
 export default async function handler(req, res) {
-  // Авторизація обовʼязкова. Загальні агреговані показники (без ПІБ) доступні всім ролям.
+  const { key } = req.body || {}
+  const isPublic = PUBLIC_KEYS.has(key)
+
   const role = await getRole(req)
-  if (!role) {
+  if (!role && !isPublic) {
     return res.status(401).json({ error: 'Не авторизовано' })
   }
 
