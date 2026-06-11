@@ -2,10 +2,17 @@ import { useState, useEffect, useMemo } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { createClient } from '../lib/supabase'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
 const MONO = { fontFamily: 'var(--mono)' }
 const UA_MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень']
+
+const ICD_NAMES = {
+  K: 'Органи травлення', I: 'Кровообіг', S: 'Травми', G: 'Нервова система',
+  N: 'Сечостатева', C: 'Новоутворення', M: "Кістково-м'язова",
+  J: 'Органи дихання', E: 'Ендокринні', A: 'Інфекційні', F: 'Психічні',
+}
+const PIE_COLORS = ['#8b8fa8', '#a8b5c8', '#c8b8a8', '#a8c8b8', '#c8a8b8']
 
 function fmt(n) {
   if (n == null || n === '') return '—'
@@ -61,6 +68,7 @@ export default function Home() {
   const [deptProfile, setDeptProfile] = useState(null)
   const [deptDocs, setDeptDocs] = useState([])
   const [deptMonthly, setDeptMonthly] = useState([])
+  const [deptIcdCat,  setDeptIcdCat]  = useState([])
   const [deptLoading, setDeptLoading] = useState(false)
 
   // Auth перевірка
@@ -92,16 +100,18 @@ export default function Home() {
 
   // Дані відділення
   useEffect(() => {
-    if (!selDept) { setDeptProfile(null); setDeptDocs([]); setDeptMonthly([]); return }
+    if (!selDept) { setDeptProfile(null); setDeptDocs([]); setDeptMonthly([]); setDeptIcdCat([]); return }
     setDeptLoading(true)
     Promise.all([
       fetchStats('deptProfile', selDept),
       fetchStats('deptDocs2', selDept),
       fetchStats('deptMonthly', selDept),
-    ]).then(([prof, docs, monthly]) => {
+      fetchStats('deptIcdCat', selDept),
+    ]).then(([prof, docs, monthly, icdCat]) => {
       setDeptProfile(prof[0] || null)
       setDeptDocs(docs)
       setDeptMonthly(monthly)
+      setDeptIcdCat(icdCat)
       setDeptLoading(false)
     })
   }, [selDept])
@@ -263,16 +273,58 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* Нижня зона — плейсхолдери */}
+                {/* Нижня зона */}
                 {deptProfile && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 32px' }}>
-                    <div style={{
-                      border: '1px solid var(--border)', borderRadius: 10,
-                      padding: '40px 24px', textAlign: 'center',
-                      color: 'var(--text3)', fontSize: 13, ...MONO,
-                    }}>
-                      Векторна діаграма<br />5 основних категорій<br />Захворюваності
+
+                    {/* Секторна діаграма захворюваності */}
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '20px 20px 12px' }}>
+                      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO, marginBottom: 4 }}>
+                        5 основних категорій захворюваності
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontSize: 22, fontWeight: 300, color: 'var(--text)', ...MONO }}>{fmt(deptProfile.випадків)}</div>
+                          <div style={{ fontSize: 8, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO }}>Госпіталізацій</div>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 22, fontWeight: 300, color: 'var(--text)', ...MONO }}>{fmt(deptProfile.унікальних)}</div>
+                          <div style={{ fontSize: 8, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO }}>Пацієнтів</div>
+                        </div>
+                      </div>
+                      {deptIcdCat.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={200}>
+                          <PieChart>
+                            <Pie
+                              data={deptIcdCat.map(r => ({
+                                name: ICD_NAMES[r.розділ] || r.розділ,
+                                value: Number(r.випадків),
+                              }))}
+                              cx="50%" cy="50%"
+                              innerRadius={50} outerRadius={80}
+                              dataKey="value" paddingAngle={2}
+                            >
+                              {deptIcdCat.map((_, i) => (
+                                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, fontFamily: 'var(--mono)' }}
+                              formatter={(v, n) => [fmt(v) + ' вип.', n]}
+                            />
+                            <Legend iconSize={8} iconType="circle"
+                              formatter={(v) => <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{v}</span>}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 11, ...MONO }}>
+                          {deptLoading ? 'завантаження…' : 'немає даних'}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Плейсхолдер другого графіку */}
                     <div style={{
                       border: '1px solid var(--border)', borderRadius: 10,
                       padding: '40px 24px', textAlign: 'center',
