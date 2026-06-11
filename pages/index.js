@@ -7,11 +7,6 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, 
 const MONO = { fontFamily: 'var(--mono)' }
 const UA_MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень']
 
-const ICD_NAMES = {
-  K: 'Органи травлення', I: 'Кровообіг', S: 'Травми', G: 'Нервова система',
-  N: 'Сечостатева', C: 'Новоутворення', M: "Кістково-м'язова",
-  J: 'Органи дихання', E: 'Ендокринні', A: 'Інфекційні', F: 'Психічні',
-}
 const PIE_COLORS = ['#8b8fa8', '#a8b5c8', '#c8b8a8', '#a8c8b8', '#c8a8b8']
 
 function fmt(n) {
@@ -321,7 +316,7 @@ export default function Home() {
                           <PieChart>
                             <Pie
                               data={deptIcdCat.map(r => ({
-                                name: ICD_NAMES[r.розділ] || r.розділ,
+                                name: r.назва || r.код,
                                 value: Number(r.випадків),
                               }))}
                               cx="50%" cy="50%"

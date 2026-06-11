@@ -96,8 +96,8 @@ const PARAM_QUERIES = {
   deptMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_date_d >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months' GROUP BY місяць ORDER BY місяць`,
   // Щоденний тренд поточного місяця по відділенню
   deptDaily: (p) => `SELECT TO_CHAR(admission_date_d, 'DD') as день, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND DATE_TRUNC('month', admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день ORDER BY день::int`,
-  // Топ-5 категорій МКХ по відділенню (для секторної діаграми)
-  deptIcdCat: (p) => `SELECT LEFT(icd_primary, 1) as розділ, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' GROUP BY LEFT(icd_primary, 1) ORDER BY випадків DESC LIMIT 5`,
+  // Топ-5 категорій МКХ по відділенню — назви з icd_10 (chapter = перша буква)
+  deptIcdCat: (p) => `SELECT i.code_level1 as код, i.category_level1 as назва, COUNT(*) as випадків FROM lsmd l JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND l.icd_primary IS NOT NULL GROUP BY i.code_level1, i.category_level1 ORDER BY випадків DESC LIMIT 5`,
   // Пошук МКХ-10 за кодом або назвою (для форми додавання пацієнта)
   icdSearch: (p) => `SELECT icd_code as код, COALESCE(diagnosis_level3, diagnosis_level2, category_level1) as назва FROM icd_10 WHERE icd_code ILIKE '${esc(p)}%' OR diagnosis_level3 ILIKE '%${esc(p)}%' OR diagnosis_level2 ILIKE '%${esc(p)}%' ORDER BY usage_count DESC NULLS LAST LIMIT 8`,
 }
