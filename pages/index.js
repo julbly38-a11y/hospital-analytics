@@ -2,18 +2,15 @@ import { useState, useEffect, useMemo } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { createClient } from '../lib/supabase'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
-const MONO = { fontFamily: 'var(--mono)' }
-const UA_MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень']
-
-const PIE_COLORS = ['#8b8fa8', '#a8b5c8', '#c8b8a8', '#a8c8b8', '#c8a8b8']
+const SANS = { fontFamily: 'var(--sans, "IBM Plex Sans", sans-serif)' }
+const MONO = { fontFamily: 'var(--mono, "IBM Plex Mono", monospace)' }
 
 function fmt(n) {
   if (n == null || n === '') return '—'
   const num = Number(n)
   if (isNaN(num)) return String(n)
-  return num.toLocaleString('uk-UA').replace(/ /g, ' ')
+  return num.toLocaleString('uk-UA').replace(/\s/g, ' ')
 }
 
 async function fetchStats(key, param) {
@@ -26,338 +23,239 @@ async function fetchStats(key, param) {
   return d.rows || []
 }
 
-/* ── Топ KPI у хедері ── */
-function HeaderKpi({ label, value }) {
-  return (
-    <div style={{ textAlign: 'center', padding: '0 28px', borderLeft: '1px solid rgba(255,255,255,0.12)' }}>
-      <div style={{ fontSize: 28, fontWeight: 300, color: 'var(--text)', ...MONO, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5, ...MONO }}>{label}</div>
-    </div>
-  )
-}
-
-/* ── Показник відділення (другий рядок) ── */
-function DeptKpi({ label, value }) {
-  return (
-    <div style={{ textAlign: 'center', flex: 1 }}>
-      <div style={{ fontSize: 26, fontWeight: 300, color: 'var(--text)', ...MONO, lineHeight: 1 }}>{value ?? '—'}</div>
-      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5, ...MONO }}>{label}</div>
-    </div>
-  )
-}
-
 export default function Home() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, [])
 
-  const [role, setRole] = useState(null)
-  const [authChecked, setAuthChecked] = useState(false)
-
-  // Глобальні KPI
   const [kpi, setKpi] = useState(null)
   const [depts, setDepts] = useState([])
   const [doctorCount, setDoctorCount] = useState(null)
 
-  // Вибране відділення
-  const [selDept, setSelDept] = useState(null)
-  const [deptProfile, setDeptProfile] = useState(null)
-  const [deptDocs, setDeptDocs] = useState([])
-  const [deptMonthly, setDeptMonthly] = useState([])
-  const [deptIcdCat,  setDeptIcdCat]  = useState([])
-  const [deptLoading, setDeptLoading] = useState(false)
-  const [chartPeriod, setChartPeriod] = useState('місяці') // 'роки' | 'місяці' | 'дні'
+  const [showLogin, setShowLogin] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState(null)
 
-  // Auth перевірка
+  // Якщо вже авторизований — редирект
   useEffect(() => {
     fetch('/api/me').then(r => r.json()).then(d => {
-      setRole(d.role)
-      setAuthChecked(true)
-      if (!d.role) router.push('/login')
-    }).catch(() => { setAuthChecked(true); router.push('/login') })
+      if (d?.role && d.role !== 'viewer') redirectByRole(d.role)
+    }).catch(() => {})
   }, [])
 
-  // Глобальні дані
+  // Публічні дані
   useEffect(() => {
     fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
-    fetchStats('wDept').then(rows => {
-      setDepts(rows)
-      // Рахуємо лікарів із dept stats
-      const total = rows.reduce((s, r) => s + Number(r.лікарів || 0), 0)
-      // Якщо немає поля лікарів — підраховуємо через orgDocs
-    })
+    fetchStats('wDept').then(rows => setDepts(rows))
     fetchStats('orgDocs').then(rows => setDoctorCount(rows.length))
   }, [])
 
-  // URL синхронізація
-  useEffect(() => {
-    const d = router.query?.dept
-    if (d) setSelDept(decodeURIComponent(d))
-  }, [router.query?.dept])
-
-  // Дані відділення
-  useEffect(() => {
-    if (!selDept) { setDeptProfile(null); setDeptDocs([]); setDeptMonthly([]); setDeptIcdCat([]); return }
-    setDeptLoading(true)
-    Promise.all([
-      fetchStats('deptProfile', selDept),
-      fetchStats('deptDocs2', selDept),
-      fetchStats('deptYearly', selDept),
-      fetchStats('deptMonthly', selDept),
-      fetchStats('deptDaily', selDept),
-      fetchStats('deptIcdCat', selDept),
-    ]).then(([prof, docs, yearly, monthly, daily, icdCat]) => {
-      setDeptProfile(prof[0] || null)
-      setDeptDocs(docs)
-      setDeptMonthly({ роки: yearly, місяці: monthly, дні: daily })
-      setDeptIcdCat(icdCat)
-      setDeptLoading(false)
-    })
-  }, [selDept])
-
-  const завідувач = useMemo(() => deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач')), [deptDocs])
-
-  const chartData = useMemo(() => {
-    const rows = deptMonthly?.[chartPeriod] || []
-    return rows.map(r => {
-      if (chartPeriod === 'роки')  return { мітка: String(r.рік),   випадків: Number(r.випадків) || 0 }
-      if (chartPeriod === 'місяці') return { мітка: UA_MONTHS[parseInt(r.місяць?.slice(5, 7), 10) - 1] || r.місяць, випадків: Number(r.випадків) || 0 }
-      return { мітка: r.день + ' ч.', випадків: Number(r.випадків) || 0 }
-    })
-  }, [deptMonthly, chartPeriod])
-
-  const handleDeptClick = (dept) => {
-    const next = selDept === dept ? null : dept
-    setSelDept(next)
-    router.replace({ query: next ? { dept: next } : {} }, undefined, { shallow: true })
+  function redirectByRole(role) {
+    if (role === 'admin') router.push('/org')
+    else if (role === 'head_dept') router.push('/dept')
+    else if (role === 'doctor') router.push('/cabinet')
+    else router.push('/org')
   }
 
-  async function handleLogout() {
-    await supabase?.auth.signOut()
-    router.push('/login')
+  async function handleLogin(e) {
+    e.preventDefault()
+    if (!supabase) return
+    setLoginLoading(true)
+    setLoginError(null)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      setLoginError('Невірний логін або пароль')
+      setLoginLoading(false)
+      return
+    }
+    const d = await fetch('/api/me').then(r => r.json()).catch(() => ({}))
+    setLoginLoading(false)
+    redirectByRole(d?.role)
   }
 
-  if (!authChecked) return null
+  const year = new Date().getFullYear()
 
   return (
     <>
       <Head>
-        <title>ЛСМД — Головна</title>
+        <title>ЛСМД — Хотинська багатопрофільна лікарня</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        minHeight: '100vh', display: 'flex',
+        background: '#f5f3f0',
+      }}>
 
-        {/* ── ХЕДЕР ── */}
-        <header style={{
-          display: 'flex', alignItems: 'center',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--surface)', flexShrink: 0,
+        {/* ── ЛІВА КОЛОНКА ── */}
+        <div style={{
+          width: 480, flexShrink: 0,
+          borderRight: '1px solid rgba(0,0,0,0.08)',
+          display: 'flex', flexDirection: 'column',
+          background: 'rgba(255,255,255,0.55)',
+          backdropFilter: 'blur(12px)',
         }}>
+
           {/* Лого + назва */}
-          <div style={{ width: 320, padding: '18px 24px', borderRight: '1px solid var(--border)', flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', lineHeight: 1.4, letterSpacing: '0.04em' }}>
-              ЛІКАРНЯ ШВИДКОЇ<br />МЕДИЧНОЇ ДОПОМОГИ
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, ...MONO }}>турбуємось про найцінніше</div>
-          </div>
-
-          {/* Глобальні KPI */}
-          <div style={{ display: 'flex', flex: 1, alignItems: 'center', padding: '18px 0', justifyContent: 'center' }}>
-            <HeaderKpi label="Госпіталізацій" value={kpi ? fmt(kpi.total_cases) : '…'} />
-            <HeaderKpi label="Пацієнтів"      value={kpi ? fmt(kpi.unique_patients) : '…'} />
-            <HeaderKpi label="Лікарів"        value={doctorCount != null ? fmt(doctorCount) : '…'} />
-            <HeaderKpi label="Відділень"      value={depts.length || '…'} />
-            <HeaderKpi label="Летальність"    value={kpi ? kpi.death_rate_pct + '%' : '…'} />
-          </div>
-
-          {/* Вийти */}
-          <div style={{ padding: '0 20px', borderLeft: '1px solid var(--border)' }}>
-            <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 11, ...MONO }}>↪ Вийти</button>
-          </div>
-        </header>
-
-        {/* ── ОСНОВНИЙ КОНТЕНТ ── */}
-        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 77px)' }}>
-
-          {/* ── ЛІВА КОЛОНКА — список відділень ── */}
-          <div style={{
-            width: 320, flexShrink: 0, borderRight: '1px solid var(--border)',
-            overflowY: 'auto', background: 'var(--surface)',
-          }}>
-            {/* Картка вибраного відділення */}
-            {selDept && deptProfile && (
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)', marginBottom: 6, lineHeight: 1.3 }}>{selDept}</div>
-                {завідувач && (
-                  <div style={{ fontSize: 11, color: 'var(--text3)', ...MONO, marginBottom: 12 }}>
-                    Завідувач: {завідувач.emp_name}
-                  </div>
-                )}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
-                  {[
-                    { l: 'Випадків',  v: fmt(deptProfile.випадків) },
-                    { l: 'Пацієнтів', v: fmt(deptProfile.унікальних) },
-                    { l: 'Ліжок',     v: '—' },
-                    { l: 'Лікарів',   v: deptDocs.length || '—' },
-                  ].map(k => (
-                    <div key={k.l} style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 14, fontWeight: 300, color: 'var(--text)', ...MONO }}>{k.v}</div>
-                      <div style={{ fontSize: 8, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', ...MONO, marginTop: 2 }}>{k.l}</div>
-                    </div>
-                  ))}
+          <div style={{ padding: '40px 48px 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 0 }}>
+              {/* SVG хрест */}
+              <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                <circle cx="36" cy="36" r="36" fill="rgba(180,60,60,0.08)" />
+                <path d="M36 14 L36 58 M14 36 L58 36" stroke="#b43c3c" strokeWidth="7" strokeLinecap="round" />
+                <path d="M22 22 Q36 10 50 22 Q62 36 50 50 Q36 62 22 50 Q10 36 22 22Z"
+                  fill="rgba(80,130,90,0.12)" stroke="rgba(80,130,90,0.3)" strokeWidth="1" />
+              </svg>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.35, letterSpacing: '0.04em', ...SANS }}>
+                  ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
+                </div>
+                <div style={{ fontSize: 11, color: '#888', marginTop: 6, fontStyle: 'italic', ...SANS }}>
+                  турбуємось про найцінніше
                 </div>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Список відділень */}
-            <div style={{ paddingTop: 8 }}>
-              {depts.map(d => {
-                const active = selDept === d.відділення
-                return (
-                  <button key={d.відділення} onClick={() => handleDeptClick(d.відділення)} style={{
-                    display: 'block', width: '100%', textAlign: 'right',
-                    padding: '9px 20px', border: 'none', cursor: 'pointer',
-                    background: active ? 'var(--bg)' : 'transparent',
-                    color: active ? 'var(--text)' : 'var(--text2)',
-                    fontSize: 13, fontFamily: 'var(--sans)',
-                    borderLeft: active ? '3px solid var(--brand)' : '3px solid transparent',
-                    transition: 'all .1s',
-                  }}>
-                    {d.відділення}
+          {/* Список відділень */}
+          <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 24 }}>
+            {depts.map((d, i) => (
+              <div key={i} style={{
+                padding: '8px 48px',
+                fontSize: 14, color: '#333', ...SANS,
+                textAlign: 'right',
+                lineHeight: 1.5,
+              }}>
+                {d.відділення}
+              </div>
+            ))}
+
+            {/* Для працівників */}
+            <div style={{ margin: '24px 48px 0', borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 20 }}>
+              <button
+                onClick={() => { setShowLogin(!showLogin); setLoginError(null) }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 500, color: '#333',
+                  ...SANS, padding: 0, display: 'block', width: '100%',
+                  textAlign: 'right', marginBottom: showLogin ? 16 : 0,
+                  letterSpacing: '0.01em',
+                }}
+              >
+                Для працівників:
+              </button>
+
+              {/* Форма логіну */}
+              {showLogin && (
+                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    style={{
+                      padding: '10px 14px', border: '1px solid rgba(0,0,0,0.15)',
+                      borderRadius: 8, fontSize: 13, ...SANS,
+                      background: 'rgba(255,255,255,0.8)', color: '#1a1a1a',
+                      outline: 'none',
+                    }}
+                  />
+                  <input
+                    type="password"
+                    placeholder="Пароль"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    style={{
+                      padding: '10px 14px', border: '1px solid rgba(0,0,0,0.15)',
+                      borderRadius: 8, fontSize: 13, ...SANS,
+                      background: 'rgba(255,255,255,0.8)', color: '#1a1a1a',
+                      outline: 'none',
+                    }}
+                  />
+                  {loginError && (
+                    <div style={{ fontSize: 11, color: '#c0392b', ...SANS }}>{loginError}</div>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={loginLoading}
+                    style={{
+                      padding: '10px 14px', background: '#1a1a1a',
+                      border: 'none', borderRadius: 8,
+                      color: '#fff', fontSize: 13, ...SANS,
+                      cursor: loginLoading ? 'not-allowed' : 'pointer',
+                      opacity: loginLoading ? 0.6 : 1,
+                      marginTop: 2,
+                    }}
+                  >
+                    {loginLoading ? 'Вхід…' : 'Увійти →'}
                   </button>
-                )
-              })}
+                </form>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* ── ПРАВА КОЛОНКА — деталі відділення ── */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '0' }}>
+        {/* ── ПРАВА ЧАСТИНА — градієнт + статистика ── */}
+        <div style={{
+          flex: 1, position: 'relative',
+          background: 'linear-gradient(135deg, #dce8f0 0%, #e8dce8 35%, #f0e8dc 60%, #dce8e0 100%)',
+          display: 'flex', flexDirection: 'column',
+        }}>
 
-            {!selDept && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text3)', fontSize: 13, ...MONO }}>
-                Оберіть відділення зі списку ліворуч
-              </div>
-            )}
-
-            {selDept && (
-              <>
-                {/* Лінійний графік */}
-                <div style={{ padding: '16px 32px 0', borderBottom: '1px solid var(--border)' }}>
-                  {/* Перемикач */}
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-                    {['роки', 'місяці', 'дні'].map(p => (
-                      <button key={p} onClick={() => setChartPeriod(p)} style={{
-                        padding: '4px 14px', border: '1px solid var(--border)', borderRadius: 20,
-                        background: chartPeriod === p ? 'var(--text)' : 'transparent',
-                        color: chartPeriod === p ? 'var(--bg)' : 'var(--text3)',
-                        fontSize: 10, cursor: 'pointer', ...MONO, textTransform: 'uppercase',
-                        letterSpacing: '0.07em', transition: 'all .15s',
-                      }}>
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  {deptLoading && <div style={{ height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12, ...MONO }}>завантаження…</div>}
-                  {!deptLoading && chartData.length > 0 && (
-                    <ResponsiveContainer width="100%" height={150}>
-                      <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
-                        <XAxis dataKey="мітка" tick={{ fontSize: 10, fontFamily: 'var(--mono)', fill: 'var(--text3)' }} axisLine={false} tickLine={false} />
-                        <YAxis hide />
-                        <Tooltip
-                          contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, fontFamily: 'var(--mono)' }}
-                          formatter={(v) => [fmt(v), 'Госпіталізацій']}
-                        />
-                        <Line type="monotone" dataKey="випадків" stroke="#8b8fa8" strokeWidth={1.5} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                  {!deptLoading && chartData.length === 0 && (
-                    <div style={{ height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 11, ...MONO }}>немає даних</div>
-                  )}
-                </div>
-
-                {/* 5 KPI відділення */}
-                {deptProfile && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center',
-                    padding: '20px 32px', borderBottom: '1px solid var(--border)',
-                    gap: 0,
-                  }}>
-                    <DeptKpi label="Середній вік"   value={deptProfile.середній_вік} />
-                    <DeptKpi label="Ліжко-день"     value={deptProfile.ліжкодень} />
-                    <DeptKpi label="Повторні"       value={fmt(deptProfile.повторні)} />
-                    <DeptKpi label="Летальність"    value={deptProfile.летальність + '%'} />
-                    <DeptKpi label="З покращенням"  value={deptProfile.поліпшення ? fmt(Math.round(Number(deptProfile.поліпшення) * 100 / Number(deptProfile.випадків || 1))) + '%' : '—'} />
-                  </div>
-                )}
-
-                {/* Нижня зона */}
-                {deptProfile && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '24px 32px' }}>
-
-                    {/* Секторна діаграма захворюваності */}
-                    <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '20px 20px 12px' }}>
-                      <div style={{ fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO, marginBottom: 4 }}>
-                        5 основних категорій захворюваності
-                      </div>
-                      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
-                        <div>
-                          <div style={{ fontSize: 22, fontWeight: 300, color: 'var(--text)', ...MONO }}>{fmt(deptProfile.випадків)}</div>
-                          <div style={{ fontSize: 8, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO }}>Госпіталізацій</div>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 22, fontWeight: 300, color: 'var(--text)', ...MONO }}>{fmt(deptProfile.унікальних)}</div>
-                          <div style={{ fontSize: 8, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO }}>Пацієнтів</div>
-                        </div>
-                      </div>
-                      {deptIcdCat.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={200}>
-                          <PieChart>
-                            <Pie
-                              data={deptIcdCat.map(r => ({
-                                name: r.назва || r.код,
-                                value: Number(r.випадків),
-                              }))}
-                              cx="50%" cy="50%"
-                              innerRadius={50} outerRadius={80}
-                              dataKey="value" paddingAngle={2}
-                            >
-                              {deptIcdCat.map((_, i) => (
-                                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, fontFamily: 'var(--mono)' }}
-                              formatter={(v, n) => [fmt(v) + ' вип.', n]}
-                            />
-                            <Legend iconSize={8} iconType="circle"
-                              formatter={(v) => <span style={{ fontSize: 10, color: 'var(--text2)', fontFamily: 'var(--mono)' }}>{v}</span>}
-                            />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 11, ...MONO }}>
-                          {deptLoading ? 'завантаження…' : 'немає даних'}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Плейсхолдер другого графіку */}
-                    <div style={{
-                      border: '1px solid var(--border)', borderRadius: 10,
-                      padding: '40px 24px', textAlign: 'center',
-                      color: 'var(--text3)', fontSize: 13, ...MONO,
-                    }}>
-                      Графік
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
+          {/* Статистика вгорі */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start',
+            padding: '40px 60px 0',
+            gap: 48, flexWrap: 'wrap',
+          }}>
+            <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
+            <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
+            <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
+            <Stat value={depts.length || '…'} label="ВІДДІЛЕНЬ" />
+            <Stat value={String(year)} label="" large />
           </div>
+
+          {/* Декоративне коло */}
+          <div style={{
+            position: 'absolute', bottom: -120, right: -120,
+            width: 500, height: 500, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.15)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{
+            position: 'absolute', top: '30%', left: '20%',
+            width: 300, height: 300, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.1)',
+            pointerEvents: 'none',
+          }} />
         </div>
       </div>
     </>
+  )
+}
+
+function Stat({ value, label, large }) {
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <div style={{
+        fontSize: large ? 64 : 42, fontWeight: 300,
+        color: '#1a1a1a', ...MONO,
+        lineHeight: 1, letterSpacing: '-0.02em',
+      }}>
+        {value}
+      </div>
+      {label && (
+        <div style={{
+          fontSize: 10, color: '#666', textTransform: 'uppercase',
+          letterSpacing: '0.12em', marginTop: 6, ...MONO,
+        }}>
+          {label}
+        </div>
+      )}
+    </div>
   )
 }
