@@ -102,6 +102,10 @@ const PARAM_QUERIES = {
   icdSearch: (p) => `SELECT icd_code as код, COALESCE(diagnosis_level3, diagnosis_level2, category_level1) as назва FROM icd_10 WHERE icd_code ILIKE '${esc(p)}%' OR diagnosis_level3 ILIKE '%${esc(p)}%' OR diagnosis_level2 ILIKE '%${esc(p)}%' ORDER BY usage_count DESC NULLS LAST LIMIT 8`,
   // Місячна динаміка поступлень по всій лікарні за конкретний рік (param = рік як рядок)
   hospitalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} GROUP BY місяць ORDER BY місяць`,
+  // Місячна динаміка терапевтичного блоку (param = рік)
+  therapeuticMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології','Відділення анестезіології з ліжками інтенсивної терапії') GROUP BY місяць ORDER BY місяць`,
+  // Місячна динаміка хірургічного блоку (param = рік)
+  surgicalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1') GROUP BY місяць ORDER BY місяць`,
 }
 
 // Запити лише для admin (персональні дані пацієнтів).

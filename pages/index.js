@@ -109,6 +109,8 @@ export default function Home() {
   const [surgStats, setSurgStats] = useState(null)
   const [blockLoading, setBlockLoading] = useState(false)
   const [monthlyData, setMonthlyData] = useState([])
+  const [therMonthly, setTherMonthly] = useState([])
+  const [surgMonthly, setSurgMonthly] = useState([])
   const [chartYear, setChartYear] = useState(new Date().getFullYear())
 
   const [email, setEmail] = useState('')
@@ -133,21 +135,29 @@ export default function Home() {
     setLoginError(null)
     if (next && !therStats) {
       setBlockLoading(true)
-      const [t, s, monthly] = await Promise.all([
+      const [t, s, monthly, tMonthly, sMonthly] = await Promise.all([
         fetchBlockStats(THERAPEUTIC),
         fetchBlockStats(SURGICAL),
         fetchStats('hospitalMonthly', String(chartYear)),
+        fetchStats('therapeuticMonthly', String(chartYear)),
+        fetchStats('surgicalMonthly', String(chartYear)),
       ])
       setTherStats(t)
       setSurgStats(s)
       setMonthlyData(monthly)
+      setTherMonthly(tMonthly)
+      setSurgMonthly(sMonthly)
       setBlockLoading(false)
     }
   }
 
   useEffect(() => {
     if (!showWorkers) return
-    fetchStats('hospitalMonthly', String(chartYear)).then(setMonthlyData)
+    Promise.all([
+      fetchStats('hospitalMonthly', String(chartYear)),
+      fetchStats('therapeuticMonthly', String(chartYear)),
+      fetchStats('surgicalMonthly', String(chartYear)),
+    ]).then(([m, t, s]) => { setMonthlyData(m); setTherMonthly(t); setSurgMonthly(s) })
   }, [chartYear])
 
   function redirectByRole(role) {
@@ -316,66 +326,71 @@ export default function Home() {
           {showWorkers && (
             <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
 
+              {/* Перемикач року — спільний для всіх графіків */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 56px 0', gap: 4 }}>
+                {[new Date().getFullYear() - 1, new Date().getFullYear()].map(y => (
+                  <button key={y} onClick={() => setChartYear(y)} style={{
+                    padding: '3px 12px', borderRadius: 12,
+                    border: '1px solid rgba(0,0,0,0.15)',
+                    background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                    fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+                  }}>{y}</button>
+                ))}
+              </div>
+
               {/* Терапевтичний блок */}
-              <div style={{ flex: 1, padding: '24px 56px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
+              <div style={{ padding: '16px 56px 20px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                   Терапевтичний напрямок
                 </div>
                 <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
+                <MiniChart data={therMonthly} loading={blockLoading} color="#5b7fa6" />
               </div>
 
               {/* Хірургічний блок */}
-              <div style={{ flex: 1, padding: '24px 56px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
+              <div style={{ padding: '16px 56px 20px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 9, color: '#c0623a', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                   Хірургічний напрямок
                 </div>
                 <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
+                <MiniChart data={surgMonthly} loading={blockLoading} color="#c0623a" />
               </div>
 
-              {/* Графік поступлень за рік */}
-              <div style={{ padding: '20px 56px 28px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO }}>
-                    Поступлення хворих помісячно
-                  </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {[new Date().getFullYear() - 1, new Date().getFullYear()].map(y => (
-                      <button key={y} onClick={() => setChartYear(y)} style={{
-                        padding: '3px 10px', borderRadius: 12,
-                        border: '1px solid rgba(0,0,0,0.15)',
-                        background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
-                        fontSize: 10, cursor: 'pointer', ...MONO,
-                        color: '#444',
-                      }}>{y}</button>
-                    ))}
-                  </div>
+              {/* Загальний графік лікарні */}
+              <div style={{ padding: '16px 56px 24px' }}>
+                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
+                  Загальні поступлення лікарні
                 </div>
-                {blockLoading ? (
-                  <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11, ...MONO }}>завантаження…</div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={120}>
-                    <BarChart data={monthlyData.map(r => ({
-                      м: r.місяць?.slice(5, 7),
-                      випадків: Number(r.випадків) || 0,
-                    }))} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={18}>
-                      <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.06)" />
-                      <XAxis dataKey="м" tick={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#888' }} axisLine={false} tickLine={false} />
-                      <YAxis hide />
-                      <Tooltip
-                        contentStyle={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, fontSize: 11, fontFamily: 'IBM Plex Mono' }}
-                        formatter={v => [Number(v).toLocaleString('uk'), 'Поступлень']}
-                        labelFormatter={l => `Місяць ${l}`}
-                      />
-                      <Bar dataKey="випадків" fill="rgba(91,127,166,0.55)" radius={[3,3,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+                <MiniChart data={monthlyData} loading={blockLoading} color="#8b8fa8" height={110} />
               </div>
             </div>
           )}
         </div>
       </div>
     </>
+  )
+}
+
+function MiniChart({ data, loading, color = '#8b8fa8', height = 90 }) {
+  if (loading) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 10, ...MONO }}>завантаження…</div>
+  if (!data?.length) return null
+  const rows = data.map(r => ({ м: r.місяць?.slice(5,7), випадків: Number(r.випадків) || 0 }))
+  return (
+    <div style={{ marginTop: 10 }}>
+      <ResponsiveContainer width="100%" height={height}>
+        <BarChart data={rows} margin={{ top: 2, right: 4, left: 0, bottom: 0 }} barSize={16}>
+          <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
+          <XAxis dataKey="м" tick={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#999' }} axisLine={false} tickLine={false} />
+          <YAxis hide />
+          <Tooltip
+            contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+            formatter={v => [Number(v).toLocaleString('uk'), 'Поступлень']}
+            labelFormatter={l => `Місяць ${l}`}
+          />
+          <Bar dataKey="випадків" fill={color + '88'} radius={[3,3,0,0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
 
