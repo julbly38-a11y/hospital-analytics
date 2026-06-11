@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { createClient } from '../lib/supabase'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
 const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
@@ -43,8 +43,12 @@ async function fetchStats(key, param) {
   return d.rows || []
 }
 
-async function fetchBlockStats(depts) {
-  const results = await Promise.all(depts.map(d => fetchStats('deptProfile', d)))
+async function fetchBlockStats(depts, year) {
+  const useYear = year && year !== 'all'
+  const fetcher = useYear
+    ? (d) => fetchStats('deptProfileYear', `${d}|${year}`)
+    : (d) => fetchStats('deptProfile', d)
+  const results = await Promise.all(depts.map(fetcher))
   const rows = results.map(r => r[0]).filter(Boolean)
   if (!rows.length) return null
   const sum = (key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0)
@@ -53,19 +57,18 @@ async function fetchBlockStats(depts) {
     return rows.reduce((s, r) => s + (Number(r[key]) || 0) * (Number(r[wkey]) || 0), 0) / tw
   }
   const total = sum('випадків')
-  // летальність — зважена середня з death_rate_pct (відс. на відділення)
   const летальність = total > 0
     ? (rows.reduce((s,r) => s + (Number(r.летальність)||0) * (Number(r.випадків)||0), 0) / total).toFixed(1)
     : '0'
   return {
-    випадків:    total,
+    випадків:     total,
     середній_вік: wavg('середній_вік', 'випадків')?.toFixed(1),
-    ліжкодень:   wavg('ліжкодень', 'випадків')?.toFixed(1),
-    повторні:    sum('повторні'),
-    поліпшення:  sum('поліпшення'),
+    ліжкодень:    wavg('ліжкодень', 'випадків')?.toFixed(1),
+    повторні:     sum('повторні'),
+    поліпшення:   sum('поліпшення'),
     летальність,
-    men:         sum('чоловіки'),
-    women:       sum('жінки'),
+    men:          sum('чоловіки'),
+    women:        sum('жінки'),
   }
 }
 
@@ -112,8 +115,10 @@ export default function Home() {
   const [monthlyData, setMonthlyData] = useState([])
   const [therMonthly, setTherMonthly] = useState([])
   const [surgMonthly, setSurgMonthly] = useState([])
-  const [chartYear, setChartYear] = useState(new Date().getFullYear())
+  const [chartYear, setChartYear] = useState('all')
   const [allYears, setAllYears] = useState([])
+  const [hoveredDept, setHoveredDept] = useState(null)
+  const [deptCache, setDeptCache] = useState({})
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -127,40 +132,45 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
     fetchStats('doctorCount').then(rows => setDoctorCount(rows[0]?.cnt || null))
     fetchStats('allYears').then(rows => setAllYears(rows.map(r => r.year).filter(Boolean)))
   }, [])
+
+  // Оновлення головної статистики при зміні року
+  useEffect(() => {
+    setKpi(null)
+    const param = chartYear === 'all' ? 'all' : String(chartYear)
+    fetchStats('ovKpiYear', param).then(rows => setKpi(rows[0] || null))
+  }, [chartYear])
+
+  async function loadBlockStats(year) {
+    setBlockLoading(true)
+    const cy = year === 'all' ? String(new Date().getFullYear()) : String(year)
+    const [t, s, monthly, tMonthly, sMonthly] = await Promise.all([
+      fetchBlockStats(THERAPEUTIC, year),
+      fetchBlockStats(SURGICAL, year),
+      fetchStats('hospitalMonthly', cy),
+      fetchStats('therapeuticMonthly', cy),
+      fetchStats('surgicalMonthly', cy),
+    ])
+    setTherStats(t)
+    setSurgStats(s)
+    setMonthlyData(monthly)
+    setTherMonthly(tMonthly)
+    setSurgMonthly(sMonthly)
+    setBlockLoading(false)
+  }
 
   async function handleShowWorkers() {
     const next = !showWorkers
     setShowWorkers(next)
     setLoginError(null)
-    if (next && !therStats) {
-      setBlockLoading(true)
-      const [t, s, monthly, tMonthly, sMonthly] = await Promise.all([
-        fetchBlockStats(THERAPEUTIC),
-        fetchBlockStats(SURGICAL),
-        fetchStats('hospitalMonthly', String(chartYear)),
-        fetchStats('therapeuticMonthly', String(chartYear)),
-        fetchStats('surgicalMonthly', String(chartYear)),
-      ])
-      setTherStats(t)
-      setSurgStats(s)
-      setMonthlyData(monthly)
-      setTherMonthly(tMonthly)
-      setSurgMonthly(sMonthly)
-      setBlockLoading(false)
-    }
+    if (next) loadBlockStats(chartYear)
   }
 
   useEffect(() => {
     if (!showWorkers) return
-    Promise.all([
-      fetchStats('hospitalMonthly', String(chartYear)),
-      fetchStats('therapeuticMonthly', String(chartYear)),
-      fetchStats('surgicalMonthly', String(chartYear)),
-    ]).then(([m, t, s]) => { setMonthlyData(m); setTherMonthly(t); setSurgMonthly(s) })
+    loadBlockStats(chartYear)
   }, [chartYear])
 
   function redirectByRole(role) {
@@ -187,6 +197,19 @@ export default function Home() {
   }
 
   const year = new Date().getFullYear()
+
+  async function handleDeptHover(dept) {
+    setHoveredDept(dept)
+    if (!dept || deptCache[dept]) return
+    const param = chartYear === 'all' ? dept : `${dept}|${chartYear}`
+    const key = chartYear === 'all' ? 'deptProfile' : 'deptProfileYear'
+    const [statsRows, headRows] = await Promise.all([
+      fetchStats(key, param),
+      fetchStats('deptHead', dept),
+    ])
+    const data = { ...(statsRows[0] || {}), head: headRows[0]?.name || null }
+    setDeptCache(c => ({ ...c, [dept]: data }))
+  }
 
   return (
     <>
@@ -234,31 +257,64 @@ export default function Home() {
             {/* Терапевтичні відділення */}
             <div style={{ padding: '16px 0 16px' }}>
               {THERAPEUTIC.map((d, i) => (
-                <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>{d}</div>
+                <DeptItem key={i} name={d} hovered={hoveredDept === d} stats={deptCache[d]}
+                  onEnter={() => handleDeptHover(d)} onLeave={() => setHoveredDept(null)} />
               ))}
             </div>
           </div>
 
-          {/* Права частина — статистика */}
+          {/* Права частина — статистика + терапевтичний блок */}
           <div style={{
             flex: 1,
             background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
             position: 'relative', overflow: 'hidden',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ position: 'absolute', top: '5%', left: '5%', width: 450, height: 450, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: 520, height: 520, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+
+            {/* Перемикач року — завжди видимий */}
+            <div style={{ position: 'relative', zIndex: 1, display: 'flex', justifyContent: 'flex-end', padding: '16px 40px 0', gap: 4 }}>
+              <button onClick={() => setChartYear('all')} style={{
+                padding: '3px 12px', borderRadius: 12,
+                border: '1px solid rgba(0,0,0,0.15)',
+                background: chartYear === 'all' ? 'rgba(0,0,0,0.12)' : 'transparent',
+                fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+              }}>Всі</button>
+              {allYears.map(y => (
+                <button key={y} onClick={() => setChartYear(y)} style={{
+                  padding: '3px 12px', borderRadius: 12,
+                  border: '1px solid rgba(0,0,0,0.15)',
+                  background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                  fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+                }}>{y}</button>
+              ))}
+            </div>
+
+            {/* Головна статистика */}
             <div style={{
               position: 'relative', zIndex: 1,
               display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
-              padding: '32px 40px 32px', gap: '20px 32px',
+              padding: '16px 40px 24px', gap: '20px 32px',
+              borderBottom: showWorkers ? '1px solid rgba(0,0,0,0.08)' : 'none',
             }}>
               <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
               <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
               <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
               <Stat value="20" label="ВІДДІЛЕНЬ" />
-              <Stat value={String(year)} large />
+              <Stat value={chartYear === 'all' ? 'Всі' : String(chartYear)} large />
             </div>
+
+            {/* Терапевтичний блок (після кліку) */}
+            {showWorkers && (
+              <div style={{ position: 'relative', zIndex: 1, padding: '12px 40px 16px', flex: 1 }}>
+                <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
+                  Терапевтичний напрямок
+                </div>
+                <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
+                <MiniChart data={therMonthly} loading={blockLoading} color="#5b7fa6" />
+              </div>
+            )}
           </div>
         </div>
 
@@ -337,7 +393,8 @@ export default function Home() {
           }}>
             <div style={{ padding: '16px 0 32px' }}>
               {SURGICAL.map((d, i) => (
-                <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>{d}</div>
+                <DeptItem key={i} name={d} hovered={hoveredDept === d} stats={deptCache[d]}
+                  onEnter={() => handleDeptHover(d)} onLeave={() => setHoveredDept(null)} />
               ))}
             </div>
           </div>
@@ -355,42 +412,13 @@ export default function Home() {
             {showWorkers ? (
               <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-                {/* Перемикач року */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 40px 0', gap: 4 }}>
-                  {(allYears.length > 0 ? allYears : [new Date().getFullYear()]).map(y => (
-                    <button key={y} onClick={() => setChartYear(y)} style={{
-                      padding: '3px 12px', borderRadius: 12,
-                      border: '1px solid rgba(0,0,0,0.15)',
-                      background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
-                      fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
-                    }}>{y}</button>
-                  ))}
-                </div>
-
-                {/* Терапевтичний блок */}
-                <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                  <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
-                    Терапевтичний напрямок
-                  </div>
-                  <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
-                  <MiniChart data={therMonthly} loading={blockLoading} color="#5b7fa6" />
-                </div>
-
                 {/* Хірургічний блок */}
-                <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                <div style={{ padding: '12px 40px 16px', flex: 1 }}>
                   <div style={{ fontSize: 9, color: '#c0623a', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                     Хірургічний напрямок
                   </div>
                   <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
                   <MiniChart data={surgMonthly} loading={blockLoading} color="#c0623a" />
-                </div>
-
-                {/* Загальний графік */}
-                <div style={{ padding: '12px 40px 20px' }}>
-                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
-                    Загальні поступлення лікарні
-                  </div>
-                  <MiniChart data={monthlyData} loading={blockLoading} color="#8b8fa8" height={110} />
                 </div>
               </div>
             ) : (
@@ -408,6 +436,48 @@ export default function Home() {
   )
 }
 
+function DeptItem({ name, hovered, stats, onEnter, onLeave }) {
+  return (
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave}
+      style={{ borderRadius: 6, margin: '1px 8px', transition: 'background .15s',
+        background: hovered ? 'rgba(0,0,0,0.04)' : 'transparent' }}>
+      <div style={{ padding: '5px 32px', fontSize: 14, color: hovered ? '#1a1a1a' : '#333', textAlign: 'right', cursor: 'default', ...SANS }}>
+        {name}
+      </div>
+      {hovered && (
+        <div style={{ padding: '8px 32px 10px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          {!stats ? (
+            <div style={{ fontSize: 10, color: '#aaa', textAlign: 'right', ...MONO }}>завантаження…</div>
+          ) : (
+            <>
+              {stats.head && (
+                <div style={{ fontSize: 11, color: '#888', textAlign: 'right', marginBottom: 8, ...SANS }}>
+                  <span style={{ color: '#aaa' }}>Завідувач: </span>{stats.head}
+                </div>
+              )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 0 }}>
+              {[
+                { v: fmt(stats.випадків),    l: 'ВИПАДКІВ' },
+                { v: fmt(stats.унікальних),  l: 'ПАЦІЄНТІВ' },
+                { v: fmt(stats.ліжкодень),   l: 'ЛІЖКО-ДЕНЬ' },
+                { v: fmt(stats.середній_вік),l: 'СЕР. ВІК' },
+                { v: (stats.летальність ?? stats.death_rate_pct) + '%', l: 'ЛЕТАЛЬНІСТЬ' },
+              ].map((it, i) => (
+                <div key={i} style={{ textAlign: 'center', padding: '0 10px',
+                  borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+                  <div style={{ fontSize: 16, fontWeight: 300, color: '#1a1a1a', lineHeight: 1, ...MONO }}>{it.v}</div>
+                  <div style={{ fontSize: 7, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4, ...MONO }}>{it.l}</div>
+                </div>
+              ))}
+            </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MiniChart({ data, loading, color = '#8b8fa8', height = 90 }) {
   if (loading) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 10, ...MONO }}>завантаження…</div>
   if (!data?.length) return null
@@ -415,7 +485,7 @@ function MiniChart({ data, loading, color = '#8b8fa8', height = 90 }) {
   return (
     <div style={{ marginTop: 10 }}>
       <ResponsiveContainer width="100%" height={height}>
-        <BarChart data={rows} margin={{ top: 2, right: 4, left: 0, bottom: 0 }} barSize={16}>
+        <LineChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
           <XAxis dataKey="м" tick={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#999' }} axisLine={false} tickLine={false} />
           <YAxis hide />
@@ -424,8 +494,8 @@ function MiniChart({ data, loading, color = '#8b8fa8', height = 90 }) {
             formatter={v => [Number(v).toLocaleString('uk'), 'Поступлень']}
             labelFormatter={l => `Місяць ${l}`}
           />
-          <Bar dataKey="випадків" fill={color + '88'} radius={[3,3,0,0]} />
-        </BarChart>
+          <Line type="monotone" dataKey="випадків" stroke={color} strokeWidth={2} dot={{ r: 3, fill: color, strokeWidth: 0 }} activeDot={{ r: 4 }} />
+        </LineChart>
       </ResponsiveContainer>
     </div>
   )

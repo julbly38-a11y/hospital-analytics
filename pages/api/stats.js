@@ -80,6 +80,27 @@ const PARAM_QUERIES = {
     (SELECT COUNT(*) FROM lsmd WHERE admission_department = '${esc(p)}' AND discharge_status = 'Помер' AND COALESCE(length_of_stay,999) <= 1) as смерть_день1,
     (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd WHERE admission_department = '${esc(p)}' GROUP BY patient_id HAVING COUNT(*) > 1) t) as повторні
     FROM v_department_stats WHERE department = '${esc(p)}' LIMIT 1`,
+  // Завідувач відділення
+  deptHead: (p) => `SELECT emp_name as name FROM empl WHERE department='${esc(p)}' AND position ILIKE '%завідувач%' AND emp_status IS DISTINCT FROM 'звільнений' LIMIT 1`,
+  // Профіль відділення за конкретний рік (param = "назва|рік" або "назва|all")
+  deptProfileYear: (p) => {
+    const sep = p.lastIndexOf('|')
+    const dept = sep >= 0 ? p.slice(0, sep) : p
+    const yPart = sep >= 0 ? p.slice(sep + 1) : 'all'
+    const yf = yearFilter(yPart)
+    return `SELECT
+      COUNT(*) as випадків,
+      COUNT(DISTINCT patient_id) as унікальних,
+      ROUND(AVG(length_of_stay),1) as ліжкодень,
+      ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0),1) as летальність,
+      ROUND(AVG(age::numeric),1) as середній_вік,
+      SUM((gender='Ж')::int) as жінки,
+      SUM((gender='Ч')::int) as чоловіки,
+      SUM((discharge_status='З поліпшенням')::int) as поліпшення,
+      (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND ${yf.replace('admission_date_d', 'l2.admission_date_d')} GROUP BY patient_id HAVING COUNT(*)>1) t) as повторні
+      FROM lsmd
+      WHERE admission_department='${esc(dept)}' AND ${yf}`
+  },
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,
   // Динаміка топ-3 діагнозів за 12 місяців (помісячно)
@@ -163,7 +184,7 @@ async function supaFetch(sql) {
 
 // Публічні запити — доступні без авторизації (тільки агреговані дані, без ПІБ)
 const PUBLIC_KEYS = new Set([
-  'ovKpiYear', 'doctorCount', 'deptProfile',
+  'ovKpiYear', 'doctorCount', 'deptProfile', 'deptProfileYear', 'deptHead',
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
 ])
 

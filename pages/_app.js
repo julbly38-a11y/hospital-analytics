@@ -17,21 +17,27 @@ export default function App({ Component, pageProps }) {
   useEffect(() => {
     if (!supabase) return
 
-    // Перша перевірка при старті
-    fetch('/api/me')
-      .then(r => r.json())
-      .then(d => setAuth({ loaded: true, role: d?.role || null }))
-      .catch(() => setAuth({ loaded: true, role: null }))
+    const loadRole = () =>
+      fetch('/api/me')
+        .then(r => r.json())
+        .then(d => setAuth({ loaded: true, role: d?.role || null }))
+        .catch(() => setAuth({ loaded: true, role: null }))
 
-    // Слухаємо зміни авторизації (логін/логаут)
+    // Спочатку клієнтська сесія (без мережі) — вирішує проблему з cookie sync
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        setAuth({ loaded: true, role: null })
+      } else {
+        loadRole()
+      }
+    })
+
+    // Слухаємо зміни авторизації
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {
         setAuth({ loaded: true, role: null })
-      } else if (event === 'SIGNED_IN') {
-        fetch('/api/me')
-          .then(r => r.json())
-          .then(d => setAuth({ loaded: true, role: d?.role || null }))
-          .catch(() => setAuth({ loaded: true, role: null }))
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        loadRole()
       }
     })
 
