@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { createClient } from '../lib/supabase'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
 const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
@@ -107,6 +108,8 @@ export default function Home() {
   const [therStats, setTherStats] = useState(null)
   const [surgStats, setSurgStats] = useState(null)
   const [blockLoading, setBlockLoading] = useState(false)
+  const [monthlyData, setMonthlyData] = useState([])
+  const [chartYear, setChartYear] = useState(new Date().getFullYear())
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -130,15 +133,22 @@ export default function Home() {
     setLoginError(null)
     if (next && !therStats) {
       setBlockLoading(true)
-      const [t, s] = await Promise.all([
+      const [t, s, monthly] = await Promise.all([
         fetchBlockStats(THERAPEUTIC),
         fetchBlockStats(SURGICAL),
+        fetchStats('hospitalMonthly', String(chartYear)),
       ])
       setTherStats(t)
       setSurgStats(s)
+      setMonthlyData(monthly)
       setBlockLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!showWorkers) return
+    fetchStats('hospitalMonthly', String(chartYear)).then(setMonthlyData)
+  }, [chartYear])
 
   function redirectByRole(role) {
     if (role === 'admin') router.push('/org')
@@ -315,11 +325,51 @@ export default function Home() {
               </div>
 
               {/* Хірургічний блок */}
-              <div style={{ flex: 1, padding: '24px 56px' }}>
+              <div style={{ flex: 1, padding: '24px 56px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
                   Хірургічний напрямок
                 </div>
                 <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
+              </div>
+
+              {/* Графік поступлень за рік */}
+              <div style={{ padding: '20px 56px 28px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO }}>
+                    Поступлення хворих помісячно
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[new Date().getFullYear() - 1, new Date().getFullYear()].map(y => (
+                      <button key={y} onClick={() => setChartYear(y)} style={{
+                        padding: '3px 10px', borderRadius: 12,
+                        border: '1px solid rgba(0,0,0,0.15)',
+                        background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                        fontSize: 10, cursor: 'pointer', ...MONO,
+                        color: '#444',
+                      }}>{y}</button>
+                    ))}
+                  </div>
+                </div>
+                {blockLoading ? (
+                  <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 11, ...MONO }}>завантаження…</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={120}>
+                    <BarChart data={monthlyData.map(r => ({
+                      м: r.місяць?.slice(5, 7),
+                      випадків: Number(r.випадків) || 0,
+                    }))} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barSize={18}>
+                      <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.06)" />
+                      <XAxis dataKey="м" tick={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#888' }} axisLine={false} tickLine={false} />
+                      <YAxis hide />
+                      <Tooltip
+                        contentStyle={{ background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, fontSize: 11, fontFamily: 'IBM Plex Mono' }}
+                        formatter={v => [Number(v).toLocaleString('uk'), 'Поступлень']}
+                        labelFormatter={l => `Місяць ${l}`}
+                      />
+                      <Bar dataKey="випадків" fill="rgba(91,127,166,0.55)" radius={[3,3,0,0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
           )}
