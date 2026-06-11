@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import '../styles/globals.css'
+import { createClient } from '../lib/supabase'
 
 /* Сторінки без авторизації */
 const PUBLIC = ['/login', '/auth/reset-password']
@@ -11,13 +12,31 @@ const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics', '/dept']
 export default function App({ Component, pageProps }) {
   const router = useRouter()
   const [auth, setAuth] = useState({ loaded: false, role: null })
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, [])
 
   useEffect(() => {
+    if (!supabase) return
+
+    // Перша перевірка при старті
     fetch('/api/me')
       .then(r => r.json())
       .then(d => setAuth({ loaded: true, role: d?.role || null }))
       .catch(() => setAuth({ loaded: true, role: null }))
-  }, [router.pathname])
+
+    // Слухаємо зміни авторизації (логін/логаут)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setAuth({ loaded: true, role: null })
+      } else if (event === 'SIGNED_IN') {
+        fetch('/api/me')
+          .then(r => r.json())
+          .then(d => setAuth({ loaded: true, role: d?.role || null }))
+          .catch(() => setAuth({ loaded: true, role: null }))
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   const path = router.pathname
   const isPublic = PUBLIC.includes(path)
