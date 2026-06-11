@@ -87,7 +87,7 @@ function BlockStats({ stats, loading, color }) {
           padding: '8px 12px',
           borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none',
         }}>
-          <div style={{ fontSize: 28, fontWeight: 300, color: color || '#1a1a1a', ...MONO, lineHeight: 1 }}>
+          <div style={{ fontSize: 22, fontWeight: 300, color: color || '#1a1a1a', ...MONO, lineHeight: 1 }}>
             {it.v ?? '—'}
           </div>
           <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5, ...MONO }}>
@@ -329,7 +329,7 @@ export default function Home() {
           <div style={{
             position: 'relative', zIndex: 1,
             display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
-            padding: '40px 56px 32px', gap: '28px 44px',
+            padding: '32px 40px 24px', gap: '20px 32px',
             borderBottom: showWorkers ? '1px solid rgba(0,0,0,0.08)' : 'none',
           }}>
             <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
@@ -344,7 +344,7 @@ export default function Home() {
             <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
 
               {/* Перемикач року — спільний для всіх графіків */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px 56px 0', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 40px 0', gap: 4 }}>
                 {[new Date().getFullYear() - 1, new Date().getFullYear()].map(y => (
                   <button key={y} onClick={() => setChartYear(y)} style={{
                     padding: '3px 12px', borderRadius: 12,
@@ -356,7 +356,7 @@ export default function Home() {
               </div>
 
               {/* Терапевтичний блок */}
-              <div style={{ padding: '16px 56px 20px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                   Терапевтичний напрямок
                 </div>
@@ -365,7 +365,7 @@ export default function Home() {
               </div>
 
               {/* Хірургічний блок */}
-              <div style={{ padding: '16px 56px 20px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize: 9, color: '#c0623a', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                   Хірургічний напрямок
                 </div>
@@ -374,7 +374,7 @@ export default function Home() {
               </div>
 
               {/* Загальний графік лікарні */}
-              <div style={{ padding: '16px 56px 24px' }}>
+              <div style={{ padding: '12px 40px 20px' }}>
                 <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
                   Загальні поступлення лікарні
                 </div>
@@ -415,13 +415,13 @@ function Stat({ value, label, large }) {
   return (
     <div>
       <div style={{
-        fontSize: large ? 68 : 42, fontWeight: 300,
+        fontSize: large ? 52 : 32, fontWeight: 300,
         color: '#1a1a1a', ...MONO, lineHeight: 1, letterSpacing: '-0.02em',
       }}>
         {value}
       </div>
       {label && (
-        <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 7, ...MONO }}>
+        <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6, ...MONO }}>
           {label}
         </div>
       )}
