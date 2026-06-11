@@ -31,6 +31,7 @@ const QUERIES = {
   orgDepts: `SELECT b.name as block, d.dept_name as відділення, d.doctors_count as лікарів, d.staff_count as персонал FROM departments d LEFT JOIN clinical_blocks b ON b.id = d.block_id ORDER BY b.name, d.dept_name`,
   orgDocs:  `SELECT emp_name as лікар, COALESCE(specialization,'—') as спеціалізація, position as посада, department as відділення FROM empl WHERE (emp_status IS DISTINCT FROM 'звільнений') AND (position ILIKE '%лікар%' OR position ILIKE '%ординатор%' OR position ILIKE '%завідувач%') ORDER BY department, (position ILIKE '%завідувач%') DESC, emp_name LIMIT 500`,
   doctorCount: `SELECT COUNT(DISTINCT doctor_id) as cnt FROM doctor_stats WHERE total_cases > 0`,
+  allYears: `SELECT DISTINCT EXTRACT(year FROM admission_date_d)::int as year FROM lsmd WHERE admission_date_d IS NOT NULL ORDER BY year DESC`,
   // --- Хвиля 3: Географія ---
   wGeo:        "SELECT region as область, COALESCE(district,'(центр / без деталізації)') as район, SUM(cases) as випадків, SUM(unique_patients) as пацієнтів, ROUND(AVG(avg_bed_days::numeric),1) as ліжкодень, SUM(deaths) as померло FROM v_region_stats GROUP BY region, district ORDER BY випадків DESC LIMIT 25",
 }
@@ -163,7 +164,7 @@ async function supaFetch(sql) {
 // Публічні запити — доступні без авторизації (тільки агреговані дані, без ПІБ)
 const PUBLIC_KEYS = new Set([
   'ovKpiYear', 'doctorCount', 'deptProfile',
-  'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly',
+  'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
 ])
 
 export default async function handler(req, res) {

@@ -113,6 +113,7 @@ export default function Home() {
   const [therMonthly, setTherMonthly] = useState([])
   const [surgMonthly, setSurgMonthly] = useState([])
   const [chartYear, setChartYear] = useState(new Date().getFullYear())
+  const [allYears, setAllYears] = useState([])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -128,6 +129,7 @@ export default function Home() {
   useEffect(() => {
     fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
     fetchStats('doctorCount').then(rows => setDoctorCount(rows[0]?.cnt || null))
+    fetchStats('allYears').then(rows => setAllYears(rows.map(r => r.year).filter(Boolean)))
   }, [])
 
   async function handleShowWorkers() {
@@ -196,138 +198,71 @@ export default function Home() {
 
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#eeeae4' }}>
 
-        {/* ── ОСНОВНИЙ КОНТЕНТ (ліво + право) ── */}
-        <div style={{ display: 'flex', flex: 1 }}>
+        {/* ══ ЗОНА 1: лого + терапевтичний блок | головна статистика ══ */}
+        <div style={{ display: 'flex' }}>
 
-        {/* ── ЛІВА КОЛОНКА ── */}
-        <div style={{
-          width: 480, flexShrink: 0,
-          borderRight: '1px solid rgba(0,0,0,0.1)',
-          background: 'rgba(255,255,255,0.55)',
-          backdropFilter: 'blur(16px)',
-          display: 'flex', flexDirection: 'column',
-        }}>
-          {/* Лого */}
-          <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <svg width="72" height="72" viewBox="0 0 200 220" fill="none" style={{ flexShrink: 0 }}>
-              {/* Дуга (sage green) */}
-              <path d="M155 55 Q175 90 155 130 Q135 155 100 160 Q65 155 45 130 Q25 90 45 55"
-                stroke="#8a9e8c" strokeWidth="18" strokeLinecap="round" fill="none" />
-              {/* Хрест (mauve) */}
-              <rect x="82" y="20" width="36" height="110" rx="8" fill="#b5697a" />
-              <rect x="42" y="55" width="116" height="36" rx="8" fill="#b5697a" />
-              {/* Ліва рука (mauve) */}
-              <path d="M30 185 Q10 165 20 140 Q35 120 55 135 Q70 148 60 170 Q50 188 30 185Z"
-                fill="#b5697a" />
-              <path d="M55 135 Q65 118 75 130 Q80 145 65 158 Q55 163 55 135Z"
-                fill="#b5697a" />
-              {/* Права рука (sage green) */}
-              <path d="M170 185 Q190 165 180 140 Q165 120 145 135 Q130 148 140 170 Q150 188 170 185Z"
-                fill="#8a9e8c" />
-              <path d="M145 135 Q135 118 125 130 Q120 145 135 158 Q145 163 145 135Z"
-                fill="#8a9e8c" />
-            </svg>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.4, letterSpacing: '0.05em', ...SANS }}>
-                ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
-              </div>
-              <div style={{ fontSize: 11, color: '#999', marginTop: 5, fontStyle: 'italic', ...SANS }}>
-                турбуємось про найцінніше
-              </div>
-            </div>
-          </div>
-
-          {/* Терапевтичний блок */}
-          <div style={{ padding: '16px 0 8px' }}>
-            {THERAPEUTIC.map((d, i) => (
-              <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Хірургічний блок */}
-          <div style={{ padding: '8px 0 32px', flex: 1 }}>
-            {SURGICAL.map((d, i) => (
-              <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>
-                {d}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── ПРАВА ЧАСТИНА ── */}
-        <div style={{
-          flex: 1,
-          background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
-          position: 'relative', overflow: 'hidden',
-          display: 'flex', flexDirection: 'column',
-        }}>
-          {/* Декоративні кола */}
-          <div style={{ position: 'absolute', top: '5%', left: '5%', width: 450, height: 450, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: 520, height: 520, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
-
-          {/* Головна статистика */}
+          {/* Ліва колонка */}
           <div style={{
-            position: 'relative', zIndex: 1,
-            display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
-            padding: '32px 40px 24px', gap: '20px 32px',
-            borderBottom: showWorkers ? '1px solid rgba(0,0,0,0.08)' : 'none',
+            width: 480, flexShrink: 0,
+            borderRight: '1px solid rgba(0,0,0,0.1)',
+            background: 'rgba(255,255,255,0.55)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex', flexDirection: 'column',
           }}>
-            <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
-            <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
-            <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
-            <Stat value="20" label="ВІДДІЛЕНЬ" />
-            <Stat value={String(year)} large />
-          </div>
-
-          {/* Блокова статистика (показується після кліку) */}
-          {showWorkers && (
-            <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
-
-              {/* Перемикач року — спільний для всіх графіків */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 40px 0', gap: 4 }}>
-                {[new Date().getFullYear() - 1, new Date().getFullYear()].map(y => (
-                  <button key={y} onClick={() => setChartYear(y)} style={{
-                    padding: '3px 12px', borderRadius: 12,
-                    border: '1px solid rgba(0,0,0,0.15)',
-                    background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
-                    fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
-                  }}>{y}</button>
-                ))}
-              </div>
-
-              {/* Терапевтичний блок */}
-              <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
-                  Терапевтичний напрямок
+            {/* Лого */}
+            <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <svg width="72" height="72" viewBox="0 0 200 220" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M155 55 Q175 90 155 130 Q135 155 100 160 Q65 155 45 130 Q25 90 45 55"
+                  stroke="#8a9e8c" strokeWidth="18" strokeLinecap="round" fill="none" />
+                <rect x="82" y="20" width="36" height="110" rx="8" fill="#b5697a" />
+                <rect x="42" y="55" width="116" height="36" rx="8" fill="#b5697a" />
+                <path d="M30 185 Q10 165 20 140 Q35 120 55 135 Q70 148 60 170 Q50 188 30 185Z" fill="#b5697a" />
+                <path d="M55 135 Q65 118 75 130 Q80 145 65 158 Q55 163 55 135Z" fill="#b5697a" />
+                <path d="M170 185 Q190 165 180 140 Q165 120 145 135 Q130 148 140 170 Q150 188 170 185Z" fill="#8a9e8c" />
+                <path d="M145 135 Q135 118 125 130 Q120 145 135 158 Q145 163 145 135Z" fill="#8a9e8c" />
+              </svg>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.4, letterSpacing: '0.05em', ...SANS }}>
+                  ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
                 </div>
-                <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
-                <MiniChart data={therMonthly} loading={blockLoading} color="#5b7fa6" />
-              </div>
-
-              {/* Хірургічний блок */}
-              <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize: 9, color: '#c0623a', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
-                  Хірургічний напрямок
+                <div style={{ fontSize: 11, color: '#999', marginTop: 5, fontStyle: 'italic', ...SANS }}>
+                  турбуємось про найцінніше
                 </div>
-                <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
-                <MiniChart data={surgMonthly} loading={blockLoading} color="#c0623a" />
-              </div>
-
-              {/* Загальний графік лікарні */}
-              <div style={{ padding: '12px 40px 20px' }}>
-                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
-                  Загальні поступлення лікарні
-                </div>
-                <MiniChart data={monthlyData} loading={blockLoading} color="#8b8fa8" height={110} />
               </div>
             </div>
-          )}
-        </div>
-        </div>{/* кінець flex-row */}
 
-        {/* ── СМУЖКА "Для працівників:" — повна ширина ── */}
+            {/* Терапевтичні відділення */}
+            <div style={{ padding: '16px 0 16px' }}>
+              {THERAPEUTIC.map((d, i) => (
+                <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>{d}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Права частина — статистика */}
+          <div style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
+            position: 'relative', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          }}>
+            <div style={{ position: 'absolute', top: '5%', left: '5%', width: 450, height: 450, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: 520, height: 520, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+            <div style={{
+              position: 'relative', zIndex: 1,
+              display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
+              padding: '32px 40px 32px', gap: '20px 32px',
+            }}>
+              <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
+              <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
+              <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
+              <Stat value="20" label="ВІДДІЛЕНЬ" />
+              <Stat value={String(year)} large />
+            </div>
+          </div>
+        </div>
+
+        {/* ══ ЗОНА 2: смужка "Для працівників:" — повна ширина ══ */}
         <div style={{
           display: 'flex', alignItems: 'center',
           borderTop: '1px solid rgba(0,0,0,0.09)',
@@ -385,6 +320,84 @@ export default function Home() {
             ) : (
               <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)', ...SANS }}>
                 — натисніть для входу —
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ══ ЗОНА 3: хірургічний блок | статистика блоків + графіки ══ */}
+        <div style={{ display: 'flex', flex: 1 }}>
+
+          {/* Ліва колонка — хірургічні відділення */}
+          <div style={{
+            width: 480, flexShrink: 0,
+            borderRight: '1px solid rgba(0,0,0,0.1)',
+            background: 'rgba(255,255,255,0.55)',
+            backdropFilter: 'blur(16px)',
+          }}>
+            <div style={{ padding: '16px 0 32px' }}>
+              {SURGICAL.map((d, i) => (
+                <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>{d}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Права частина — статистика блоків та графіки */}
+          <div style={{
+            flex: 1,
+            background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
+            position: 'relative', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none',
+              background: 'rgba(255,255,255,0.05)' }} />
+
+            {showWorkers ? (
+              <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
+
+                {/* Перемикач року */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 40px 0', gap: 4 }}>
+                  {(allYears.length > 0 ? allYears : [new Date().getFullYear()]).map(y => (
+                    <button key={y} onClick={() => setChartYear(y)} style={{
+                      padding: '3px 12px', borderRadius: 12,
+                      border: '1px solid rgba(0,0,0,0.15)',
+                      background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                      fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+                    }}>{y}</button>
+                  ))}
+                </div>
+
+                {/* Терапевтичний блок */}
+                <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                  <div style={{ fontSize: 9, color: '#5b7fa6', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
+                    Терапевтичний напрямок
+                  </div>
+                  <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
+                  <MiniChart data={therMonthly} loading={blockLoading} color="#5b7fa6" />
+                </div>
+
+                {/* Хірургічний блок */}
+                <div style={{ padding: '12px 40px 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                  <div style={{ fontSize: 9, color: '#c0623a', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
+                    Хірургічний напрямок
+                  </div>
+                  <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
+                  <MiniChart data={surgMonthly} loading={blockLoading} color="#c0623a" />
+                </div>
+
+                {/* Загальний графік */}
+                <div style={{ padding: '12px 40px 20px' }}>
+                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>
+                    Загальні поступлення лікарні
+                  </div>
+                  <MiniChart data={monthlyData} loading={blockLoading} color="#8b8fa8" height={110} />
+                </div>
+              </div>
+            ) : (
+              <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.2)', ...MONO }}>
+                  натисніть «Для працівників» для перегляду статистики
+                </div>
               </div>
             )}
           </div>
