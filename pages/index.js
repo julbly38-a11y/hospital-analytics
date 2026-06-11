@@ -127,7 +127,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
-    fetchStats('doctorCount').then(rows => setDoctorCount(rows[0]?.кількість || null))
+    fetchStats('doctorCount').then(rows => setDoctorCount(rows[0]?.cnt || null))
   }, [])
 
   async function handleShowWorkers() {
@@ -194,7 +194,10 @@ export default function Home() {
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', display: 'flex', background: '#eeeae4' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#eeeae4' }}>
+
+        {/* ── ОСНОВНИЙ КОНТЕНТ (ліво + право) ── */}
+        <div style={{ display: 'flex', flex: 1 }}>
 
         {/* ── ЛІВА КОЛОНКА ── */}
         <div style={{
@@ -241,67 +244,6 @@ export default function Home() {
                 {d}
               </div>
             ))}
-          </div>
-
-          {/* ── СМУЖКА "Для працівників:" ── */}
-          <div style={{
-            background: showWorkers ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)',
-            borderTop: '1px solid rgba(0,0,0,0.09)',
-            borderBottom: '1px solid rgba(0,0,0,0.09)',
-            transition: 'background .2s',
-          }}>
-            {/* Рядок з написом + полями */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 10px 20px' }}>
-              <button
-                onClick={handleShowWorkers}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 14, fontWeight: 700, color: '#333',
-                  whiteSpace: 'nowrap', flexShrink: 0, padding: 0, ...SANS,
-                }}
-              >
-                Для працівників:
-              </button>
-
-              {showWorkers && (
-                <form onSubmit={handleLogin} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="email" placeholder="Login"
-                    value={email} onChange={e => { setEmail(e.target.value); setLoginError(null) }}
-                    required
-                    style={{
-                      flex: 1, minWidth: 0, padding: '5px 10px',
-                      border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
-                      borderRadius: 5, fontSize: 12, ...SANS,
-                      background: 'rgba(255,255,255,0.9)', color: '#1a1a1a', outline: 'none',
-                    }}
-                  />
-                  <input
-                    type="password" placeholder="Password"
-                    value={password} onChange={e => { setPassword(e.target.value); setLoginError(null) }}
-                    required
-                    style={{
-                      flex: 1, minWidth: 0, padding: '5px 10px',
-                      border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
-                      borderRadius: 5, fontSize: 12, ...SANS,
-                      background: 'rgba(255,255,255,0.9)', color: '#1a1a1a', outline: 'none',
-                    }}
-                  />
-                  <button type="submit" disabled={loginLoading} style={{
-                    padding: '5px 12px', background: '#1a1a1a', border: 'none', borderRadius: 5,
-                    color: '#fff', fontSize: 12, cursor: loginLoading ? 'not-allowed' : 'pointer',
-                    opacity: loginLoading ? 0.6 : 1, flexShrink: 0, ...SANS,
-                  }}>
-                    {loginLoading ? '…' : '→'}
-                  </button>
-                </form>
-              )}
-            </div>
-            {loginError && (
-              <div style={{ padding: '2px 20px 8px', fontSize: 11, color: '#c0392b', ...SANS }}>
-                {loginError}
-              </div>
-            )}
           </div>
 
           {/* Хірургічний блок */}
@@ -383,6 +325,71 @@ export default function Home() {
             </div>
           )}
         </div>
+        </div>{/* кінець flex-row */}
+
+        {/* ── СМУЖКА "Для працівників:" — повна ширина ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          borderTop: '1px solid rgba(0,0,0,0.09)',
+          borderBottom: '1px solid rgba(0,0,0,0.09)',
+          background: showWorkers ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)',
+          transition: 'background .2s',
+        }}>
+          {/* Ліва частина — напис по правому краю */}
+          <div style={{ width: 480, flexShrink: 0, padding: '10px 40px', borderRight: '1px solid rgba(0,0,0,0.09)' }}>
+            <button onClick={handleShowWorkers} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 14, fontWeight: 700, color: '#333',
+              padding: 0, display: 'block', width: '100%',
+              textAlign: 'right', ...SANS,
+            }}>
+              Для працівників:
+            </button>
+          </div>
+
+          {/* Права частина — поля логіну */}
+          <div style={{ flex: 1, padding: '8px 40px' }}>
+            {showWorkers ? (
+              <form onSubmit={handleLogin} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  type="email" placeholder="Login"
+                  value={email} onChange={e => { setEmail(e.target.value); setLoginError(null) }}
+                  required
+                  style={{
+                    flex: 1, minWidth: 0, padding: '6px 12px',
+                    border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
+                    borderRadius: 6, fontSize: 13, ...SANS,
+                    background: 'rgba(255,255,255,0.85)', color: '#1a1a1a', outline: 'none',
+                  }}
+                />
+                <input
+                  type="password" placeholder="Password"
+                  value={password} onChange={e => { setPassword(e.target.value); setLoginError(null) }}
+                  required
+                  style={{
+                    flex: 1, minWidth: 0, padding: '6px 12px',
+                    border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
+                    borderRadius: 6, fontSize: 13, ...SANS,
+                    background: 'rgba(255,255,255,0.85)', color: '#1a1a1a', outline: 'none',
+                  }}
+                />
+                <button type="submit" disabled={loginLoading} style={{
+                  padding: '6px 20px', background: '#1a1a1a', border: 'none', borderRadius: 6,
+                  color: '#fff', fontSize: 13, cursor: loginLoading ? 'not-allowed' : 'pointer',
+                  opacity: loginLoading ? 0.6 : 1, flexShrink: 0, ...SANS,
+                }}>
+                  {loginLoading ? '…' : 'Увійти →'}
+                </button>
+                {loginError && <span style={{ fontSize: 11, color: '#c0392b', ...SANS }}>{loginError}</span>}
+              </form>
+            ) : (
+              <div style={{ fontSize: 12, color: 'rgba(0,0,0,0.3)', ...SANS }}>
+                — натисніть для входу —
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </>
   )
