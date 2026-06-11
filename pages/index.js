@@ -53,16 +53,17 @@ async function fetchBlockStats(depts) {
     return rows.reduce((s, r) => s + (Number(r[key]) || 0) * (Number(r[wkey]) || 0), 0) / tw
   }
   const total = sum('випадків')
+  // летальність — зважена середня з death_rate_pct (відс. на відділення)
+  const летальність = total > 0
+    ? (rows.reduce((s,r) => s + (Number(r.летальність)||0) * (Number(r.випадків)||0), 0) / total).toFixed(1)
+    : '0'
   return {
     випадків:    total,
     середній_вік: wavg('середній_вік', 'випадків')?.toFixed(1),
     ліжкодень:   wavg('ліжкодень', 'випадків')?.toFixed(1),
     повторні:    sum('повторні'),
     поліпшення:  sum('поліпшення'),
-    померло:     sum('deaths') || rows.reduce((s,r)=>s+(Number(r.deaths)||0),0),
-    летальність: total > 0 ? (rows.reduce((s,r)=>s+(Number(r.deaths)||0),0) / total * 100).toFixed(1) : '0',
-    urgent:      sum('urgent') || rows.reduce((s,r)=>s+(Number(r.urgent)||0),0),
-    planned:     sum('planned') || rows.reduce((s,r)=>s+(Number(r.planned)||0),0),
+    летальність,
     men:         sum('чоловіки'),
     women:       sum('жінки'),
   }
@@ -126,7 +127,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
-    fetchStats('orgDocs').then(rows => setDoctorCount(rows.length))
+    fetchStats('doctorCount').then(rows => setDoctorCount(rows[0]?.кількість || null))
   }, [])
 
   async function handleShowWorkers() {
@@ -205,8 +206,11 @@ export default function Home() {
         }}>
           {/* Лого */}
           <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <img src="/logo.png" alt="ЛСМД" style={{ width: 72, height: 72, objectFit: 'contain' }}
-              onError={e => { e.target.style.display = 'none' }} />
+            <svg width="68" height="68" viewBox="0 0 68 68" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="34" cy="34" r="34" fill="rgba(180,60,60,0.07)" />
+              <path d="M34 14 L34 54 M14 34 L54 34" stroke="#b43c3c" strokeWidth="6.5" strokeLinecap="round" />
+              <path d="M20 20 Q34 9 48 20 Q59 34 48 48 Q34 59 20 48 Q9 34 20 20Z" fill="rgba(80,130,90,0.1)" stroke="rgba(80,130,90,0.25)" strokeWidth="1" />
+            </svg>
             <div>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.4, letterSpacing: '0.05em', ...SANS }}>
                 ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
