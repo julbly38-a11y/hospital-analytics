@@ -1,208 +1,146 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'
-import { deptIcon } from '../lib/dept-icons'
 
-/* ── Config ───────────────────────────────────────── */
+const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
+const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
+
 const BLOCK_CFG = {
-  'хірургічний':        { icon: '✂', color: '#c0392b', label: 'Хірургічний' },
-  'терапевтичний':      { icon: '♡', color: '#4a9870', label: 'Терапевтичний' },
-  'інтенсивна_терапія': { icon: '◎', color: '#2563eb', label: 'Інтенсивна терапія' },
-  'параклінічний':      { icon: '≡', color: '#6b6760', label: 'Параклінічний' },
+  'приймально_діагностичний': { color: '#c0392b', label: 'Приймально-діагностичний' },
+  'клінічний':                { color: '#4a9870', label: 'Клінічні відділення' },
+  'анестезіологія_іт':        { color: '#2563eb', label: 'Анестезіологія та ІТ' },
+  'параклінічний':            { color: '#6b7280', label: 'Параклінічні' },
+  'адміністративний':         { color: '#7c3aed', label: 'Адміністративний' },
 }
-const BLOCK_ORDER = ['хірургічний', 'терапевтичний', 'інтенсивна_терапія', 'параклінічний']
+const BLOCK_ORDER = ['приймально_діагностичний', 'клінічний', 'анестезіологія_іт', 'параклінічний', 'адміністративний']
 
-async function fetchStats(key) {
+async function fetchStats(key, param) {
   const r = await fetch('/api/stats', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key })
+    body: JSON.stringify(param !== undefined ? { key, param } : { key }),
   })
   const d = await r.json()
   return d.rows || []
 }
 
-function initials(name = '') {
-  if (name.startsWith('+')) return '+'
-  return name.split(/[\s.]+/).filter(p => p.length > 1).slice(0, 2).map(p => p[0].toUpperCase()).join('')
+function fmt(v, suffix = '') {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  return isNaN(n) ? '—' : n.toLocaleString('uk') + suffix
 }
 
-/* ── Hospital card ────────────────────────────────── */
-function HospitalCard({ total, patients, staff, depts }) {
-  const stats = [
-    { v: total?.toLocaleString('uk') || '…', l: 'Госпіталізацій' },
-    { v: patients?.toLocaleString('uk') || '…', l: 'Пацієнтів' },
-    { v: staff || '…', l: 'Співробітників' },
-    { v: depts || '…', l: 'Відділень' },
-  ]
+function initials(name = '') {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
+}
+
+/* ── Stat number (same as index.js) ─────────────────── */
+function Stat({ value, label, large }) {
   return (
-    <div style={{
-      border: '1px solid var(--border)', borderRadius: 12,
-      padding: '20px 24px', background: 'var(--bg2)',
-      display: 'flex', alignItems: 'flex-start',
-      justifyContent: 'space-between', gap: 16,
-      flexWrap: 'wrap', marginBottom: 20
-    }}>
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <span style={{ fontSize: 26, fontWeight: 300, color: '#c0392b', fontFamily: 'var(--mono)', lineHeight: 1 }}>+</span>
-          <span style={{ fontSize: 20, fontWeight: 500, fontFamily: 'var(--mono)', color: 'var(--text)' }}>ЛСМД</span>
+    <div>
+      <div style={{ fontSize: large ? 52 : 32, fontWeight: 300, color: '#1a1a1a', ...MONO, lineHeight: 1, letterSpacing: '-0.02em' }}>
+        {value}
+      </div>
+      {label && (
+        <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6, ...MONO }}>
+          {label}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text2)' }}>Лікарня швидкої медичної допомоги</div>
-        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2, fontFamily: 'var(--mono)' }}>Чернівці · Україна · 20 відділень</div>
-      </div>
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        {stats.map(s => (
-          <div key={s.l} style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 300, fontFamily: 'var(--mono)', color: 'var(--text)', lineHeight: 1.1 }}>{s.v}</div>
-            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--mono)' }}>{s.l}</div>
-          </div>
-        ))}
-      </div>
+      )}
     </div>
   )
 }
 
-/* ── Block card ───────────────────────────────────── */
-function BlockCard({ blk, cfg, depts, active, onClick }) {
+/* ── Block pill ──────────────────────────────────────── */
+function BlockPill({ blk, cfg, depts, active, onClick }) {
   const totalDocs = depts.reduce((s, d) => s + (Number(d.лікарів) || 0), 0)
   return (
     <div onClick={onClick} style={{
-      border: `1px solid ${active ? cfg.color : 'var(--border)'}`,
-      borderRadius: 10, padding: '16px',
-      background: active ? 'var(--bg2)' : 'var(--surface)',
-      cursor: 'pointer', transition: 'all .18s',
+      background: active ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.45)',
+      border: `1px solid ${active ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.08)'}`,
       borderTop: `3px solid ${cfg.color}`,
+      borderRadius: 10, padding: '14px 18px', cursor: 'pointer',
+      backdropFilter: 'blur(8px)',
+      transition: 'all .18s',
+      boxShadow: active ? '0 4px 16px rgba(0,0,0,0.1)' : 'none',
     }}
-    onMouseEnter={e => { if (!active) e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)' }}
-    onMouseLeave={e => { e.currentTarget.style.boxShadow = '' }}
+    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.6)' }}
+    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.45)' }}
     >
-      <div style={{ fontSize: 22, marginBottom: 8 }}>{cfg.icon}</div>
-      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 8, lineHeight: 1.3 }}>{cfg.label}</div>
-      <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 2 }}>{depts.length} відділень</div>
-      <div style={{ fontSize: 11, color: 'var(--text2)', fontFamily: 'var(--mono)', marginBottom: 10 }}>{totalDocs} лікарів</div>
-      <div style={{ fontSize: 10, fontWeight: 500, color: active ? cfg.color : 'var(--text3)', fontFamily: 'var(--mono)' }}>
-        {active ? '▲ Згорнути' : '▼ Відкрити'}
-      </div>
+      <div style={{ fontSize: 13, fontWeight: 500, color: '#1a1a1a', marginBottom: 8, lineHeight: 1.3, ...SANS }}>{cfg.label}</div>
+      <div style={{ fontSize: 11, color: '#555', ...MONO }}>{depts.length} відд. · {totalDocs} лікарів</div>
+      <div style={{ fontSize: 10, color: active ? cfg.color : '#999', marginTop: 8, ...MONO }}>{active ? '▲ Згорнути' : '▼ Відкрити'}</div>
     </div>
   )
 }
 
-/* ── Department card ──────────────────────────────── */
-function DeptCard({ dept, cfg, active, hasDoc, onClick }) {
-  const head = dept._head
+/* ── Dept card ───────────────────────────────────────── */
+function DeptCard({ dept, cfg, active, onClick }) {
   return (
     <div onClick={onClick} style={{
-      border: `${active ? '1.5px' : '1px'} solid ${active ? cfg.color : 'var(--border)'}`,
-      borderRadius: 8, padding: '12px 14px',
-      background: active ? 'var(--bg2)' : 'var(--surface)',
-      cursor: hasDoc ? 'pointer' : 'default',
+      background: active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)',
+      border: `1px solid ${active ? cfg.color + '55' : 'rgba(0,0,0,0.08)'}`,
+      borderRadius: 8, padding: '11px 14px', cursor: 'pointer',
+      backdropFilter: 'blur(6px)',
       transition: 'all .15s',
+      boxShadow: active ? `0 3px 12px ${cfg.color}18` : 'none',
     }}
-    onMouseEnter={e => { if (hasDoc && !active) e.currentTarget.style.background = 'var(--bg2)' }}
-    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'var(--surface)' }}
+    onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.7)' }}
+    onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.5)' }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 6 }}>
-        <span style={{ fontSize: 15, lineHeight: 1.2 }}>{deptIcon(dept.відділення)}</span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', lineHeight: 1.3 }}>{dept.відділення}</span>
-      </div>
-      {head && (
-        <div style={{ fontSize: 10, color: cfg.color, marginBottom: 5, fontFamily: 'var(--mono)' }}>↳ {head}</div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
-        <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{dept.лікарів} лікарів</span>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <a href={'/analytics'} onClick={e => e.stopPropagation()}
-            title="Аналітика відділення"
-            style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', textDecoration: 'none',
-              padding: '1px 4px', border: '1px solid var(--border)', borderRadius: 3 }}>📊</a>
-          {hasDoc && <span style={{ fontSize: 10, color: 'var(--text3)' }}>{active ? '▲' : '▼'}</span>}
-        </div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.35, marginBottom: 4, ...SANS }}>{dept.відділення}</div>
+      {dept._head && <div style={{ fontSize: 10, color: cfg.color, ...MONO, marginBottom: 4 }}>↳ {dept._head}</div>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 10, color: '#888', ...MONO }}>{dept.лікарів} лікарів</span>
+        <span style={{ fontSize: 10, color: active ? cfg.color : '#bbb' }}>{active ? '▲' : '▼'}</span>
       </div>
     </div>
   )
 }
 
-/* ── Doctor chip ──────────────────────────────────── */
-function DocChip({ doc, cfg, onAsk }) {
-  const isHead = doc.посада?.toLowerCase().includes('завідувач')
-  const ini = initials(doc.лікар || '')
-  const clickable = !doc.лікар?.startsWith('+')
-  return (
-    <div onClick={clickable ? onAsk : undefined}
-      title={clickable ? `Запитати AI про ${doc.лікар}` : ''}
-      style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      padding: '5px 10px 5px 5px',
-      border: '1px solid var(--border)', borderRadius: 8,
-      background: 'var(--surface)',
-      cursor: clickable ? 'pointer' : 'default',
-      transition: 'border-color .15s, background .15s',
-    }}
-    onMouseEnter={e => { if (clickable) { e.currentTarget.style.borderColor = cfg.color; e.currentTarget.style.background = 'var(--bg2)' } }}
-    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface)' }}
-    >
-      <div style={{
-        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-        background: isHead ? cfg.color : 'var(--bg2)',
-        color: isHead ? '#fff' : 'var(--text2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 9, fontWeight: 500, fontFamily: 'var(--mono)',
-      }}>{ini}</div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: isHead ? 500 : 400, color: 'var(--text)', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-          {doc.лікар}
-        </div>
-        {doc.спеціалізація && doc.спеціалізація !== '—' && (
-          <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>{doc.спеціалізація}</div>
-        )}
-      </div>
-      {isHead && (
-        <div style={{
-          fontSize: 9, padding: '2px 5px', borderRadius: 3,
-          background: cfg.color + '18', color: cfg.color, fontWeight: 500,
-          fontFamily: 'var(--mono)', flexShrink: 0
-        }}>завід.</div>
-      )}
-      {clickable && (
-        <div style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'var(--mono)', flexShrink: 0 }}>→AI</div>
-      )}
-    </div>
-  )
-}
-
-/* ── Section label ────────────────────────────────── */
-function SectionLabel({ text }) {
-  return (
-    <div style={{
-      fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.09em',
-      color: 'var(--text3)', fontFamily: 'var(--mono)', marginBottom: 10
-    }}>{text}</div>
-  )
-}
-
-/* ── Main page ────────────────────────────────────── */
+/* ── Main page ───────────────────────────────────────── */
 export default function OrgPage() {
   const router = useRouter()
-  const [depts, setDepts]   = useState([])
-  const [docs, setDocs]     = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selBlock, setSelBlock] = useState(null)
-  const [selDept,  setSelDept]  = useState(null)
 
+  const [depts,   setDepts]   = useState([])
+  const [docs,    setDocs]    = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const [kpi,       setKpi]       = useState(null)
+  const [doctorCnt, setDoctorCnt] = useState(null)
+  const [allYears,  setAllYears]  = useState([])
+  const [chartYear, setChartYear] = useState('all')
+
+  const [selBlock,    setSelBlock]    = useState(null)
+  const [selDept,     setSelDept]     = useState(null)
+  const [deptProfile, setDeptProfile] = useState(null)
+  const [deptDiag,    setDeptDiag]    = useState([])
+
+  /* Initial load */
   useEffect(() => {
-    Promise.all([fetchStats('orgDepts'), fetchStats('orgDocs')])
-      .then(([d, dc]) => { setDepts(d); setDocs(dc); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetchStats('orgDepts'),
+      fetchStats('orgDocs'),
+      fetchStats('doctorCount'),
+      fetchStats('allYears'),
+    ]).then(([d, dc, cnt, yrs]) => {
+      setDepts(d); setDocs(dc)
+      setDoctorCnt(cnt[0]?.cnt ?? null)
+      setAllYears(yrs.map(r => r.year).filter(Boolean))
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
-  // useMemo ПЕРЕД useEffect що від нього залежить — уникаємо TDZ ReferenceError
+  /* KPI by year */
+  useEffect(() => {
+    setKpi(null)
+    fetchStats('ovKpiYear', chartYear === 'all' ? 'all' : String(chartYear))
+      .then(rows => setKpi(rows[0] || null))
+  }, [chartYear])
+
   const blocks = useMemo(() => {
     const headMap = {}
     docs.forEach(d => {
-      if (d.посада?.toLowerCase().includes('завідувач') && !headMap[d.відділення]) {
+      if (d.посада?.toLowerCase().includes('завідувач') && !headMap[d.відділення])
         headMap[d.відділення] = d.лікар
-      }
     })
     const grouped = {}
     depts.forEach(d => {
@@ -218,18 +156,34 @@ export default function OrgPage() {
     return docs.filter(d => d.відділення === selDept)
   }, [docs, selDept])
 
-  // Auto-expand dept + block from URL param (?dept=...)
+  /* URL param */
   useEffect(() => {
-    const deptParam = router.query?.dept
-    if (!deptParam || loading || !blocks.length) return
-    setSelDept(deptParam)
-    const blk = blocks.find(b => b.depts.some(d => d.відділення === deptParam))
+    const p = router.query?.dept
+    if (!p || loading || !blocks.length) return
+    setSelDept(p)
+    const blk = blocks.find(b => b.depts.some(d => d.відділення === p))
     if (blk) setSelBlock(blk.id)
   }, [router.query?.dept, loading, blocks])
 
-  // Stats
-  const totalDocs  = depts.reduce((s, d) => s + (Number(d.лікарів) || 0), 0)
-  const totalStaff = depts.reduce((s, d) => s + (Number(d.персонал) || 0), 0)
+  /* Dept stats — оновлюється при зміні відділення АБО року */
+  useEffect(() => {
+    if (!selDept) { setDeptProfile(null); setDeptDiag([]); return }
+    setDeptProfile(null); setDeptDiag([])
+    const y = chartYear === 'all' ? 'all' : String(chartYear)
+    Promise.all([
+      fetchStats('deptProfileYear', `${selDept}|${y}`),
+      fetchStats('deptDiag', selDept),
+    ]).then(([prof, diag]) => {
+      setDeptProfile(prof[0] || null)
+      setDeptDiag(diag)
+    })
+  }, [selDept, chartYear])
+
+  const selCfg     = selBlock ? (BLOCK_CFG[selBlock] || { color: '#6b7280' }) : null
+  const head       = selDeptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'))
+  const others     = selDeptDocs.filter(d => !d.посада?.toLowerCase().includes('завідувач'))
+  const top7       = deptDiag.slice(0, 7)
+  const maxPct     = top7.reduce((m, d) => Math.max(m, Number(d.відс) || 0), 0) || 1
 
   return (
     <>
@@ -239,96 +193,209 @@ export default function OrgPage() {
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 32px', maxWidth: 1280, margin: '0 auto' }}>
+      <div style={{ minHeight: '100vh', background: '#eeeae4', ...SANS }}>
 
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ЛСМД</span>
-            <span style={{ color: 'var(--border)' }}>·</span>
-            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Структура лікарні</span>
-            {loading && <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)', marginLeft: 8 }}>завантаження…</span>}
+        {/* ══ ВЕРХНЯ ЗОНА: статистика + рік ══ */}
+        <div style={{
+          background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
+          position: 'relative', overflow: 'hidden',
+          padding: '0 40px',
+        }}>
+          {/* Декоративні кола */}
+          <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '-20%', right: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+
+          {/* Лого + назва */}
+          <div style={{ position: 'relative', zIndex: 1, paddingTop: 28, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 22, color: '#c0392b', ...MONO, lineHeight: 1 }}>+</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#1a1a1a', letterSpacing: '0.06em', ...MONO }}>ЛСМД</div>
+              <div style={{ fontSize: 10, color: '#666', marginTop: 1, ...SANS }}>Структура лікарні</div>
+            </div>
+            {/* Кнопка назад */}
+            <button onClick={() => router.push('/')} style={{
+              marginLeft: 'auto', background: 'rgba(0,0,0,0.08)', border: 'none',
+              borderRadius: 8, padding: '5px 14px', cursor: 'pointer',
+              fontSize: 11, color: '#444', ...MONO,
+            }}>← Головна</button>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[['← AI Асистент', '/'], ['Аналітика', '/analytics'], ['Гло-графіки', '/glow']].map(([t, h]) => (
-              <Link key={h} href={h} style={{
-                fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text2)',
-                textDecoration: 'none', padding: '5px 12px',
-                border: '1px solid var(--border)', borderRadius: 6, transition: 'all .15s'
-              }}>{t}</Link>
+
+          {/* Перемикач року */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: 4, marginBottom: 16 }}>
+            <button onClick={() => setChartYear('all')} style={{
+              padding: '3px 12px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)',
+              background: chartYear === 'all' ? 'rgba(0,0,0,0.12)' : 'transparent',
+              fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+            }}>Всі</button>
+            {allYears.map(y => (
+              <button key={y} onClick={() => setChartYear(y)} style={{
+                padding: '3px 12px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)',
+                background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+              }}>{y}</button>
             ))}
           </div>
+
+          {/* Головні показники */}
+          <div style={{
+            position: 'relative', zIndex: 1,
+            display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
+            gap: '16px 32px', paddingBottom: 28,
+          }}>
+            <Stat value={kpi ? fmt(kpi.total_cases)       : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
+            <Stat value={kpi ? fmt(kpi.unique_patients)   : '…'} label="ПАЦІЄНТІВ" />
+            <Stat value={doctorCnt != null ? fmt(doctorCnt) : '…'} label="ЛІКАРІВ" />
+            <Stat value={depts.length || '…'}                     label="ВІДДІЛЕНЬ" />
+            <Stat value={kpi ? fmt(kpi.death_rate_pct, '%') : '…'} label="ЛЕТАЛЬНІСТЬ" />
+            <Stat value={chartYear === 'all' ? 'Всі' : String(chartYear)} large />
+          </div>
         </div>
 
-        {/* Hospital card */}
-        <HospitalCard total={110206} patients={72293} staff={totalStaff || 882} depts={depts.length || 20} />
+        {/* ══ КОНТЕНТ: блоки + відділення ══ */}
+        <div style={{ padding: '28px 40px', maxWidth: 1280, margin: '0 auto' }}>
 
-        {/* Block cards */}
-        <SectionLabel text="Клінічні напрямки" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
-          {blocks.map(blk => {
-            const cfg = BLOCK_CFG[blk.id] || { icon: '⊞', color: '#6b6760', label: blk.id }
+          {/* Section label */}
+          <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
+            Клінічні напрямки {loading && '· завантаження…'}
+          </div>
+
+          {/* Block pills */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, marginBottom: 24 }}>
+            {blocks.map(blk => {
+              const cfg = BLOCK_CFG[blk.id] || { color: '#6b7280', label: blk.id }
+              return (
+                <BlockPill key={blk.id} blk={blk.id} cfg={cfg} depts={blk.depts}
+                  active={selBlock === blk.id}
+                  onClick={() => { setSelBlock(selBlock === blk.id ? null : blk.id); setSelDept(null) }}
+                />
+              )
+            })}
+          </div>
+
+          {/* Dept grid */}
+          {selBlock && (() => {
+            const blk = blocks.find(b => b.id === selBlock)
+            const cfg = BLOCK_CFG[selBlock] || { color: '#6b7280' }
             return (
-              <BlockCard key={blk.id} blk={blk.id} cfg={cfg} depts={blk.depts}
-                active={selBlock === blk.id}
-                onClick={() => { setSelBlock(selBlock === blk.id ? null : blk.id); setSelDept(null) }}
-              />
-            )
-          })}
-        </div>
-
-        {/* Departments */}
-        {selBlock && (() => {
-          const blk = blocks.find(b => b.id === selBlock)
-          const cfg = BLOCK_CFG[selBlock] || { icon: '⊞', color: '#6b6760', label: selBlock }
-          return (
-            <div style={{ marginBottom: 24 }}>
-              <SectionLabel text={`Відділення · ${cfg.label}`} />
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
-                {blk.depts.map(dept => {
-                  const deptDocs = docs.filter(d => d.відділення === dept.відділення)
-                  return (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 14 }}>
+                  Відділення · {cfg.label}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 10 }}>
+                  {blk.depts.map(dept => (
                     <DeptCard key={dept.відділення} dept={dept} cfg={cfg}
                       active={selDept === dept.відділення}
-                      hasDoc={deptDocs.length > 0}
-                      onClick={() => { if (deptDocs.length > 0) setSelDept(selDept === dept.відділення ? null : dept.відділення) }}
+                      onClick={() => setSelDept(selDept === dept.відділення ? null : dept.відділення)}
                     />
-                  )
-                })}
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Dept detail panel */}
+          {selDept && selCfg && (
+            <div style={{
+              background: 'rgba(255,255,255,0.65)',
+              backdropFilter: 'blur(12px)',
+              border: `1px solid rgba(0,0,0,0.08)`,
+              borderLeft: `4px solid ${selCfg.color}`,
+              borderRadius: 12, padding: '22px 28px', marginBottom: 24,
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 500, color: '#1a1a1a', ...SANS }}>{selDept}</div>
+                  {head && (
+                    <div style={{ fontSize: 11, color: '#666', marginTop: 4, ...MONO }}>
+                      Завідувач:{' '}
+                      <span onClick={() => router.push('/dept?dept=' + encodeURIComponent(selDept))}
+                        style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted' }}>
+                        {head.лікар}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => router.push('/dept?dept=' + encodeURIComponent(selDept))} style={{
+                    fontSize: 11, color: selCfg.color, background: 'none',
+                    border: `1px solid ${selCfg.color}55`, borderRadius: 7,
+                    padding: '6px 14px', cursor: 'pointer', ...MONO, fontWeight: 500,
+                  }}>Кабінет відділення →</button>
+                  <button onClick={() => setSelDept(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}>×</button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap' }}>
+
+                {/* KPI */}
+                <div>
+                  {!deptProfile ? (
+                    <div style={{ fontSize: 11, color: '#aaa', ...MONO }}>завантаження…</div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+                      {[
+                        { l: 'ВИПАДКІВ',    v: fmt(deptProfile.випадків) },
+                        { l: 'ПАЦІЄНТІВ',   v: fmt(deptProfile.унікальних) },
+                        { l: 'ЛІЖКО-ДЕНЬ',  v: fmt(deptProfile.ліжкодень, ' дн.') },
+                        { l: 'ЛЕТАЛЬНІСТЬ', v: fmt(deptProfile.летальність, '%') },
+                        { l: 'ПОВТОРНІ',    v: fmt(deptProfile.повторні) },
+                      ].map(k => (
+                        <div key={k.l}>
+                          <div style={{ fontSize: 24, fontWeight: 300, color: selCfg.color, ...MONO, lineHeight: 1 }}>{k.v}</div>
+                          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, ...MONO }}>{k.l}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Лікарі */}
+                {others.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO, marginBottom: 10 }}>
+                      Ординатори ({others.length})
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', maxWidth: 440 }}>
+                      {others.map((d, i) => (
+                        <span key={i} onClick={() => router.push('/cabinet?emp=' + encodeURIComponent(d.лікар))}
+                          style={{ fontSize: 12, color: '#444', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', ...SANS }}>
+                          {d.лікар}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Топ діагнози */}
+                {top7.length > 0 && (
+                  <div style={{ flex: 1, minWidth: 260 }}>
+                    <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', ...MONO, marginBottom: 10 }}>Топ МКХ-10</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      {top7.map((d, i) => (
+                        <div key={i}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            <span style={{ color: selCfg.color, fontSize: 10, minWidth: 34, ...MONO }}>{d.код}</span>
+                            <span style={{ color: '#555', flex: 1, fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...SANS }}>{d.діагноз}</span>
+                            <span style={{ color: '#888', fontSize: 10, ...MONO }}>{d.відс}%</span>
+                          </div>
+                          <div style={{ height: 2, background: 'rgba(0,0,0,0.06)', borderRadius: 1 }}>
+                            <div style={{ width: `${Math.round((Number(d.відс) / maxPct) * 100)}%`, height: '100%', background: selCfg.color + 'aa', borderRadius: 1, transition: 'width .4s' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )
-        })()}
+          )}
 
-        {/* Doctors */}
-        {selDept && selDeptDocs.length > 0 && (() => {
-          const cfg = BLOCK_CFG[selBlock] || { icon: '⊞', color: '#6b6760', label: selBlock }
-          return (
-            <div>
-              <SectionLabel text={`Лікарський склад · ${selDept}`} />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {selDeptDocs.map((d, i) => (
-                  <DocChip key={i} doc={d} cfg={cfg}
-                    onAsk={() => {
-                      const surname = (d.лікар || '').split(' ')[0]
-                      router.push('/?q=' + encodeURIComponent('Статистика лікаря ' + surname))
-                    }}
-                  />
-                ))}
-              </div>
+          {!loading && blocks.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#aaa', fontSize: 12, ...MONO }}>
+              Дані не завантажились
             </div>
-          )
-        })()}
-
-        {/* Empty state */}
-        {!loading && blocks.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text3)', fontFamily: 'var(--mono)', fontSize: 12 }}>
-            Дані структури не завантажились. Перевірте підключення.
-          </div>
-        )}
-
-        <div style={{ textAlign: 'center', marginTop: 32, fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
-          ЛСМД · Чернівці · реальні дані Supabase
+          )}
         </div>
       </div>
     </>

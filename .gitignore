@@ -17,3 +17,6 @@ out/
 scripts/.env
 .env.local
 .vercel
+.DS_Store
+tables_public.sql
+schema.sql
