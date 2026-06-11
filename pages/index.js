@@ -206,10 +206,23 @@ export default function Home() {
         }}>
           {/* Лого */}
           <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-            <svg width="68" height="68" viewBox="0 0 68 68" fill="none" style={{ flexShrink: 0 }}>
-              <circle cx="34" cy="34" r="34" fill="rgba(180,60,60,0.07)" />
-              <path d="M34 14 L34 54 M14 34 L54 34" stroke="#b43c3c" strokeWidth="6.5" strokeLinecap="round" />
-              <path d="M20 20 Q34 9 48 20 Q59 34 48 48 Q34 59 20 48 Q9 34 20 20Z" fill="rgba(80,130,90,0.1)" stroke="rgba(80,130,90,0.25)" strokeWidth="1" />
+            <svg width="72" height="72" viewBox="0 0 200 220" fill="none" style={{ flexShrink: 0 }}>
+              {/* Дуга (sage green) */}
+              <path d="M155 55 Q175 90 155 130 Q135 155 100 160 Q65 155 45 130 Q25 90 45 55"
+                stroke="#8a9e8c" strokeWidth="18" strokeLinecap="round" fill="none" />
+              {/* Хрест (mauve) */}
+              <rect x="82" y="20" width="36" height="110" rx="8" fill="#b5697a" />
+              <rect x="42" y="55" width="116" height="36" rx="8" fill="#b5697a" />
+              {/* Ліва рука (mauve) */}
+              <path d="M30 185 Q10 165 20 140 Q35 120 55 135 Q70 148 60 170 Q50 188 30 185Z"
+                fill="#b5697a" />
+              <path d="M55 135 Q65 118 75 130 Q80 145 65 158 Q55 163 55 135Z"
+                fill="#b5697a" />
+              {/* Права рука (sage green) */}
+              <path d="M170 185 Q190 165 180 140 Q165 120 145 135 Q130 148 140 170 Q150 188 170 185Z"
+                fill="#8a9e8c" />
+              <path d="M145 135 Q135 118 125 130 Q120 145 135 158 Q145 163 145 135Z"
+                fill="#8a9e8c" />
             </svg>
             <div>
               <div style={{ fontSize: 15, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.4, letterSpacing: '0.05em', ...SANS }}>
