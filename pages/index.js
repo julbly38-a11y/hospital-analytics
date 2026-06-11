@@ -70,6 +70,7 @@ export default function Home() {
   const [deptMonthly, setDeptMonthly] = useState([])
   const [deptIcdCat,  setDeptIcdCat]  = useState([])
   const [deptLoading, setDeptLoading] = useState(false)
+  const [chartPeriod, setChartPeriod] = useState('місяці') // 'роки' | 'місяці' | 'дні'
 
   // Auth перевірка
   useEffect(() => {
@@ -105,12 +106,14 @@ export default function Home() {
     Promise.all([
       fetchStats('deptProfile', selDept),
       fetchStats('deptDocs2', selDept),
+      fetchStats('deptYearly', selDept),
       fetchStats('deptMonthly', selDept),
+      fetchStats('deptDaily', selDept),
       fetchStats('deptIcdCat', selDept),
-    ]).then(([prof, docs, monthly, icdCat]) => {
+    ]).then(([prof, docs, yearly, monthly, daily, icdCat]) => {
       setDeptProfile(prof[0] || null)
       setDeptDocs(docs)
-      setDeptMonthly(monthly)
+      setDeptMonthly({ роки: yearly, місяці: monthly, дні: daily })
       setDeptIcdCat(icdCat)
       setDeptLoading(false)
     })
@@ -118,10 +121,14 @@ export default function Home() {
 
   const завідувач = useMemo(() => deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач')), [deptDocs])
 
-  const chartData = useMemo(() => deptMonthly.map(r => ({
-    місяць: UA_MONTHS[parseInt(r.місяць?.slice(5, 7), 10) - 1] || r.місяць,
-    випадків: Number(r.випадків) || 0,
-  })), [deptMonthly])
+  const chartData = useMemo(() => {
+    const rows = deptMonthly?.[chartPeriod] || []
+    return rows.map(r => {
+      if (chartPeriod === 'роки')  return { мітка: String(r.рік),   випадків: Number(r.випадків) || 0 }
+      if (chartPeriod === 'місяці') return { мітка: UA_MONTHS[parseInt(r.місяць?.slice(5, 7), 10) - 1] || r.місяць, випадків: Number(r.випадків) || 0 }
+      return { мітка: r.день + ' ч.', випадків: Number(r.випадків) || 0 }
+    })
+  }, [deptMonthly, chartPeriod])
 
   const handleDeptClick = (dept) => {
     const next = selDept === dept ? null : dept
@@ -241,12 +248,26 @@ export default function Home() {
             {selDept && (
               <>
                 {/* Лінійний графік */}
-                <div style={{ padding: '24px 32px 0', borderBottom: '1px solid var(--border)' }}>
-                  {deptLoading && <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12, ...MONO }}>завантаження…</div>}
+                <div style={{ padding: '16px 32px 0', borderBottom: '1px solid var(--border)' }}>
+                  {/* Перемикач */}
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+                    {['роки', 'місяці', 'дні'].map(p => (
+                      <button key={p} onClick={() => setChartPeriod(p)} style={{
+                        padding: '4px 14px', border: '1px solid var(--border)', borderRadius: 20,
+                        background: chartPeriod === p ? 'var(--text)' : 'transparent',
+                        color: chartPeriod === p ? 'var(--bg)' : 'var(--text3)',
+                        fontSize: 10, cursor: 'pointer', ...MONO, textTransform: 'uppercase',
+                        letterSpacing: '0.07em', transition: 'all .15s',
+                      }}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  {deptLoading && <div style={{ height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12, ...MONO }}>завантаження…</div>}
                   {!deptLoading && chartData.length > 0 && (
-                    <ResponsiveContainer width="100%" height={160}>
-                      <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                        <XAxis dataKey="місяць" tick={{ fontSize: 10, fontFamily: 'var(--mono)', fill: 'var(--text3)' }} axisLine={false} tickLine={false} />
+                    <ResponsiveContainer width="100%" height={150}>
+                      <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                        <XAxis dataKey="мітка" tick={{ fontSize: 10, fontFamily: 'var(--mono)', fill: 'var(--text3)' }} axisLine={false} tickLine={false} />
                         <YAxis hide />
                         <Tooltip
                           contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11, fontFamily: 'var(--mono)' }}
@@ -255,6 +276,9 @@ export default function Home() {
                         <Line type="monotone" dataKey="випадків" stroke="#8b8fa8" strokeWidth={1.5} dot={false} />
                       </LineChart>
                     </ResponsiveContainer>
+                  )}
+                  {!deptLoading && chartData.length === 0 && (
+                    <div style={{ height: 150, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 11, ...MONO }}>немає даних</div>
                   )}
                 </div>
 

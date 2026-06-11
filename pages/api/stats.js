@@ -90,8 +90,12 @@ const PARAM_QUERIES = {
   docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.avg_age as середній_вік, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.empl_name_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
   docDiag: (p) => `SELECT COALESCE(dd.diagnosis, dd.icd_code) as діагноз, dd.icd_code as код, dd.cases as випадків, dd.deaths as померло FROM doctor_diagnoses dd JOIN lsmd_doctors ld ON ld.empl_name_id = dd.doctor_id WHERE ld.doc_name = '${esc(p)}' ORDER BY dd.cases DESC LIMIT 10`,
+  // Тренд по роках (для головної сторінки)
+  deptYearly: (p) => `SELECT EXTRACT(year FROM admission_date_d)::int as рік, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_date_d IS NOT NULL GROUP BY рік ORDER BY рік`,
   // Місячний тренд госпіталізацій по відділенню (для головної сторінки)
   deptMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_date_d >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months' GROUP BY місяць ORDER BY місяць`,
+  // Щоденний тренд поточного місяця по відділенню
+  deptDaily: (p) => `SELECT TO_CHAR(admission_date_d, 'DD') as день, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND DATE_TRUNC('month', admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день ORDER BY день::int`,
   // Топ-5 категорій МКХ по відділенню (для секторної діаграми)
   deptIcdCat: (p) => `SELECT LEFT(icd_primary, 1) as розділ, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' GROUP BY LEFT(icd_primary, 1) ORDER BY випадків DESC LIMIT 5`,
   // Пошук МКХ-10 за кодом або назвою (для форми додавання пацієнта)
