@@ -25,11 +25,11 @@ const SURGICAL = [
   'Хірургічне відділення №1',
 ]
 
-function fmt(n) {
+function fmt(n, suffix = '') {
   if (n == null || n === '') return '—'
   const num = Number(n)
   if (isNaN(num)) return String(n)
-  return num.toLocaleString('uk-UA')
+  return num.toLocaleString('uk-UA') + suffix
 }
 
 async function fetchStats(key, param) {
@@ -42,13 +42,71 @@ async function fetchStats(key, param) {
   return d.rows || []
 }
 
+async function fetchBlockStats(depts) {
+  const results = await Promise.all(depts.map(d => fetchStats('deptProfile', d)))
+  const rows = results.map(r => r[0]).filter(Boolean)
+  if (!rows.length) return null
+  const sum = (key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0)
+  const wavg = (key, wkey) => {
+    const tw = sum(wkey); if (!tw) return null
+    return rows.reduce((s, r) => s + (Number(r[key]) || 0) * (Number(r[wkey]) || 0), 0) / tw
+  }
+  const total = sum('випадків')
+  return {
+    випадків:    total,
+    середній_вік: wavg('середній_вік', 'випадків')?.toFixed(1),
+    ліжкодень:   wavg('ліжкодень', 'випадків')?.toFixed(1),
+    повторні:    sum('повторні'),
+    поліпшення:  sum('поліпшення'),
+    померло:     sum('deaths') || rows.reduce((s,r)=>s+(Number(r.deaths)||0),0),
+    летальність: total > 0 ? (rows.reduce((s,r)=>s+(Number(r.deaths)||0),0) / total * 100).toFixed(1) : '0',
+    urgent:      sum('urgent') || rows.reduce((s,r)=>s+(Number(r.urgent)||0),0),
+    planned:     sum('planned') || rows.reduce((s,r)=>s+(Number(r.planned)||0),0),
+    men:         sum('чоловіки'),
+    women:       sum('жінки'),
+  }
+}
+
+function BlockStats({ stats, loading, color }) {
+  if (loading) return <div style={{ fontSize: 12, color: '#999', ...MONO }}>завантаження…</div>
+  if (!stats) return null
+  const items = [
+    { l: 'СЕРЕДНІЙ ВІК',   v: stats.середній_вік },
+    { l: 'ЛІЖКО-ДЕНЬ',     v: stats.ліжкодень },
+    { l: 'ПОВТОРНІ',       v: fmt(stats.повторні) },
+    { l: 'З ПОКРАЩЕННЯМ',  v: stats.випадків > 0 ? (Number(stats.поліпшення)/Number(stats.випадків)*100).toFixed(1)+'%' : '—' },
+    { l: 'ЛЕТАЛЬНІСТЬ',    v: stats.летальність + '%' },
+  ]
+  return (
+    <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+      {items.map((it, i) => (
+        <div key={i} style={{
+          flex: '1 1 80px', textAlign: 'center',
+          padding: '8px 12px',
+          borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none',
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 300, color: color || '#1a1a1a', ...MONO, lineHeight: 1 }}>
+            {it.v ?? '—'}
+          </div>
+          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5, ...MONO }}>
+            {it.l}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function Home() {
   const router = useRouter()
   const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, [])
 
   const [kpi, setKpi] = useState(null)
   const [doctorCount, setDoctorCount] = useState(null)
-  const [deptCount, setDeptCount] = useState(13)
+  const [showWorkers, setShowWorkers] = useState(false)
+  const [therStats, setTherStats] = useState(null)
+  const [surgStats, setSurgStats] = useState(null)
+  const [blockLoading, setBlockLoading] = useState(false)
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -65,6 +123,22 @@ export default function Home() {
     fetchStats('ovKpiYear', 'all').then(rows => setKpi(rows[0] || null))
     fetchStats('orgDocs').then(rows => setDoctorCount(rows.length))
   }, [])
+
+  async function handleShowWorkers() {
+    const next = !showWorkers
+    setShowWorkers(next)
+    setLoginError(null)
+    if (next && !therStats) {
+      setBlockLoading(true)
+      const [t, s] = await Promise.all([
+        fetchBlockStats(THERAPEUTIC),
+        fetchBlockStats(SURGICAL),
+      ])
+      setTherStats(t)
+      setSurgStats(s)
+      setBlockLoading(false)
+    }
+  }
 
   function redirectByRole(role) {
     if (role === 'admin') router.push('/org')
@@ -105,13 +179,12 @@ export default function Home() {
         <div style={{
           width: 480, flexShrink: 0,
           borderRight: '1px solid rgba(0,0,0,0.1)',
-          background: 'rgba(255,255,255,0.6)',
+          background: 'rgba(255,255,255,0.55)',
           backdropFilter: 'blur(16px)',
           display: 'flex', flexDirection: 'column',
         }}>
-
-          {/* Лого + назва */}
-          <div style={{ padding: '32px 40px 28px', display: 'flex', alignItems: 'center', gap: 18 }}>
+          {/* Лого */}
+          <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
             <img src="/logo.png" alt="ЛСМД" style={{ width: 72, height: 72, objectFit: 'contain' }}
               onError={e => { e.target.style.display = 'none' }} />
             <div>
@@ -125,102 +198,86 @@ export default function Home() {
           </div>
 
           {/* Терапевтичний блок */}
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: '16px 0 8px' }}>
             {THERAPEUTIC.map((d, i) => (
-              <div key={i} style={{
-                padding: '7px 40px', fontSize: 14, color: '#333',
-                textAlign: 'right', lineHeight: 1.5, ...SANS,
-              }}>
+              <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>
                 {d}
               </div>
             ))}
           </div>
 
-          {/* ── СМУЖКА "Для працівників:" + логін ── */}
+          {/* ── СМУЖКА "Для працівників:" ── */}
           <div style={{
-            background: 'rgba(0,0,0,0.04)',
-            borderTop: '1px solid rgba(0,0,0,0.08)',
-            borderBottom: '1px solid rgba(0,0,0,0.08)',
-            padding: '10px 20px 10px 16px',
-            display: 'flex', alignItems: 'center', gap: 10,
+            background: showWorkers ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.03)',
+            borderTop: '1px solid rgba(0,0,0,0.09)',
+            borderBottom: '1px solid rgba(0,0,0,0.09)',
+            transition: 'background .2s',
           }}>
-            <span style={{
-              fontSize: 13, fontWeight: 600, color: '#444',
-              whiteSpace: 'nowrap', flexShrink: 0, ...SANS,
-            }}>
-              Для працівників:
-            </span>
-
-            <form onSubmit={handleLogin} style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={e => { setEmail(e.target.value); setLoginError(null) }}
-                required
-                style={{
-                  flex: 1, minWidth: 0, padding: '6px 10px',
-                  border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
-                  borderRadius: 6, fontSize: 12, ...SANS,
-                  background: 'rgba(255,255,255,0.9)', color: '#1a1a1a',
-                  outline: 'none',
-                }}
-              />
-              <input
-                type="password"
-                placeholder="Пароль"
-                value={password}
-                onChange={e => { setPassword(e.target.value); setLoginError(null) }}
-                required
-                style={{
-                  flex: 1, minWidth: 0, padding: '6px 10px',
-                  border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
-                  borderRadius: 6, fontSize: 12, ...SANS,
-                  background: 'rgba(255,255,255,0.9)', color: '#1a1a1a',
-                  outline: 'none',
-                }}
-              />
+            {/* Рядок з написом + полями */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 10px 20px' }}>
               <button
-                type="submit"
-                disabled={loginLoading}
+                onClick={handleShowWorkers}
                 style={{
-                  padding: '6px 14px', background: '#1a1a1a',
-                  border: 'none', borderRadius: 6,
-                  color: '#fff', fontSize: 12, ...SANS,
-                  cursor: loginLoading ? 'not-allowed' : 'pointer',
-                  opacity: loginLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 700, color: '#333',
+                  whiteSpace: 'nowrap', flexShrink: 0, padding: 0, ...SANS,
                 }}
               >
-                {loginLoading ? '…' : 'Увійти →'}
+                Для працівників:
               </button>
-            </form>
+
+              {showWorkers && (
+                <form onSubmit={handleLogin} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="email" placeholder="Login"
+                    value={email} onChange={e => { setEmail(e.target.value); setLoginError(null) }}
+                    required
+                    style={{
+                      flex: 1, minWidth: 0, padding: '5px 10px',
+                      border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
+                      borderRadius: 5, fontSize: 12, ...SANS,
+                      background: 'rgba(255,255,255,0.9)', color: '#1a1a1a', outline: 'none',
+                    }}
+                  />
+                  <input
+                    type="password" placeholder="Password"
+                    value={password} onChange={e => { setPassword(e.target.value); setLoginError(null) }}
+                    required
+                    style={{
+                      flex: 1, minWidth: 0, padding: '5px 10px',
+                      border: loginError ? '1px solid #c0392b' : '1px solid rgba(0,0,0,0.15)',
+                      borderRadius: 5, fontSize: 12, ...SANS,
+                      background: 'rgba(255,255,255,0.9)', color: '#1a1a1a', outline: 'none',
+                    }}
+                  />
+                  <button type="submit" disabled={loginLoading} style={{
+                    padding: '5px 12px', background: '#1a1a1a', border: 'none', borderRadius: 5,
+                    color: '#fff', fontSize: 12, cursor: loginLoading ? 'not-allowed' : 'pointer',
+                    opacity: loginLoading ? 0.6 : 1, flexShrink: 0, ...SANS,
+                  }}>
+                    {loginLoading ? '…' : '→'}
+                  </button>
+                </form>
+              )}
+            </div>
+            {loginError && (
+              <div style={{ padding: '2px 20px 8px', fontSize: 11, color: '#c0392b', ...SANS }}>
+                {loginError}
+              </div>
+            )}
           </div>
 
-          {loginError && (
-            <div style={{
-              padding: '4px 20px 6px', fontSize: 11, color: '#c0392b', ...SANS,
-              background: 'rgba(192,57,43,0.06)',
-            }}>
-              {loginError}
-            </div>
-          )}
-
           {/* Хірургічний блок */}
-          <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 32 }}>
+          <div style={{ padding: '8px 0 32px', flex: 1 }}>
             {SURGICAL.map((d, i) => (
-              <div key={i} style={{
-                padding: '7px 40px', fontSize: 14, color: '#333',
-                textAlign: 'right', lineHeight: 1.5, ...SANS,
-              }}>
+              <div key={i} style={{ padding: '6px 40px', fontSize: 14, color: '#333', textAlign: 'right', ...SANS }}>
                 {d}
               </div>
             ))}
           </div>
         </div>
 
-        {/* ── ПРАВА ЧАСТИНА — градієнт + статистика ── */}
+        {/* ── ПРАВА ЧАСТИНА ── */}
         <div style={{
           flex: 1,
           background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
@@ -228,21 +285,44 @@ export default function Home() {
           display: 'flex', flexDirection: 'column',
         }}>
           {/* Декоративні кола */}
-          <div style={{ position: 'absolute', top: '10%', left: '10%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', top: '5%', left: '5%', width: 450, height: 450, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: 520, height: 520, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
 
-          {/* Статистика */}
+          {/* Головна статистика */}
           <div style={{
             position: 'relative', zIndex: 1,
             display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
-            padding: '40px 56px', gap: '32px 48px',
+            padding: '40px 56px 32px', gap: '28px 44px',
+            borderBottom: showWorkers ? '1px solid rgba(0,0,0,0.08)' : 'none',
           }}>
             <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
             <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
             <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
-            <Stat value={fmt(deptCount)} label="ВІДДІЛЕНЬ" />
-            <Stat value={String(year)} label="" large />
+            <Stat value="20" label="ВІДДІЛЕНЬ" />
+            <Stat value={String(year)} large />
           </div>
+
+          {/* Блокова статистика (показується після кліку) */}
+          {showWorkers && (
+            <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
+
+              {/* Терапевтичний блок */}
+              <div style={{ flex: 1, padding: '24px 56px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
+                  Терапевтичний напрямок
+                </div>
+                <BlockStats stats={therStats} loading={blockLoading} color="#5b7fa6" />
+              </div>
+
+              {/* Хірургічний блок */}
+              <div style={{ flex: 1, padding: '24px 56px' }}>
+                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 16 }}>
+                  Хірургічний напрямок
+                </div>
+                <BlockStats stats={surgStats} loading={blockLoading} color="#c0623a" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -253,17 +333,13 @@ function Stat({ value, label, large }) {
   return (
     <div>
       <div style={{
-        fontSize: large ? 72 : 44, fontWeight: 300,
-        color: '#1a1a1a', ...MONO, lineHeight: 1,
-        letterSpacing: '-0.02em',
+        fontSize: large ? 68 : 42, fontWeight: 300,
+        color: '#1a1a1a', ...MONO, lineHeight: 1, letterSpacing: '-0.02em',
       }}>
         {value}
       </div>
       {label && (
-        <div style={{
-          fontSize: 10, color: '#666', textTransform: 'uppercase',
-          letterSpacing: '0.12em', marginTop: 7, ...MONO,
-        }}>
+        <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: '0.12em', marginTop: 7, ...MONO }}>
           {label}
         </div>
       )}
