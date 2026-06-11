@@ -80,8 +80,15 @@ const PARAM_QUERIES = {
     (SELECT COUNT(*) FROM lsmd WHERE admission_department = '${esc(p)}' AND discharge_status = 'Помер' AND COALESCE(length_of_stay,999) <= 1) as смерть_день1,
     (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd WHERE admission_department = '${esc(p)}' GROUP BY patient_id HAVING COUNT(*) > 1) t) as повторні
     FROM v_department_stats WHERE department = '${esc(p)}' LIMIT 1`,
-  // Завідувач відділення
-  deptHead: (p) => `SELECT emp_name as name FROM empl WHERE department='${esc(p)}' AND position ILIKE '%завідувач%' AND emp_status IS DISTINCT FROM 'звільнений' LIMIT 1`,
+  // Завідувач + кількість лікарів + ліжок по відділенню
+  deptHead: (p) => `SELECT
+    COALESCE(e.full_name, e.emp_name) as name,
+    (SELECT COUNT(*) FROM empl e2 WHERE e2.department='${esc(p)}' AND e2.emp_status IS DISTINCT FROM 'звільнений' AND (e2.position ILIKE '%лікар%' OR e2.position ILIKE '%ординатор%' OR e2.position ILIKE '%завідувач%')) as doctors,
+    d.doctors_count as beds
+    FROM empl e
+    LEFT JOIN departments d ON d.dept_name='${esc(p)}'
+    WHERE e.department='${esc(p)}' AND e.position ILIKE '%завідувач%' AND e.emp_status IS DISTINCT FROM 'звільнений'
+    LIMIT 1`,
   // Профіль відділення за конкретний рік (param = "назва|рік" або "назва|all")
   deptProfileYear: (p) => {
     const sep = p.lastIndexOf('|')
@@ -93,13 +100,38 @@ const PARAM_QUERIES = {
       COUNT(DISTINCT patient_id) as унікальних,
       ROUND(AVG(length_of_stay),1) as ліжкодень,
       ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0),1) as летальність,
-      ROUND(AVG(age::numeric),1) as середній_вік,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as середній_вік,
       SUM((gender='Ж')::int) as жінки,
       SUM((gender='Ч')::int) as чоловіки,
       SUM((discharge_status='З поліпшенням')::int) as поліпшення,
       (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND ${yf.replace('admission_date_d', 'l2.admission_date_d')} GROUP BY patient_id HAVING COUNT(*)>1) t) as повторні
       FROM lsmd
       WHERE admission_department='${esc(dept)}' AND ${yf}`
+  },
+  // Сьогоднішня активність відділення (поступили / виписані сьогодні)
+  deptToday: (p) => `SELECT
+    SUM((DATE(admission_date_d) = CURRENT_DATE)::int) as admitted,
+    SUM((DATE(discharge_date_d) = CURRENT_DATE)::int) as discharged
+    FROM lsmd WHERE admission_department='${esc(p)}'`,
+  // Топ-5 ICD категорій для пончика (param = назва відділення)
+  deptIcdPie: (p) => `SELECT i.code_level1 as код, i.category_level1 as назва,
+    ROUND(100.0*COUNT(*)::numeric/NULLIF((SELECT COUNT(*) FROM lsmd l2 WHERE l2.admission_department='${esc(p)}' AND l2.icd_primary IS NOT NULL),0),1) as відс,
+    COUNT(*) as випадків
+    FROM lsmd l JOIN icd_10 i ON i.icd_code=l.icd_primary
+    WHERE l.admission_department='${esc(p)}' AND l.icd_primary IS NOT NULL AND i.code_level1 IS NOT NULL
+    GROUP BY i.code_level1, i.category_level1 ORDER BY випадків DESC LIMIT 5`,
+  // Топ-5 ICD з фільтром по року (param = "назва|рік" або "назва|all")
+  deptIcdPieYear: (p) => {
+    const sep = p.lastIndexOf('|')
+    const dept = sep >= 0 ? p.slice(0, sep) : p
+    const yPart = sep >= 0 ? p.slice(sep + 1) : 'all'
+    const yf = yearFilter(yPart)
+    return `SELECT i.code_level1 as код, i.category_level1 as назва,
+      ROUND(100.0*COUNT(*)::numeric/NULLIF((SELECT COUNT(*) FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND l2.icd_primary IS NOT NULL AND ${yf.replace('admission_date_d','l2.admission_date_d')}),0),1) as відс,
+      COUNT(*) as випадків
+      FROM lsmd l JOIN icd_10 i ON i.icd_code=l.icd_primary
+      WHERE l.admission_department='${esc(dept)}' AND l.icd_primary IS NOT NULL AND i.code_level1 IS NOT NULL AND ${yf}
+      GROUP BY i.code_level1, i.category_level1 ORDER BY випадків DESC LIMIT 5`
   },
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,

@@ -74,18 +74,13 @@ function StatusBadge({ status }) {
   return <span style={{ fontSize: 11, color: c, border: `1px solid ${c}55`, borderRadius: '999px', padding: '2px 9px', whiteSpace: 'nowrap' }}>{status || '—'}</span>
 }
 
-/* ── Fetch hier stats ──────────────────────────── */
-async function fetchHier(scope, id, dateFrom, dateTo) {
-  const body = { scope }
-  if (id)       body.id       = id
-  if (dateFrom) body.dateFrom = dateFrom
-  if (dateTo)   body.dateTo   = dateTo
-  const r = await fetch('/api/hier-stats', {
+async function fetchStats(key, param) {
+  const r = await fetch('/api/stats', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(param !== undefined ? { key, param } : { key }),
   })
-  if (!r.ok) return {}
-  return r.json()
+  const d = await r.json()
+  return d.rows || []
 }
 
 /* ── Main Page ───────────────────────────────────── */
@@ -99,39 +94,25 @@ export default function Cabinet() {
   const [error,   setError]   = useState(null)
   const [tab,     setTab]     = useState('recent') // recent | active | diag
 
-  // Ієрархічна статистика
-  const [hospStats,   setHospStats]   = useState(null)
-  const [hospLoading, setHospLoading] = useState(true)
-  const [docStats,    setDocStats]    = useState(null)
-  const [docLoading,  setDocLoading]  = useState(false)
+  const [hospKpi, setHospKpi] = useState(null)
 
-  // Завантаження кабінету (без фільтру дат — дані лікаря статичні)
+  // Завантаження кабінету
   useEffect(() => {
-    fetch('/api/cabinet')
+    const emp = router.query?.emp
+    const url = emp ? `/api/cabinet?emp=${encodeURIComponent(emp)}` : '/api/cabinet'
+    fetch(url)
       .then(async (r) => {
         const j = await r.json()
         if (!r.ok) { setError(j.error || 'Помилка завантаження'); return }
         setData(j)
       })
       .catch(() => setError('Помилка з\'єднання'))
+  }, [router.query?.emp])
+
+  // Статичні лікарняні показники (одноразово)
+  useEffect(() => {
+    fetchStats('ovKpiYear', 'all').then(rows => setHospKpi(rows[0] || null))
   }, [])
-
-  // Лікарняна ієрархічна статистика (залежить від дат)
-  useEffect(() => {
-    setHospLoading(true)
-    fetchHier('hospital', null, dateFrom, dateTo)
-      .then(d => { setHospStats(d); setHospLoading(false) })
-      .catch(() => setHospLoading(false))
-  }, [dateFrom, dateTo])
-
-  // Статистика лікаря (ієрархічна, залежить від дат і doc_name)
-  useEffect(() => {
-    if (!data?.profile?.doc_name) { setDocStats(null); return }
-    setDocLoading(true)
-    fetchHier('doctor', data.profile.doc_name, dateFrom, dateTo)
-      .then(d => { setDocStats(d); setDocLoading(false) })
-      .catch(() => setDocLoading(false))
-  }, [data?.profile?.doc_name, dateFrom, dateTo])
 
   const handleDateChange = (from, to) => { setDateFrom(from); setDateTo(to) }
 
@@ -166,13 +147,28 @@ export default function Cabinet() {
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>{profile?.full_name || 'Кабінет лікаря'}</h1>
             <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
-              {[profile?.position, profile?.specialization, profile?.department].filter(Boolean).join(' · ') || profile?.email}
+              {[profile?.position, profile?.specialization].filter(Boolean).join(' · ')}
+              {profile?.department && (
+                <>
+                  {(profile?.position || profile?.specialization) ? ' · ' : ''}
+                  <span
+                    onClick={() => router.push('/dept?dept=' + encodeURIComponent(profile.department))}
+                    style={{ cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', color: 'var(--text3)' }}
+                    title="Перейти до відділення"
+                  >{profile.department}</span>
+                </>
+              )}
+              {!profile?.position && !profile?.specialization && !profile?.department && profile?.email}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <DateFilter from={dateFrom} to={dateTo} onChange={handleDateChange} />
-            <button onClick={() => router.push('/admit')} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, ...MONO }}>+ Новий випадок</button>
-            <button onClick={() => router.push('/')} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text3)', padding: '8px 14px', cursor: 'pointer', fontSize: 12, ...MONO }}>← Дашборд</button>
+            {!profile?.viewedByAdmin && (
+              <button onClick={() => router.push('/admit')} style={{ background: 'var(--accent)', color: '#000', border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 600, ...MONO }}>+ Новий випадок</button>
+            )}
+            <button onClick={() => router.push(profile?.viewedByAdmin ? '/org' : '/')} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text3)', padding: '8px 14px', cursor: 'pointer', fontSize: 12, ...MONO }}>
+              {profile?.viewedByAdmin ? '← Структура' : '← Дашборд'}
+            </button>
           </div>
         </div>
 
@@ -182,10 +178,42 @@ export default function Cabinet() {
           </div>
         )}
 
-        {/* Ієрархічні статистики */}
+        {/* Показники */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, margin: '20px 0' }}>
-          <HierStatsBar stats={hospStats} loading={hospLoading} accent="#cfae5a" level="ЛІКАРНЯ" />
-          <HierStatsBar stats={docStats}  loading={docLoading}  accent="#7fd99a" level="МОЯ СТАТИСТИКА" />
+          {/* Лікарня */}
+          <div style={{ ...card, padding: '12px 16px' }}>
+            <div style={{ ...lbl, marginBottom: 8 }}>ЛІКАРНЯ</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+              {[
+                { l: 'ГОСПІТАЛІЗАЦІЙ', v: hospKpi ? Number(hospKpi.total_cases).toLocaleString('uk') : '…' },
+                { l: 'ПАЦІЄНТІВ',      v: hospKpi ? Number(hospKpi.unique_patients).toLocaleString('uk') : '…' },
+                { l: 'ЛЕТАЛЬНІСТЬ',    v: hospKpi ? hospKpi.death_rate_pct + '%' : '…' },
+                { l: 'ЛІЖКО-ДЕНЬ',     v: hospKpi ? hospKpi.avg_bed_days + ' дн.' : '…' },
+              ].map((m, i) => (
+                <div key={m.l} style={{ flex: '1 1 90px', padding: '4px 12px', borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ fontSize: 20, fontWeight: 300, color: '#cfae5a', ...MONO, lineHeight: 1, marginBottom: 3 }}>{m.v}</div>
+                  <div style={{ ...lbl }}>{m.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Лікар */}
+          <div style={{ ...card, padding: '12px 16px' }}>
+            <div style={{ ...lbl, marginBottom: 8 }}>МОЯ СТАТИСТИКА</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+              {[
+                { l: 'ВИПАДКІВ',    v: summary ? Number(summary['всього']).toLocaleString('uk') : '…' },
+                { l: 'АКТИВНИХ',    v: summary ? summary['активних'] : '…' },
+                { l: 'ЛІЖКО-ДЕНЬ',  v: summary ? summary['серед_ліжкодень'] + ' дн.' : '…' },
+                { l: 'УРГЕНТНИХ',   v: summary ? summary['ургентних'] : '…' },
+              ].map((m, i) => (
+                <div key={m.l} style={{ flex: '1 1 90px', padding: '4px 12px', borderLeft: i > 0 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ fontSize: 20, fontWeight: 300, color: '#7fd99a', ...MONO, lineHeight: 1, marginBottom: 3 }}>{m.v}</div>
+                  <div style={{ ...lbl }}>{m.l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Legacy summary boxes */}

@@ -7,7 +7,7 @@ import { createClient } from '../lib/supabase'
 const PUBLIC = ['/', '/login', '/auth/reset-password']
 
 /* Сторінки тільки для адміна */
-const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics', '/dept']
+const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()

@@ -16,16 +16,34 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!supabase) return
+    let done = false
+    const ready = () => { if (!done) { done = true; setStatus('ready') } }
+    const fail = (msg) => { if (!done) { done = true; setStatus('error'); setMessage(msg) } }
 
-    // Supabase SDK сам парсить #access_token з hash і видає PASSWORD_RECOVERY
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setStatus('ready')
-      if (event === 'SIGNED_IN' && status === 'loading') setStatus('ready')
+    const params = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search) : new URLSearchParams()
+    const tokenHash = params.get('token_hash')
+    const type = params.get('type')
+    const code = params.get('code')
+    const hasHash = typeof window !== 'undefined' && window.location.hash.includes('access_token')
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || session) ready()
     })
 
-    // Запасний варіант — якщо hash вже є при маунті
-    if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
-      setStatus('ready')
+    if (tokenHash) {
+      // Надійний механізм: верифікація OTP за token_hash (без code_verifier)
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: type || 'recovery' })
+        .then(({ error }) => error
+          ? fail('Посилання недійсне або застаріле. Запросіть новий лист.')
+          : ready())
+    } else {
+      // Фолбек на старі формати (?code= / #access_token), які SDK обробляє сам
+      supabase.auth.getSession().then(({ data }) => { if (data?.session) ready() })
+      const hasToken = code || hasHash
+      setTimeout(() => fail(hasToken
+        ? 'Посилання недійсне або застаріле. Запросіть новий лист.'
+        : 'Немає токена. Відкрийте посилання з листа.'), 6000)
     }
 
     return () => subscription.unsubscribe()

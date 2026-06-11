@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
 import Head from 'next/head'
-import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 
-/* ── Tokens ─────────────────────────────────────── */
-const MONO = { fontFamily: 'var(--mono)' }
-const lbl  = { fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }
+const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
+const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
 
-/* ── Fetch helpers ───────────────────────────────── */
+const PIE_COLORS = ['#4e9af1', '#6dd5c0', '#f7c948', '#e86a4e', '#a78bfa']
+
 async function fetchStats(key, param) {
   const r = await fetch('/api/stats', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -17,401 +17,449 @@ async function fetchStats(key, param) {
   return d.rows || []
 }
 
-async function fetchHier(scope, id, dateFrom, dateTo) {
-  const body = { scope }
-  if (id)       body.id       = id
-  if (dateFrom) body.dateFrom = dateFrom
-  if (dateTo)   body.dateTo   = dateTo
-  const r = await fetch('/api/hier-stats', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!r.ok) return {}
-  return r.json()
+function fmt(v, suffix = '') {
+  if (v == null || v === '') return '—'
+  const n = Number(v)
+  return isNaN(n) ? '—' : n.toLocaleString('uk') + suffix
 }
 
-/* ── HierStatsBar ────────────────────────────────── */
-const METRICS = [
-  { key: 'госпіталізацій', label: 'Госпіталізацій', fmt: v => Number(v).toLocaleString('uk') },
-  { key: 'пацієнтів',      label: 'Пацієнтів',      fmt: v => Number(v).toLocaleString('uk') },
-  { key: 'летальність',    label: 'Летальність',     fmt: v => v + '%' },
-  { key: 'ліжкодень',      label: 'Ліжко-день',      fmt: v => v + ' дн.' },
-  { key: 'середній_вік',   label: 'Середній вік',    fmt: v => v + ' р.' },
-]
-
-function HierStatsBar({ stats, loading, accent = '#cfae5a', label = '' }) {
-  return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 10, padding: '12px 20px',
-      display: 'flex', gap: 0, flexWrap: 'wrap', alignItems: 'center',
-    }}>
-      {label && (
-        <div style={{ ...lbl, flexBasis: '100%', marginBottom: 8 }}>{label}</div>
-      )}
-      {METRICS.map((m, i) => (
-        <div key={m.key} style={{
-          flex: '1 1 90px', padding: '4px 14px',
-          borderLeft: i > 0 ? '1px solid var(--border)' : 'none',
-        }}>
-          <div style={{ fontSize: 22, fontWeight: 300, color: accent, ...MONO, lineHeight: 1, marginBottom: 3 }}>
-            {loading ? '…' : (stats?.[m.key] != null ? m.fmt(stats[m.key]) : '—')}
-          </div>
-          <div style={{ ...lbl }}>{m.label}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ── DateFilter ──────────────────────────────────── */
-function DateFilter({ from, to, onChange }) {
-  const inp = {
-    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4,
-    color: 'var(--text)', padding: '3px 7px', fontSize: 11, ...MONO,
-  }
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, ...MONO }}>
-      <span style={{ fontSize: 10, color: 'var(--text3)' }}>З</span>
-      <input type="date" value={from} onChange={e => onChange(e.target.value, to)} style={inp} />
-      <span style={{ fontSize: 10, color: 'var(--text3)' }}>до</span>
-      <input type="date" value={to}   onChange={e => onChange(from, e.target.value)} style={inp} />
-      {(from || to) && (
-        <button onClick={() => onChange('', '')}
-          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}>×</button>
-      )}
-    </div>
-  )
-}
-
-/* ── DiagBars ────────────────────────────────────── */
-function DiagBars({ rows, accent }) {
-  if (!rows?.length) return <div style={{ fontSize: 11, color: 'var(--text3)', ...MONO }}>Немає діагнозів</div>
-  const top = rows.slice(0, 8)
-  const maxPct = top.reduce((m, d) => Math.max(m, Number(d.відс) || 0), 0) || 1
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      {top.map((d, i) => (
-        <div key={i}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <span style={{ ...MONO, color: accent, fontSize: 10, minWidth: 38, flexShrink: 0 }}>{d.код}</span>
-            <span style={{ color: 'var(--text2)', flex: 1, fontSize: 11, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.діагноз}</span>
-            <span style={{ ...MONO, color: 'var(--text3)', fontSize: 10, flexShrink: 0 }}>{d.відс ?? d.випадків}</span>
-          </div>
-          {d.відс != null && (
-            <div style={{ height: 3, background: 'var(--border)', borderRadius: 2 }}>
-              <div style={{ width: `${Math.round((Number(d.відс) / maxPct) * 100)}%`, height: '100%', background: accent + 'bb', borderRadius: 2, transition: 'width .4s' }} />
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ── DocChip ─────────────────────────────────────── */
 function initials(name = '') {
-  return name.split(/[\s.]+/).filter(p => p.length > 1).slice(0, 2).map(p => p[0].toUpperCase()).join('')
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
 }
 
-function DocChip({ doc, accent, isHead, active, onClick }) {
+/* ── Same Stat as index.js ───────────────────────────── */
+function Stat({ value, label, large }) {
   return (
-    <div onClick={onClick} style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      padding: '6px 10px 6px 6px',
-      border: `1px solid ${active ? accent : 'var(--border)'}`,
-      borderRadius: 8, background: active ? 'var(--bg2)' : 'var(--surface)',
-      cursor: 'pointer', transition: 'all .12s', minWidth: 0,
-    }}
-    onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = accent + '88'; e.currentTarget.style.background = 'var(--bg2)' } }}
-    onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface)' } }}
-    >
-      <div style={{
-        width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
-        background: isHead ? accent : 'var(--bg)',
-        color: isHead ? '#000' : 'var(--text3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 9, fontWeight: 600, ...MONO,
-      }}>{initials(doc.emp_name || doc.doc_name || '')}</div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: isHead ? 500 : 400, color: 'var(--text)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {doc.emp_name || doc.doc_name}
-        </div>
-        {doc.спеціалізація && doc.спеціалізація !== '—' && (
-          <div style={{ fontSize: 9, color: 'var(--text3)', ...MONO }}>{doc.спеціалізація}</div>
-        )}
+    <div>
+      <div style={{ fontSize: large ? 52 : 32, fontWeight: 300, color: '#1a1a1a', ...MONO, lineHeight: 1, letterSpacing: '-0.02em' }}>
+        {value}
       </div>
-      {isHead && (
-        <div style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: accent + '22', color: accent, ...MONO, flexShrink: 0 }}>завід.</div>
+      {label && (
+        <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6, ...MONO }}>
+          {label}
+        </div>
       )}
     </div>
   )
 }
 
-/* ── Main Page ───────────────────────────────────── */
+/* ── Dept selector ───────────────────────────────────── */
+function DeptSelector({ depts, onSelect }) {
+  return (
+    <div style={{ padding: '32px 40px', maxWidth: 640 }}>
+      <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 14 }}>Оберіть відділення</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {depts.map(d => (
+          <button key={d.відділення} onClick={() => onSelect(d.відділення)} style={{
+            textAlign: 'left', padding: '11px 18px',
+            background: 'rgba(255,255,255,0.55)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(0,0,0,0.08)', borderRadius: 10, cursor: 'pointer',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            transition: 'background .12s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.8)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.55)'}
+          >
+            <span style={{ fontSize: 13, color: '#1a1a1a', ...SANS }}>{d.відділення}</span>
+            <span style={{ fontSize: 10, color: '#999', ...MONO }}>{fmt(d.випадків)} випадків</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Main page ───────────────────────────────────────── */
 export default function DeptPage() {
   const router = useRouter()
+  const [me, setMe]               = useState(null)
+  const [hospitalKpi, setHospitalKpi] = useState(null)
+  const [doctorCnt, setDoctorCnt] = useState(null)
+  const [allDepts, setAllDepts]   = useState([])
+  const [allYears, setAllYears]   = useState([])
+  const [chartYear, setChartYear] = useState('all')
 
-  // Дата фільтр
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo,   setDateTo]   = useState('')
+  const [selDept, setSelDept]     = useState(null)
+  const [loading, setLoading]     = useState(false)
 
-  // Список відділень
-  const [allDepts,     setAllDepts]     = useState([])
-  const [deptsLoading, setDeptsLoading] = useState(true)
-
-  // Вибране відділення
-  const [selDept,     setSelDept]     = useState(null)
-  const [deptStats,   setDeptStats]   = useState(null)
-  const [deptLoading, setDeptLoading] = useState(false)
   const [deptProfile, setDeptProfile] = useState(null)
-  const [deptDiag,    setDeptDiag]    = useState([])
-  const [deptTrend,   setDeptTrend]   = useState([])
-  const [deptDocs,    setDeptDocs]    = useState([])
+  const [deptHead, setDeptHead]   = useState(null)
+  const [deptToday, setDeptToday] = useState(null)
+  const [deptIcd, setDeptIcd]     = useState([])
+  const [deptDocs, setDeptDocs]   = useState([])
 
-  // Вибраний лікар
-  const [selDoc,     setSelDoc]     = useState(null)  // { doc_name, emp_name, посада }
-  const [docLoading, setDocLoading] = useState(false)
-  const [docProfile, setDocProfile] = useState(null)
-  const [docDiag,    setDocDiag]    = useState([])
-
-  const ACCENT = '#5ab0ff'   // dept level
-  const DOC_ACCENT = '#7fd99a' // doctor level
-
-  // Завантаження списку відділень (одноразово)
+  /* Initial load */
   useEffect(() => {
-    fetchStats('wDept').then(rows => { setAllDepts(rows); setDeptsLoading(false) })
-      .catch(() => setDeptsLoading(false))
+    fetch('/api/me').then(r => r.json()).then(d => {
+      setMe(d)
+      if (d?.role === 'head_dept' && d?.department) setSelDept(d.department)
+    }).catch(() => {})
+
+    fetchStats('doctorCount').then(rows => setDoctorCnt(rows[0]?.cnt ?? null))
+    fetchStats('allYears').then(rows => setAllYears(rows.map(r => r.year).filter(Boolean)))
+    fetchStats('wDept').then(rows => setAllDepts(rows))
   }, [])
 
-  // Синхронізація з URL
+  /* URL param */
   useEffect(() => {
-    const d = router.query?.dept
-    if (d && d !== selDept) setSelDept(d)
+    const p = router.query?.dept
+    if (p && !selDept) setSelDept(p)
   }, [router.query?.dept])
 
-  // Статистика відділення (залежить від selDept + дат)
+  /* KPI by year */
+  useEffect(() => {
+    setHospitalKpi(null)
+    fetchStats('ovKpiYear', chartYear === 'all' ? 'all' : String(chartYear))
+      .then(rows => setHospitalKpi(rows[0] || null))
+  }, [chartYear])
+
+  /* Dept data — перезавантажується при зміні відділення АБО року */
   useEffect(() => {
     if (!selDept) {
-      setDeptStats(null); setDeptProfile(null); setDeptDiag([])
-      setDeptTrend([]); setDeptDocs([]); setSelDoc(null)
+      setDeptProfile(null); setDeptHead(null); setDeptToday(null)
+      setDeptIcd([]); setDeptDocs([])
       return
     }
-    setDeptLoading(true); setSelDoc(null)
+    setLoading(true)
+    const y = chartYear === 'all' ? 'all' : String(chartYear)
     Promise.all([
-      fetchHier('dept', selDept, dateFrom, dateTo),
-      fetchStats('deptProfile', selDept),
-      fetchStats('deptDiag', selDept),
-      fetchStats('deptTrend12m', selDept),
+      fetchStats('deptProfileYear', `${selDept}|${y}`),
+      fetchStats('deptHead', selDept),
+      fetchStats('deptToday', selDept),
+      fetchStats('deptIcdPieYear', `${selDept}|${y}`),
       fetchStats('deptDocs2', selDept),
-    ]).then(([hier, prof, diag, trend, docs]) => {
-      setDeptStats(hier); setDeptLoading(false)
+    ]).then(([prof, head, today, icd, docs]) => {
       setDeptProfile(prof[0] || null)
-      setDeptDiag(diag); setDeptTrend(trend)
+      setDeptHead(head[0] || null)
+      setDeptToday(today[0] || null)
+      setDeptIcd(icd)
       setDeptDocs(docs)
-    }).catch(() => setDeptLoading(false))
-  }, [selDept, dateFrom, dateTo])
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [selDept, chartYear])
 
-  // Статистика лікаря (залежить від selDoc + дат)
+  const headDoc = deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'))
+  const ordDocs = deptDocs.filter(d => !d.посада?.toLowerCase().includes('завідувач'))
+
+  /* Особиста статистика завідувача */
+  const [headCabinet, setHeadCabinet] = useState(null)
   useEffect(() => {
-    if (!selDoc) { setDocProfile(null); setDocDiag([]); return }
-    setDocLoading(true)
-    Promise.all([
-      fetchStats('docProfile', selDoc.doc_name),
-      fetchStats('docDiag', selDoc.doc_name),
-    ]).then(([prof, diag]) => {
-      setDocProfile(prof[0] || null); setDocDiag(diag)
-      setDocLoading(false)
-    }).catch(() => setDocLoading(false))
-  }, [selDoc, dateFrom, dateTo])
-
-  const handleDateChange = (from, to) => { setDateFrom(from); setDateTo(to) }
-  const handleDeptClick  = (dept) => {
-    const next = selDept === dept ? null : dept
-    setSelDept(next)
-    router.replace({ query: next ? { dept: next } : {} }, undefined, { shallow: true })
-  }
-
-  const head   = deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'))
-  const others = deptDocs.filter(d => !d.посада?.toLowerCase().includes('завідувач'))
+    if (!headDoc?.emp_name) { setHeadCabinet(null); return }
+    fetch(`/api/cabinet?emp=${encodeURIComponent(headDoc.emp_name)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setHeadCabinet(d))
+      .catch(() => {})
+  }, [headDoc?.emp_name])
 
   return (
     <>
       <Head>
         <title>ЛСМД · Кабінет відділення</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--text)', ...MONO }}>
+      <div style={{ minHeight: '100vh', background: '#eeeae4', ...SANS }}>
 
-        {/* ── Header ─────────────────────────────── */}
+        {/* ══ ВЕРХНЯ ЗОНА: градієнт + рік + статистика ══ */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 24px', borderBottom: '1px solid var(--border)',
-          gap: 12, flexWrap: 'wrap', background: 'var(--bg)',
+          background: 'linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%)',
+          position: 'relative', overflow: 'hidden',
+          padding: '0 40px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-            <span style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ЛСМД</span>
-            <span style={{ color: 'var(--border)' }}>·</span>
-            <span style={{ fontSize: 11, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Кабінет відділення</span>
-            {selDept && !selDoc && (
-              <><span style={{ color: 'var(--border)' }}>›</span>
-              <span style={{ fontSize: 11, color: ACCENT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{selDept}</span></>
-            )}
-            {selDoc && (
-              <>
-                <span style={{ color: 'var(--border)' }}>›</span>
-                <button onClick={() => setSelDoc(null)} style={{ fontSize: 11, color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selDept}</button>
-                <span style={{ color: 'var(--border)' }}>›</span>
-                <span style={{ fontSize: 11, color: DOC_ACCENT }}>{selDoc.emp_name || selDoc.doc_name}</span>
-              </>
-            )}
+          <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: 400, height: 400, borderRadius: '50%', background: 'rgba(255,255,255,0.1)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '-20%', right: '-5%', width: 500, height: 500, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', pointerEvents: 'none' }} />
+
+          {/* Лого + назва + навігація */}
+          <div style={{ position: 'relative', zIndex: 1, paddingTop: 28, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 14 }}>
+            <span style={{ fontSize: 22, color: '#c0392b', ...MONO, lineHeight: 1 }}>+</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#1a1a1a', letterSpacing: '0.06em', ...MONO }}>ЛСМД</div>
+              <div style={{ fontSize: 10, color: '#666', marginTop: 1, ...SANS }}>Кабінет відділення</div>
+            </div>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              {me?.role === 'admin' && (
+                <button onClick={() => router.push('/org')} style={{
+                  background: 'rgba(0,0,0,0.08)', border: 'none', borderRadius: 8,
+                  padding: '5px 14px', cursor: 'pointer', fontSize: 11, color: '#444', ...MONO,
+                }}>← Структура</button>
+              )}
+              <button onClick={() => router.push('/')} style={{
+                background: 'rgba(0,0,0,0.08)', border: 'none', borderRadius: 8,
+                padding: '5px 14px', cursor: 'pointer', fontSize: 11, color: '#444', ...MONO,
+              }}>← Головна</button>
+            </div>
           </div>
-          <DateFilter from={dateFrom} to={dateTo} onChange={handleDateChange} />
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-            {[['← Дашборд', '/'], ['Структура', '/org']].map(([t, h]) => (
-              <Link key={h} href={h} style={{
-                fontSize: 11, color: 'var(--text3)', textDecoration: 'none',
-                padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 5,
-              }}>{t}</Link>
+
+          {/* Перемикач року */}
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', gap: 4, marginBottom: 16 }}>
+            <button onClick={() => setChartYear('all')} style={{
+              padding: '3px 12px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)',
+              background: chartYear === 'all' ? 'rgba(0,0,0,0.12)' : 'transparent',
+              fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+            }}>Всі</button>
+            {allYears.map(y => (
+              <button key={y} onClick={() => setChartYear(y)} style={{
+                padding: '3px 12px', borderRadius: 12, border: '1px solid rgba(0,0,0,0.15)',
+                background: chartYear === y ? 'rgba(0,0,0,0.12)' : 'transparent',
+                fontSize: 10, cursor: 'pointer', ...MONO, color: '#444',
+              }}>{y}</button>
             ))}
+          </div>
+
+          {/* Лікарняні показники */}
+          <div style={{
+            position: 'relative', zIndex: 1,
+            display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap',
+            gap: '16px 32px', paddingBottom: 28,
+          }}>
+            <Stat value={hospitalKpi ? fmt(hospitalKpi.total_cases)      : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
+            <Stat value={hospitalKpi ? fmt(hospitalKpi.unique_patients)  : '…'} label="ПАЦІЄНТІВ" />
+            <Stat value={doctorCnt != null ? fmt(doctorCnt)              : '…'} label="ЛІКАРІВ" />
+            <Stat value={allDepts.length || '…'}                                label="ВІДДІЛЕНЬ" />
+            <Stat value={hospitalKpi ? fmt(hospitalKpi.death_rate_pct, '%') : '…'} label="ЛЕТАЛЬНІСТЬ" />
+            <Stat value={chartYear === 'all' ? 'Всі' : String(chartYear)} large />
           </div>
         </div>
 
+        {/* ══ КОНТЕНТ ══ */}
+        <div style={{ padding: '28px 40px' }}>
 
-        {/* ── Two-column layout ───────────────────── */}
-        <div style={{ display: 'flex', height: 'calc(100vh - 165px)', overflow: 'hidden' }}>
+          {/* Без відділення — вибір */}
+          {!selDept && <DeptSelector depts={allDepts} onSelect={setSelDept} />}
 
-          {/* ── Left sidebar ────────────────────── */}
-          <div style={{
-            width: 230, flexShrink: 0, borderRight: '1px solid var(--border)',
-            overflowY: 'auto', paddingTop: 12,
-          }}>
-            <div style={{ ...lbl, padding: '0 16px', marginBottom: 8 }}>
-              {deptsLoading ? 'Завантаження…' : `${allDepts.length} відділень`}
-            </div>
-            {allDepts.map(d => {
-              const active = selDept === d.відділення
-              return (
-                <button key={d.відділення} onClick={() => handleDeptClick(d.відділення)} style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 14px 8px 14px', border: 'none', cursor: 'pointer',
-                  background: active ? 'var(--bg2)' : 'transparent',
-                  color: active ? '#cfae5a' : 'var(--text2)', fontSize: 12, ...MONO,
-                  borderLeft: active ? '2px solid #cfae5a' : '2px solid transparent',
-                  transition: 'all .1s',
-                }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'var(--bg2)' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
-                >
-                  {d.відділення}
-                  {d.випадків != null && (
-                    <span style={{ display: 'block', fontSize: 9, color: 'var(--text3)', marginTop: 1 }}>
-                      {Number(d.випадків).toLocaleString('uk')} випадків
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
+          {/* З відділенням — кабінет */}
+          {selDept && (
+            <div>
 
-          {/* ── Right content ───────────────────── */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', minWidth: 0 }}>
+              {/* Рядок 1: назва + head + 4 stats | сьогодні + клінічні */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
 
-            {/* No dept selected */}
-            {!selDept && (
-              <div style={{ color: 'var(--text3)', fontSize: 12, paddingTop: 60, textAlign: 'center' }}>
-                Оберіть відділення зі списку ліворуч
-              </div>
-            )}
+                {/* Ліво: назва + статистика */}
+                <div style={{
+                  flex: '0 0 auto', width: 'min(55%, 600px)',
+                  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 14, padding: '22px 28px',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 600, color: '#1a1a1a', lineHeight: 1.3, ...SANS }}>{selDept}</div>
+                      <div style={{ fontSize: 11, color: '#666', marginTop: 5, ...MONO }}>
+                        Завідувач: {deptHead?.name || (loading ? '…' : '—')}
+                      </div>
+                    </div>
+                    {me?.role !== 'head_dept' && (
+                      <button onClick={() => setSelDept(null)} style={{
+                        fontSize: 10, color: '#888', background: 'rgba(0,0,0,0.06)',
+                        border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', ...MONO,
+                      }}>змінити ▾</button>
+                    )}
+                  </div>
 
-            {/* Dept selected */}
-            {selDept && (
-              <div>
-                {/* Dept header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <h2 style={{ margin: 0, fontSize: 16, fontWeight: 500, color: 'var(--text)' }}>
-                    {selDoc ? (selDoc.emp_name || selDoc.doc_name) : selDept}
-                  </h2>
-                  <button onClick={() => { setSelDoc(null); handleDeptClick(selDept) }}
-                    style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, ...MONO }}>✕</button>
+                  <div style={{ display: 'flex', gap: 0 }}>
+                    {[
+                      { label: 'ВИПАДКІВ',  value: fmt(deptProfile?.випадків) },
+                      { label: 'ПАЦІЄНТІВ', value: fmt(deptProfile?.унікальних) },
+                      { label: 'ЛІЖОК',     value: deptHead?.beds ? fmt(deptHead.beds) : '—' },
+                      { label: 'ЛІКАРІВ',   value: deptHead?.doctors ? fmt(deptHead.doctors) : '—' },
+                    ].map((s, i) => (
+                      <div key={i} style={{ flex: 1, padding: '0 16px', borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.07)' : 'none' }}>
+                        <div style={{ fontSize: 28, fontWeight: 300, color: '#2563eb', ...MONO, lineHeight: 1 }}>
+                          {loading ? '…' : s.value}
+                        </div>
+                        <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, ...MONO }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Dept hier stats */}
-                {!selDoc && (
-                  <div style={{ marginBottom: 16 }}>
-                    <HierStatsBar stats={deptStats} loading={deptLoading} accent={ACCENT} label="ВІДДІЛЕННЯ" />
-                  </div>
-                )}
+                {/* Право: сьогодні + клінічні */}
+                <div style={{ flex: 1, minWidth: 260, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-                {/* Doctor detail */}
-                {selDoc && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ ...lbl, marginBottom: 4 }}>
-                      {selDoc.посада || 'Ординатор'}{selDoc.спеціалізація && selDoc.спеціалізація !== '—' ? ' · ' + selDoc.спеціалізація : ''}
+                  {/* Сьогодні */}
+                  <div style={{
+                    background: 'rgba(26,39,68,0.88)', backdropFilter: 'blur(8px)',
+                    borderRadius: 14, padding: '16px 24px', color: '#fff',
+                  }}>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 10 }}>Сьогодні</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+                      <div>
+                        <span style={{ fontSize: 32, fontWeight: 300, ...MONO }}>{loading ? '…' : (deptToday?.discharged ?? '—')}</span>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 3, ...MONO }}>ВИПИСАНО</div>
+                      </div>
+                      <div style={{ fontSize: 24, color: 'rgba(255,255,255,0.2)', fontWeight: 200 }}>/</div>
+                      <div>
+                        <span style={{ fontSize: 32, fontWeight: 300, ...MONO }}>{loading ? '…' : (deptToday?.admitted ?? '—')}</span>
+                        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 3, ...MONO }}>ПОСТУПИЛО</div>
+                      </div>
                     </div>
-
-                    {/* Top diagnoses */}
-                    {(docDiag.length > 0 || !docLoading) && (
-                      <div style={{ marginTop: 20 }}>
-                        <div style={{ ...lbl, marginBottom: 10 }}>Топ діагнози МКХ-10</div>
-                        <DiagBars rows={docDiag} accent={DOC_ACCENT} />
-                      </div>
-                    )}
-
-                    {/* Link to cabinet if doc has doc_name */}
-                    {docProfile && selDoc.doc_name && (
-                      <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                        <button onClick={() => router.push('/doctors?name=' + encodeURIComponent(selDoc.doc_name))}
-                          style={{ fontSize: 11, ...MONO, color: DOC_ACCENT, background: 'none', border: `1px solid ${DOC_ACCENT}55`, borderRadius: 6, padding: '6px 14px', cursor: 'pointer' }}>
-                          Кабінет лікаря →
-                        </button>
-                      </div>
-                    )}
                   </div>
-                )}
+
+                  {/* Клінічні метрики */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    borderRadius: 14, padding: '16px 24px', flex: 1,
+                  }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 0 }}>
+                      {[
+                        { label: 'ЛЕТАЛЬНІСТЬ',  value: fmt(deptProfile?.летальність, '%') },
+                        { label: 'ЛІЖКО-ДЕНЬ',   value: fmt(deptProfile?.ліжкодень, ' дн.') },
+                        { label: 'СЕРЕДНІЙ ВІК', value: fmt(deptProfile?.середній_вік, ' р.') },
+                        { label: 'ПОЛІПШЕННЯ',   value: fmt(deptProfile?.поліпшення) },
+                        { label: 'ПОВТОРНІ',     value: fmt(deptProfile?.повторні) },
+                      ].map((s, i) => (
+                        <div key={i} style={{ flex: '1 1 30%', padding: '8px 12px 8px 0' }}>
+                          <div style={{ fontSize: 20, fontWeight: 300, color: '#1a1a1a', ...MONO, lineHeight: 1 }}>
+                            {loading ? '…' : s.value}
+                          </div>
+                          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 3, ...MONO }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Рядок 2: ординаторська + donut + стать */}
+              <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
                 {/* Ординаторська */}
-                {!selDoc && deptDocs.length > 0 && (
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ ...lbl, marginBottom: 10 }}>
-                      Ординаторська <span style={{ color: ACCENT }}>({deptDocs.length})</span>
-                    </div>
-                    {head && (
-                      <div style={{ marginBottom: 10 }}>
-                        <div style={{ ...lbl, color: 'var(--text3)', marginBottom: 6 }}>Завідувач</div>
-                        <div style={{ display: 'inline-block' }}>
-                          <DocChip doc={head} accent={ACCENT} isHead active={selDoc?.doc_name === head.doc_name}
-                            onClick={() => setSelDoc(head)} />
-                        </div>
-                      </div>
-                    )}
-                    {others.length > 0 && (
-                      <div>
-                        <div style={{ ...lbl, marginBottom: 8 }}>Ординатори ({others.length})</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {others.map((d, i) => (
-                            <DocChip key={i} doc={d} accent={ACCENT} isHead={false}
-                              active={selDoc?.doc_name === d.doc_name}
-                              onClick={() => setSelDoc(d)} />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div style={{
+                  width: 210, flexShrink: 0,
+                  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 14, padding: '20px 22px',
+                }}>
+                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 14 }}>Ординаторська</div>
 
-                {/* Top diagnoses (dept level) */}
-                {!selDoc && deptDiag.length > 0 && (
-                  <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ ...lbl, marginBottom: 10 }}>Топ діагнози МКХ-10</div>
-                    <DiagBars rows={deptDiag} accent={ACCENT} />
+                  {headDoc && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <div style={{
+                        width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                        background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, fontWeight: 600, color: '#fff', ...MONO,
+                      }}>{initials(headDoc.emp_name)}</div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.3, ...SANS }}>{headDoc.emp_name}</div>
+                        <div style={{ fontSize: 9, color: '#2563eb', ...MONO, marginTop: 1 }}>завідувач</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    {ordDocs.map((d, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{
+                          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                          background: 'rgba(0,0,0,0.06)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 8, color: '#666', ...MONO,
+                        }}>{initials(d.emp_name)}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11, color: '#1a1a1a', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...SANS }}>{d.emp_name}</div>
+                          {d.спеціалізація && d.спеціалізація !== '—' && (
+                            <div style={{ fontSize: 8, color: '#888', ...MONO }}>{d.спеціалізація}</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {loading && <div style={{ fontSize: 10, color: '#aaa', ...MONO }}>завантаження…</div>}
                   </div>
-                )}
+                </div>
+
+                {/* Donut ICD */}
+                <div style={{
+                  flex: 1, minWidth: 280,
+                  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 14, padding: '20px 24px',
+                }}>
+                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 16 }}>Топ категорій МКХ-10</div>
+                  {deptIcd.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                      <div style={{ width: 160, height: 160, flexShrink: 0 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={deptIcd} dataKey="випадків" innerRadius={44} outerRadius={72} paddingAngle={2} startAngle={90} endAngle={-270}>
+                              {deptIcd.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{ background: 'rgba(26,26,26,0.9)', border: 'none', borderRadius: 8, fontSize: 11 }}
+                              formatter={(v, n, p) => [p.payload.відс + '%  (' + fmt(v) + ' випадків)', '']}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {deptIcd.map((d, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 7, height: 7, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                            <div style={{ flex: 1, fontSize: 11, color: '#333', lineHeight: 1.35, ...SANS }}>{d.назва || d.код}</div>
+                            <div style={{ fontSize: 12, fontWeight: 500, color: '#2563eb', ...MONO }}>{d.відс}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#aaa', ...MONO }}>{loading ? 'завантаження…' : 'Немає даних'}</div>
+                  )}
+                </div>
+
+                {/* Стать */}
+                <div style={{
+                  width: 180, flexShrink: 0,
+                  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(0,0,0,0.08)',
+                  borderRadius: 14, padding: '20px 22px',
+                }}>
+                  <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 16 }}>Стать</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 32, fontWeight: 300, color: '#c0392b', ...MONO, lineHeight: 1 }}>
+                        {loading ? '…' : fmt(deptProfile?.жінки)}
+                      </div>
+                      <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, ...MONO }}>ЖІНКА</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 32, fontWeight: 300, color: '#2563eb', ...MONO, lineHeight: 1 }}>
+                        {loading ? '…' : fmt(deptProfile?.чоловіки)}
+                      </div>
+                      <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, ...MONO }}>ЧОЛОВІК</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+
+            {/* ── Особиста статистика завідувача ── */}
+            {headCabinet && headCabinet.summary && (
+              <div style={{ marginTop: 24, background: 'rgba(255,255,255,0.55)', backdropFilter: 'blur(12px)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, padding: '20px 28px' }}>
+                <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 16 }}>
+                  Статистика завідувача · {headDoc?.emp_name}
+                </div>
+                <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
+                  {[
+                    { l: 'ВСЬОГО ВИПАДКІВ',  v: fmt(headCabinet.summary['всього']) },
+                    { l: 'ЗАРАЗ ЛІКУЮТЬСЯ', v: fmt(headCabinet.summary['активних']) },
+                    { l: 'СЕРЕД. ЛІЖКОДЕНЬ', v: fmt(headCabinet.summary['серед_ліжкодень'], ' дн.') },
+                    { l: 'УРГЕНТНИХ',        v: fmt(headCabinet.summary['ургентних']) },
+                    { l: 'З ПОЛІПШЕННЯМ',    v: fmt(headCabinet.summary['поліпшення']) },
+                    { l: 'ЛЕТАЛЬНІСТЬ',      v: fmt(headCabinet.summary['померло']) },
+                  ].map(k => (
+                    <div key={k.l}>
+                      <div style={{ fontSize: 28, fontWeight: 300, color: '#2563eb', ...MONO, lineHeight: 1 }}>{k.v}</div>
+                      <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4, ...MONO }}>{k.l}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
+            </div>
+
+          )}
         </div>
       </div>
     </>

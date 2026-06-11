@@ -50,9 +50,7 @@ async function getRole(req) {
     )
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    const { data: appUser } = await supabase
-      .from('app_users').select('role').eq('auth_user_id', user.id).single()
-    return appUser?.role || null
+    return 'authenticated'
   } catch { return null }
 }
 
