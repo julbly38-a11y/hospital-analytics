@@ -78,31 +78,19 @@ export default function DoctorPage() {
   const [diag,       setDiag]       = useState([])
   const [profile,    setProfile]    = useState(null)
 
-  const [hospStats,  setHospStats]  = useState(null)
-  const [deptStats,  setDeptStats]  = useState(null)
   const [docStats,   setDocStats]   = useState(null)
+  const [docLoading, setDocLoading] = useState(false)
+  const [loading,    setLoading]    = useState(true)
 
-  const [hospLoading, setHospLoading] = useState(true)
-  const [deptLoading, setDeptLoading] = useState(false)
-  const [docLoading,  setDocLoading]  = useState(false)
-  const [loading,     setLoading]     = useState(true)
-
-  // Завантаження лікарняного рівня — один раз
   useEffect(() => {
-    fetchHier('hospital', null, '', '').then(s => {
-      setHospStats(s)
-      setHospLoading(false)
-    })
     fetchStats('orgDocs').then(setAllDocs)
     fetchStats('orgDepts').then(setAllDepts)
   }, [])
 
-  // Завантаження рівня лікаря
   useEffect(() => {
     if (!name) return
     setLoading(true)
     setDocLoading(true)
-    setDeptLoading(true)
 
     fetchStats('docProfile', name).then(prof => {
       setProfile(prof[0] || null)
@@ -115,17 +103,7 @@ export default function DoctorPage() {
     })
   }, [name])
 
-  // Завантаження рівня відділення (після того як знаємо відділення лікаря)
   const docInfo = useMemo(() => allDocs.find(d => d.лікар === name), [allDocs, name])
-
-  useEffect(() => {
-    if (!docInfo?.відділення) return
-    setDeptLoading(true)
-    fetchHier('dept', docInfo.відділення, '', '').then(s => {
-      setDeptStats(s)
-      setDeptLoading(false)
-    })
-  }, [docInfo?.відділення])
 
   const accentColor = useMemo(() => {
     if (!docInfo?.відділення) return DEFAULT_COLOR
@@ -196,12 +174,10 @@ export default function DoctorPage() {
 
         {loading && <div style={{ fontSize: 12, color: 'var(--text3)', ...MONO }}>завантаження…</div>}
 
-        {/* ── Ієрархія показників ── */}
+        {/* ── 5 показників лікаря ── */}
         {!loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-            <HierStatsBar stats={hospStats}  loading={hospLoading} accent="#cfae5a" label="🏥 ЛІКАРНЯ" />
-            <HierStatsBar stats={deptStats}  loading={deptLoading} accent="#5ab0ff" label="🏢 ВІДДІЛЕННЯ" />
-            <HierStatsBar stats={docStats}   loading={docLoading}  accent={accentColor} label="👨‍⚕️ ЛІКАР" />
+          <div style={{ marginBottom: 24 }}>
+            <HierStatsBar stats={docStats} loading={docLoading} accent={accentColor} />
           </div>
         )}
 

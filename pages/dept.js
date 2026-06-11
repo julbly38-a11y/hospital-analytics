@@ -156,10 +156,6 @@ export default function DeptPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo,   setDateTo]   = useState('')
 
-  // Рівень: лікарня
-  const [hospStats,   setHospStats]   = useState(null)
-  const [hospLoading, setHospLoading] = useState(true)
-
   // Список відділень
   const [allDepts,     setAllDepts]     = useState([])
   const [deptsLoading, setDeptsLoading] = useState(true)
@@ -175,7 +171,6 @@ export default function DeptPage() {
 
   // Вибраний лікар
   const [selDoc,     setSelDoc]     = useState(null)  // { doc_name, emp_name, посада }
-  const [docStats,   setDocStats]   = useState(null)
   const [docLoading, setDocLoading] = useState(false)
   const [docProfile, setDocProfile] = useState(null)
   const [docDiag,    setDocDiag]    = useState([])
@@ -194,14 +189,6 @@ export default function DeptPage() {
     const d = router.query?.dept
     if (d && d !== selDept) setSelDept(d)
   }, [router.query?.dept])
-
-  // Лікарняна ієрархічна статистика (залежить від дат)
-  useEffect(() => {
-    setHospLoading(true)
-    fetchHier('hospital', null, dateFrom, dateTo)
-      .then(d => { setHospStats(d); setHospLoading(false) })
-      .catch(() => setHospLoading(false))
-  }, [dateFrom, dateTo])
 
   // Статистика відділення (залежить від selDept + дат)
   useEffect(() => {
@@ -227,15 +214,14 @@ export default function DeptPage() {
 
   // Статистика лікаря (залежить від selDoc + дат)
   useEffect(() => {
-    if (!selDoc) { setDocStats(null); setDocProfile(null); setDocDiag([]); return }
+    if (!selDoc) { setDocProfile(null); setDocDiag([]); return }
     setDocLoading(true)
     Promise.all([
       fetchStats('docProfile', selDoc.doc_name),
       fetchStats('docDiag', selDoc.doc_name),
-      fetchHier('doctor', selDoc.doc_name, dateFrom, dateTo),
-    ]).then(([prof, diag, hier]) => {
+    ]).then(([prof, diag]) => {
       setDocProfile(prof[0] || null); setDocDiag(diag)
-      setDocStats(hier); setDocLoading(false)
+      setDocLoading(false)
     }).catch(() => setDocLoading(false))
   }, [selDoc, dateFrom, dateTo])
 
@@ -293,11 +279,6 @@ export default function DeptPage() {
           </div>
         </div>
 
-        {/* ── Hospital HierStats ──────────────────── */}
-        <div style={{ padding: '14px 24px 0' }}>
-          <HierStatsBar stats={hospStats} loading={hospLoading} accent="#cfae5a"
-            label={(dateFrom || dateTo) ? `ЛІКАРНЯ · ${dateFrom || '?'} — ${dateTo || '?'}` : 'ЛІКАРНЯ · УСІ РОКИ'} />
-        </div>
 
         {/* ── Two-column layout ───────────────────── */}
         <div style={{ display: 'flex', height: 'calc(100vh - 165px)', overflow: 'hidden' }}>
@@ -370,7 +351,6 @@ export default function DeptPage() {
                     <div style={{ ...lbl, marginBottom: 4 }}>
                       {selDoc.посада || 'Ординатор'}{selDoc.спеціалізація && selDoc.спеціалізація !== '—' ? ' · ' + selDoc.спеціалізація : ''}
                     </div>
-                    <HierStatsBar stats={docStats} loading={docLoading} accent={DOC_ACCENT} label="ЛІКАР" />
 
                     {/* Top diagnoses */}
                     {(docDiag.length > 0 || !docLoading) && (
