@@ -27,9 +27,8 @@ export async function middleware(request) {
   const isPublic = publicPaths.some(p => request.nextUrl.pathname === p || (p !== '/' && request.nextUrl.pathname.startsWith(p)))
 
   if (!user && !isPublic) {
-    // вхід для кабінету — статичний слайд (page 1), для решти захищених сторінок — старий /login
-    const dest = request.nextUrl.pathname === '/cabinet.html' ? '/khotyn_slide.html' : '/login'
-    return NextResponse.redirect(new URL(dest, request.url))
+    // захищені React-сторінки → старий /login (статичні кабінети захищені на клієнті через /api/me)
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   return response
@@ -37,6 +36,6 @@ export async function middleware(request) {
 
 export const config = {
   // ВАЖЛИВО: не вписувати сюди статичні .html з public/ — на Vercel такий файл
-  // не віддається статичним шаром і дає 404. Захист cabinet.html — на клієнті (fetch /api/me).
+  // не віддається статичним шаром і дає 404. Захист kabinet.html — на клієнті (fetch /api/me).
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.).*)'],
 }
