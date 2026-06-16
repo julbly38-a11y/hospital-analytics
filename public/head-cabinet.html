@@ -814,8 +814,13 @@
     if (deptTitleEl && deptParam) deptTitleEl.textContent = deptParam;
 
     // профіль залогінованого працівника (для будь-якої ролі)
-    fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => {
-      const name = d && (d.full_name || d.emp_name || d.email) || '';
+    // захист сторінки на клієнті — якщо немає сесії, /api/me дає 401 → назад на слайд-вхід
+    fetch('/api/me').then(r => {
+      if (r.status === 401) { window.location.replace('/khotyn_slide.html'); return null; }
+      return r.ok ? r.json() : null;
+    }).then(d => {
+      if (!d) return;
+      const name = (d.full_name || d.emp_name || d.email) || '';
       const [surname, ...rest] = name.split(' ');
       const surEl = document.getElementById('meSurname');
       const firstEl = document.getElementById('meFirstname');
@@ -824,7 +829,7 @@
 
       const greetEl = document.getElementById('meGreet');
       if (greetEl) {
-        const parts = d ? [d.position, d.department].filter(Boolean) : [];
+        const parts = [d.position, d.department].filter(Boolean);
         greetEl.textContent = parts.join(' · ');
       }
     }).catch(() => {});
