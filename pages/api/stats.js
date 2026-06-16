@@ -47,10 +47,88 @@ const yearFilter = (p) => {
   if (!/^\d{4}$/.test(s) || y < 2000 || y > 2100) return '1=1'
   return `EXTRACT(year FROM admission_date_d) = ${y}`
 }
+// Універсальний розбір періоду "відділення|рік|місяць|день|тиждень" — будь-яка частина може бути
+// порожньою або 'all'. Відділення порожнє = вся лікарня. Тиждень, якщо заданий, має пріоритет
+// над місяцем/днем (взаємовиключні — тиждень ISO не комбінується з конкретним днем місяця).
+const parsePeriod = (p) => {
+  const [dept = '', year = 'all', month = 'all', day = 'all', week = 'all'] = String(p || '').split('|')
+  const conditions = ['admission_date_d IS NOT NULL']
+  if (dept) conditions.push(`admission_department = '${esc(dept)}'`)
+  const ys = String(year).trim().toLowerCase()
+  if (ys && ys !== 'all' && ys !== 'усі') {
+    const y = parseInt(ys, 10)
+    if (/^\d{4}$/.test(ys) && y >= 2000 && y <= 2100) conditions.push(`EXTRACT(year FROM admission_date_d) = ${y}`)
+  }
+  const ws = String(week).trim().toLowerCase()
+  if (ws && ws !== 'all') {
+    const w = parseInt(ws, 10)
+    if (w >= 1 && w <= 53) conditions.push(`EXTRACT(week FROM admission_date_d) = ${w}`)
+  } else {
+    const ms = String(month).trim().toLowerCase()
+    if (ms && ms !== 'all') {
+      const m = parseInt(ms, 10)
+      if (m >= 1 && m <= 12) conditions.push(`EXTRACT(month FROM admission_date_d) = ${m}`)
+    }
+    const ds = String(day).trim().toLowerCase()
+    if (ds && ds !== 'all') {
+      const d = parseInt(ds, 10)
+      if (d >= 1 && d <= 31) conditions.push(`EXTRACT(day FROM admission_date_d) = ${d}`)
+    }
+  }
+  return conditions.join(' AND ')
+}
 const PARAM_QUERIES = {
+  // КПІ за будь-яку комбінацію відділення/рік/місяць/день/тиждень.
+  // param = "відділення|рік|місяць|день|тиждень" (відділення порожнє = вся лікарня)
+  periodKpi: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
+      ROUND(AVG(length_of_stay),1) as avg_bed_days,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as avg_age,
+      ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0)::numeric,2) as death_rate_pct,
+      ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct
+    FROM lsmd WHERE ${parsePeriod(p)}`,
+  // Графік по днях для тієї ж комбінації фільтрів (x=день, y=кількість — формат для renderSpark)
+  periodDaily: (p) => `SELECT EXTRACT(day FROM admission_date_d)::int as x, COUNT(*) as y
+    FROM lsmd WHERE ${parsePeriod(p)} GROUP BY x ORDER BY x`,
+  // Кількість лікарів за рік (distinct doctor_id з lsmd; param = рік або 'all')
+  doctorCountYear: (p) => `SELECT COUNT(DISTINCT doctor_id) as cnt FROM lsmd WHERE doctor_id IS NOT NULL AND ${yearFilter(p)}`,
+  // KPI терапевтичного блоку (сума 5 відділень; param = рік або 'all')
+  therapeuticKpiYear: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
+      ROUND(AVG(length_of_stay),1) as avg_bed_days,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as avg_age,
+      ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct,
+      ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0),1) as death_rate_pct
+    FROM lsmd
+    WHERE admission_department IN ('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології')
+      AND ${yearFilter(p)}`,
+  // KPI хірургічного блоку (7 відділень; param = рік або 'all')
+  surgicalKpiYear: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
+      ROUND(AVG(length_of_stay),1) as avg_bed_days,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as avg_age,
+      ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct,
+      ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0),1) as death_rate_pct
+    FROM lsmd
+    WHERE admission_department IN ('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1')
+      AND ${yearFilter(p)}`,
+  // Тренд госпіталізацій терапевтичного блоку: all → по роках, рік → по місяцях
+  therapeuticTrend: (p) => {
+    const dept = "('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології')";
+    const s = String(p || '').trim().toLowerCase();
+    if (!s || s === 'all' || s === 'усі')
+      return `SELECT EXTRACT(year FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
+    return `SELECT EXTRACT(month FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
+  },
+  // Тренд госпіталізацій хірургічного блоку
+  surgicalTrend: (p) => {
+    const dept = "('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1')";
+    const s = String(p || '').trim().toLowerCase();
+    if (!s || s === 'all' || s === 'усі')
+      return `SELECT EXTRACT(year FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
+    return `SELECT EXTRACT(month FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
+  },
   // --- Огляд із фільтром по року (param = рік як рядок, або 'all') ---
   ovKpiYear: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
       ROUND(AVG(length_of_stay),1) as avg_bed_days,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as avg_age,
       SUM((discharge_status='Помер')::int) as deaths,
       ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0)::numeric,2) as death_rate_pct,
       SUM((admission_type='Екстренна')::int) as urgent,
@@ -141,6 +219,8 @@ const PARAM_QUERIES = {
   deptTrendMonth: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(l.admission_date_d, 'DD') AS день, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND DATE_TRUNC('month', l.admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день, l.icd_primary, i.diagnosis_level3 ORDER BY день::int, COUNT(*) DESC`,
   // Лікарі відділення з doc_name + emp_name (для dept cabinet)
   deptDocs2: (p) => `SELECT ld.doc_name as doc_name, e.emp_name as emp_name, e.position as посада, e.specialization as спеціалізація, COALESCE(ds.total_cases, 0) as випадків FROM empl e LEFT JOIN lsmd_doctors ld ON ld.empl_name_id = e.name_id LEFT JOIN doctor_stats ds ON ds.doctor_id = ld.empl_name_id WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%' OR e.position ILIKE '%завідувач%') ORDER BY (e.position ILIKE '%завідувач%') DESC, e.emp_name LIMIT 50`,
+  // Ординатори (резиденти) відділення, макс 20
+  deptOrdinators: (p) => `SELECT e.emp_name, e.specialization FROM empl e WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND e.position ILIKE '%ординатор%' ORDER BY e.emp_name LIMIT 20`,
   // Профіль лікаря (param = doc_name)
   docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.avg_age as середній_вік, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.empl_name_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
@@ -216,8 +296,10 @@ async function supaFetch(sql) {
 
 // Публічні запити — доступні без авторизації (тільки агреговані дані, без ПІБ)
 const PUBLIC_KEYS = new Set([
-  'ovKpiYear', 'doctorCount', 'deptProfile', 'deptProfileYear', 'deptHead',
+  'ovKpiYear', 'doctorCount', 'doctorCountYear', 'therapeuticKpiYear', 'surgicalKpiYear', 'deptProfile', 'deptProfileYear', 'deptHead',
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
+  'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily',
+  'periodKpi', 'periodDaily',
 ])
 
 export default async function handler(req, res) {

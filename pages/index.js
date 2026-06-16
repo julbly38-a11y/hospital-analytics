@@ -223,10 +223,55 @@ export default function Home() {
       <Head>
         <title>ЛСМД — Хотинська багатопрофільна лікарня</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&family=Poppins:wght@300&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300&display=swap" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: '#eeeae4' }}>
+      <div style={{
+          width: '100vw',
+          aspectRatio: '16 / 9',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#eeeae4',
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+
+        {/* ══ Текстовий блок лікарні: x=285 y=59 w=315 h=139 ══ */}
+        <div style={{
+          position: 'absolute',
+          left: 285,
+          top: 59,
+          width: 315,
+          height: 139,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          zIndex: 10,
+        }}>
+          <div style={{
+            fontFamily: "'ITF Devanagari', 'Noto Sans', 'Segoe UI', sans-serif",
+            fontWeight: 300,
+            fontSize: 32,
+            color: '#4a4a4a',
+            textAlign: 'left',
+            lineHeight: 0.8,
+          }}>
+            ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
+          </div>
+          <div style={{
+            fontFamily: "'ITF Devanagari', 'Noto Sans', 'Segoe UI', sans-serif",
+            fontWeight: 300,
+            fontSize: 24,
+            color: '#4a4a4a',
+            textAlign: 'left',
+            lineHeight: 0.8,
+            marginTop: 10,
+            textTransform: 'uppercase',
+          }}>
+            турбуємось про найцінніше
+          </div>
+        </div>
 
         {/* ══ ЗОНА 1: лого + терапевтичні ліворуч | KPI + терапевтична статистика праворуч ══ */}
         <div style={{ display: 'flex' }}>
@@ -240,7 +285,7 @@ export default function Home() {
             display: 'flex', flexDirection: 'column',
           }}>
             {/* Лого */}
-            <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', gap: 18, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+            <div style={{ padding: '32px 40px 24px', display: 'flex', alignItems: 'center', borderBottom: '1px solid rgba(0,0,0,0.06)', minHeight: 198 }}>
               <svg width="72" height="72" viewBox="0 0 200 220" fill="none" style={{ flexShrink: 0 }}>
                 <path d="M155 55 Q175 90 155 130 Q135 155 100 160 Q65 155 45 130 Q25 90 45 55"
                   stroke="#8a9e8c" strokeWidth="18" strokeLinecap="round" fill="none" />
@@ -251,15 +296,8 @@ export default function Home() {
                 <path d="M170 185 Q190 165 180 140 Q165 120 145 135 Q130 148 140 170 Q150 188 170 185Z" fill="#8a9e8c" />
                 <path d="M145 135 Q135 118 125 130 Q120 145 135 158 Q145 163 145 135Z" fill="#8a9e8c" />
               </svg>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#1a1a1a', lineHeight: 1.4, letterSpacing: '0.05em', ...SANS }}>
-                  ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
-                </div>
-                <div style={{ fontSize: 11, color: '#999', marginTop: 5, fontStyle: 'italic', ...SANS }}>
-                  турбуємось про найцінніше
-                </div>
-              </div>
             </div>
+            {/* Текстовий блок: position absolute на сторінці x=285 y=59 w=315 h=139 */}
 
             {/* Терапевтичні відділення */}
             <div style={{ padding: '16px 0' }}>

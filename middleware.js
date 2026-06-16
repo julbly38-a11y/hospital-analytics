@@ -23,16 +23,18 @@ export async function middleware(request) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const publicPaths = ['/', '/login', '/auth', '/_next', '/favicon.ico', '/api']
+  const publicPaths = ['/', '/login', '/auth', '/_next', '/favicon.ico', '/api', '/title-test', '/khotyn_slide.html']
   const isPublic = publicPaths.some(p => request.nextUrl.pathname === p || (p !== '/' && request.nextUrl.pathname.startsWith(p)))
 
   if (!user && !isPublic) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    // вхід для кабінету — статичний слайд (page 1), для решти захищених сторінок — старий /login
+    const dest = request.nextUrl.pathname === '/cabinet.html' ? '/khotyn_slide.html' : '/login'
+    return NextResponse.redirect(new URL(dest, request.url))
   }
 
   return response
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.).*)', '/cabinet.html'],
 }
