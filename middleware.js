@@ -36,5 +36,7 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.).*)', '/cabinet.html'],
+  // ВАЖЛИВО: не вписувати сюди статичні .html з public/ — на Vercel такий файл
+  // не віддається статичним шаром і дає 404. Захист cabinet.html — на клієнті (fetch /api/me).
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.).*)'],
 }
