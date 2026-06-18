@@ -89,6 +89,48 @@ const PARAM_QUERIES = {
   // Графік по днях для тієї ж комбінації фільтрів (x=день, y=кількість — формат для renderSpark)
   periodDaily: (p) => `SELECT EXTRACT(day FROM admission_date_d)::int as x, COUNT(*) as y
     FROM lsmd WHERE ${parsePeriod(p)} GROUP BY x ORDER BY x`,
+  // Рух за конкретну дату (відділення|рік|місяць|день): скільки поступило і скільки виписано саме в цей день
+  periodFlow: (p) => {
+    const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const valid = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = valid ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const deptCond = dept ? `AND admission_department='${esc(dept)}'` : ''
+    return `SELECT
+      (SELECT COUNT(*) FROM lsmd WHERE admission_date_d=${dateExpr} ${deptCond}) as поступило,
+      (SELECT COUNT(*) FROM lsmd WHERE discharge_date_d=${dateExpr} ${deptCond}) as виписано`
+  },
+  // Хворі, що ПЕРЕБУВАЮТЬ у відділенні станом на обрану дату (відділення|рік|місяць|день).
+  // Поступили <= дати і ще не виписані (або виписані >= дати). ПІБ/вік/діагноз/днів перебування.
+  // НЕ публічний (містить ПІБ) — доступний лише авторизованим.
+  periodAdmissions: (p) => {
+    const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const conds = [
+      `l.admission_date_d <= ${dateExpr}`,
+      `(l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)`,
+    ]
+    if (dept) conds.push(`l.admission_department = '${esc(dept)}'`)
+    return `SELECT
+        COALESCE(pb.full_name, '—') as піб,
+        CASE WHEN l.age ~ '^\\d+$' THEN l.age ELSE NULL END as вік,
+        l.gender as стать,
+        COALESCE(i.diagnosis_level3, i.diagnosis_level2, i.category_level1, l.icd_primary, '—') as діагноз,
+        l.icd_primary as код,
+        l.length_of_stay as днів,
+        l.doc_name as лікар,
+        TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
+        TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
+        CASE WHEN l.patient_id IS NULL THEN 0
+          ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні
+      FROM lsmd l
+      LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
+      LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
+      WHERE ${conds.join(' AND ')}
+      ORDER BY pb.full_name ASC NULLS LAST LIMIT 100`
+  },
   // Кількість лікарів за рік (distinct doctor_id з lsmd; param = рік або 'all')
   doctorCountYear: (p) => `SELECT COUNT(DISTINCT doctor_id) as cnt FROM lsmd WHERE doctor_id IS NOT NULL AND ${yearFilter(p)}`,
   // KPI терапевтичного блоку (сума 5 відділень; param = рік або 'all')
@@ -218,7 +260,7 @@ const PARAM_QUERIES = {
   // Динаміка топ-3 діагнозів поточного місяця (щодня)
   deptTrendMonth: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(l.admission_date_d, 'DD') AS день, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND DATE_TRUNC('month', l.admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день, l.icd_primary, i.diagnosis_level3 ORDER BY день::int, COUNT(*) DESC`,
   // Лікарі відділення з doc_name + emp_name (для dept cabinet)
-  deptDocs2: (p) => `SELECT ld.doc_name as doc_name, e.emp_name as emp_name, e.position as посада, e.specialization as спеціалізація, COALESCE(ds.total_cases, 0) as випадків FROM empl e LEFT JOIN lsmd_doctors ld ON ld.empl_name_id = e.name_id LEFT JOIN doctor_stats ds ON ds.doctor_id = ld.empl_name_id WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%' OR e.position ILIKE '%завідувач%') ORDER BY (e.position ILIKE '%завідувач%') DESC, e.emp_name LIMIT 50`,
+  deptDocs2: (p) => `SELECT ld.doc_name as doc_name, COALESCE(e.full_name, e.emp_name) as full_name, e.emp_name as emp_name, e.position as посада, e.specialization as спеціалізація, COALESCE(ds.total_cases, 0) as випадків FROM empl e LEFT JOIN lsmd_doctors ld ON ld.empl_name_id = e.name_id LEFT JOIN doctor_stats ds ON ds.doctor_id = ld.empl_name_id WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%' OR e.position ILIKE '%завідувач%') ORDER BY COALESCE(e.full_name, e.emp_name) ASC LIMIT 50`,
   // Ординатори (резиденти) відділення, макс 20
   deptOrdinators: (p) => `SELECT e.emp_name, e.specialization FROM empl e WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND e.position ILIKE '%ординатор%' ORDER BY e.emp_name LIMIT 20`,
   // Профіль лікаря (param = doc_name)
@@ -299,7 +341,8 @@ const PUBLIC_KEYS = new Set([
   'ovKpiYear', 'doctorCount', 'doctorCountYear', 'therapeuticKpiYear', 'surgicalKpiYear', 'deptProfile', 'deptProfileYear', 'deptHead',
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
   'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily',
-  'periodKpi', 'periodDaily',
+  'periodKpi', 'periodDaily', 'periodFlow',
+  // periodAdmissions — НЕ тут: містить ПІБ пацієнтів, доступний лише авторизованим
 ])
 
 export default async function handler(req, res) {

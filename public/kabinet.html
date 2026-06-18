@@ -90,7 +90,7 @@
   .hline {
     position: absolute;
     left: 221px;
-    top: 226px;
+    top: 211px;
     width: 1688px;
     height: 3px;
     background: rgba(0,0,0,0.12);
@@ -98,7 +98,7 @@
   .hline2 {
     position: absolute;
     left: 221px;
-    top: 217px;
+    top: 202px;
     width: 1688px;
     height: 3px;
     background: #b27c8b;
@@ -121,17 +121,17 @@
   }
   /* рядок статистики блоку (6 метрик), нижче шапки */
   .block-row {
-    top: 262px;
+    top: 257px;
     width: 1176px;
   }
   .block-row2 {
-    top: 618px;
+    top: 603px;
   }
 
   /* графіки-спарклайни */
   .spark { position: absolute; left: 690px; display: block; overflow: visible; }
-  .chart-therap { top: 352px; }
-  .chart-surg   { top: 712px; }
+  .chart-therap { top: 322px; }
+  .chart-surg   { top: 697px; }
   .spark-line {
     fill: none;
     stroke: #8d978c;
@@ -169,7 +169,7 @@
   .kpi-num {
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
-    font-size: 36px;
+    font-size: 32.5px;
     color: #1a1a1a;
     line-height: 1.1;
     white-space: nowrap;
@@ -177,7 +177,7 @@
   .kpi-label {
     font-family: 'ITFLight', 'Palatino', serif;
     font-weight: 300;
-    font-size: 18px;
+    font-size: 16.2px;
     letter-spacing: 0.5px;
     color: #9a958f;
     text-transform: uppercase;
@@ -189,14 +189,14 @@
   .dept-list {
     position: absolute;
     left: 153px;
-    top: 264px;
+    top: 249px;
     width: 380px;
   }
   /* смуга «Для працівників»: X=3 Y=545, 1920x50 */
   .work-band {
     position: absolute;
     left: 3px;
-    top: 521px;
+    top: 511px;
     width: 1920px;
     height: 50px;
     background: linear-gradient(90deg, rgba(178,124,139,0.28), rgba(141,151,140,0.28));
@@ -267,7 +267,7 @@
   .staff-fields {
     position: absolute;
     left: 0;
-    top: 521px;
+    top: 511px;
     width: 1920px;
     height: 50px;
     z-index: 3;
@@ -345,7 +345,7 @@
   .dept-list2 {
     position: absolute;
     left: 228px;
-    top: 618px;
+    top: 593px;
     width: 294px;
   }
 
@@ -356,7 +356,7 @@
     justify-content: flex-end;
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
-    font-size: 26px;
+    font-size: 24.7px;
     color: #3a3a3a;
     white-space: nowrap;
   }
@@ -462,13 +462,12 @@
   /* профіль працівника — смуга між блоком «Хотинська лікарня» і пігулками років, над рядком KPI */
   .me-bar {
     position: absolute;
-    left: 690px;
-    top: 64px;
+    right: 54px;
+    top: 850px;
     width: 630px;
-    height: 41px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-end;
     white-space: nowrap;
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
   }
@@ -529,11 +528,19 @@
   .vline {
     animation: rise 0.9s cubic-bezier(.2,.7,.2,1) 0.15s forwards,
                fadeline 0.8s ease 1.15s forwards;
+    transition: opacity .28s ease;
   }
   .vline2 {
     animation: rise 0.9s cubic-bezier(.2,.7,.2,1) 0.20s forwards,
                fadeline 0.8s ease 1.15s forwards;
+    transition: opacity .28s ease;
   }
+  /* коли смуга зсувається (hover на відділення) — суцільна лінія проявляється НАД смугою (z-index>смуги),
+     щоб бути чіткою, а не блідо просвічувати крізь напівпрозору смугу */
+  body.expand-pushed .vline,
+  body.expand-pushed .vline2,
+  body.expand-pushed-up .vline,
+  body.expand-pushed-up .vline2 { opacity: 1 !important; z-index: 3; }
   /* статичні сегменти (верх 58→521, низ 571→912) */
   .vseg, .vseg2 {
     position: absolute;
@@ -541,8 +548,9 @@
   }
   .vseg  { left: 585px; background: rgba(0,0,0,0.12); }
   .vseg2 { left: 576px; background: #b27c8b; }
-  .seg-top { top: 58px;  height: 463px; }
-  .seg-bot { top: 571px; height: 341px; }
+  /* статичні сегменти з розривом у зоні смуги (511→561) */
+  .seg-top { top: 58px;  height: 453px; }
+  .seg-bot { top: 561px; height: 351px; }
 
   /* смуга розмотується зліва направо після ліній */
   @keyframes unroll {
@@ -588,43 +596,70 @@
     cursor: pointer;
   }
   .me-logout:hover { text-decoration: underline; }
-
-  /* нижня шторка — деталі відділення (винесена за межі масштабованого стейджа) */
-  .dept-drawer {
-    position: fixed;
-    left: 0; bottom: 0; width: 100%;
-    max-height: 44vh;
-    background: #f3eee8;
-    border-top: 2px solid #b27c8b;
-    box-shadow: 0 -12px 30px rgba(0,0,0,0.18);
-    transform: translateY(100%);
-    transition: transform .28s ease;
-    z-index: 999;
-    overflow-y: auto;
-    font-family: 'ITFLight', 'Palatino', serif;
+  /* «Вийти» на смузі «Чергові лікарі» — ліворуч перед написом (успадковує position:absolute, top:50% від .work-band span) */
+  .work-band .me-logout {
+    left: 134px;
+    font-size: 19px;
+    z-index: 3;
+    text-align: left;
   }
-  .dept-drawer.open { transform: translateY(0); }
-  .dd-inner { padding: 22px 48px 28px; }
-  .dd-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 14px; }
-  .dd-name { font-size: 24px; color: #1a1a1a; }
-  .dd-chief { font-size: 14px; color: #b27c8b; }
-  .dd-kpi { display: flex; gap: 0; flex-wrap: wrap; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 16px; margin-bottom: 16px; }
-  .dd-kpi .s { flex: 1 1 110px; padding: 0 18px; border-left: 1px solid rgba(0,0,0,0.08); }
-  .dd-kpi .s:first-child { border-left: none; padding-left: 0; }
-  .dd-kpi .s .v { font-size: 26px; color: #1a1a1a; line-height: 1; }
-  .dd-kpi .s .l { font-size: 11px; color: #978f88; text-transform: uppercase; letter-spacing: .07em; margin-top: 5px; }
-  .dd-cols { display: flex; gap: 40px; }
-  .dd-col { flex: 1; }
-  .dd-col-title { font-size: 11px; color: #978f88; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
-  .dd-staff-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; font-size: 14px; color: #333; }
-  .dd-staff-row .av { width: 24px; height: 24px; border-radius: 50%; background: rgba(141,151,140,0.25); color: #5b6359; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
-  .dd-staff-row.chief .av { background: #b27c8b; color: #fff; }
-  .dd-staff-row.chief b { color: #b27c8b; font-weight: normal; }
-  .dd-icd-row { margin-bottom: 9px; }
-  .dd-icd-row .top { display: flex; justify-content: space-between; font-size: 13px; color: #333; margin-bottom: 3px; }
-  .dd-icd-row .pct { color: #8d978c; }
-  .dd-icd-row .bar { height: 5px; border-radius: 3px; background: rgba(0,0,0,0.06); overflow: hidden; }
-  .dd-icd-row .bar i { display: block; height: 100%; background: #8d978c; }
+
+  /* інлайн-розгортка під відділенням при наведенні */
+  .dept-expand {
+    padding: 4px 0 4px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+  /* коли розкрито будь-яке відділення верхнього списку — зсуваємо всю нижню частину на висоту 4 показників */
+  .work-band, .staff-fields, .block-row, .chart-therap, .dept-list, .block-row2, .chart-surg, .dept-list2 {
+    transition: transform .28s ease;
+  }
+  /* зсуваємо тільки смугу «Чергові лікарі» (work-band + staff-fields) вниз на (h − 52) */
+  body.expand-pushed .work-band { transform: translateY(calc(var(--push, 85px) - 52px)) !important; }
+  body.expand-pushed .staff-fields { transform: translateY(calc(var(--push, 85px) - 52px)) translateZ(0) !important; }
+  /* при hover на хір. відділення — експанд вставляється перед .dept (НАД назвою) */
+  /* dept-list2 зсувається на h — щоб hover dept лишився на місці */
+  /* зсуваємо тільки смугу «Чергові лікарі» (+ поля логіну) на (h - 32) */
+  body.expand-pushed-up .work-band { transform: translateY(calc(-1 * (var(--push, 70px) - 32px))) !important; }
+  body.expand-pushed-up .dept-list2 { transform: translateY(calc(-1 * var(--push, 70px))) !important; }
+  body.expand-pushed-up .staff-fields { transform: translateY(calc(-1 * (var(--push, 70px) - 32px))) translateZ(0) !important; }
+  .dept-expand .head {
+    font-size: 19px;
+    color: #555;
+    margin-bottom: 8px;
+    white-space: nowrap;
+  }
+  .dept-expand .head .label {
+    color: #aaa;
+    font-size: 17px;
+  }
+  .dept-expand .stats {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .dept-expand .s {
+    text-align: right;
+    padding: 0 12px;
+    border-left: 1px solid rgba(0,0,0,0.08);
+  }
+  .dept-expand .s:first-child { border-left: none; }
+  .dept-expand .s:last-child { padding-right: 0; }
+  .dept-expand .s .v {
+    font-size: 19px;
+    font-weight: 300;
+    color: #1a1a1a;
+    line-height: 1;
+  }
+  .dept-expand .s .l {
+    font-size: 9px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
 </style>
 <script>
   function scaleSlide() {
@@ -751,11 +786,10 @@
     }).then(d => {
       if (!d) return;
       const name = (d.full_name || d.emp_name || d.email) || '';
-      const [surname, ...rest] = name.split(' ');
       const surEl = document.getElementById('meSurname');
       const firstEl = document.getElementById('meFirstname');
-      if (surEl) surEl.textContent = surname || '';
-      if (firstEl) firstEl.textContent = rest.join(' ');
+      if (surEl) surEl.textContent = name;       // весь ПІБ в один рядок шрифтом прізвища
+      if (firstEl) firstEl.textContent = '';
 
       const greetEl = document.getElementById('meGreet');
       if (greetEl) {
@@ -795,7 +829,9 @@
       }
     }
 
-    const allPill = pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ')) || pills[pills.length - 1];
+    // дефолт — рік тому від сьогодні (динамічно): 18.06.2026 → 2025
+    const defaultYear = String(new Date().getFullYear() - 1);
+    const allPill = pills.find(p => p.textContent.trim() === defaultYear) || pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ')) || pills[pills.length - 1];
     setActive(allPill);
 
     // блок-рядок (терапевтичний)
@@ -856,7 +892,7 @@
         })
         .catch(() => {});
     }
-    loadMain('all', 1600, 600);
+    loadMain(activeParam, 1600, 600);
 
     pills.forEach(p => {
       p.addEventListener('click', () => {
@@ -905,78 +941,70 @@
     });
 
     // нижня шторка з деталями відділення (перенесено зі старого кабінету: KPI, ординаторська, топ МКХ-10)
-    const drawer  = document.getElementById('deptDrawer');
-    const ddName  = document.getElementById('ddName');
-    const ddChief = document.getElementById('ddChief');
-    const ddKpi   = document.getElementById('ddKpi');
-    const ddStaff = document.getElementById('ddStaff');
-    const ddIcd   = document.getElementById('ddIcd');
-    let ddTimer = null, ddReqId = 0;
+    let expReqId = 0;
+    const topList = document.querySelector('.dept-list');
+    const bottomList = document.querySelector('.dept-list2');
+    const closeAllExpands = () => {
+      document.querySelectorAll('.dept-expand').forEach(e => e.remove());
+      document.body.classList.remove('expand-pushed', 'expand-pushed-up');
+    };
+    const expandTpl = `
+      <div class="head"><span class="label">Завідувач:</span>&nbsp;<span class="chief">…</span></div>
+      <div class="stats">
+        <div class="s"><div class="v" data-f="випадків">…</div><div class="l">ВИПАДКІВ</div></div>
+        <div class="s"><div class="v" data-f="пацієнтів">…</div><div class="l">ПАЦІЄНТІВ</div></div>
+        <div class="s"><div class="v" data-f="лікарів">…</div><div class="l">ЛІКАРІВ</div></div>
+        <div class="s"><div class="v" data-f="ліжок">…</div><div class="l">ЛІЖОК</div></div>
+      </div>`;
 
-    const ddKpiHtml = (items) => items.map(s =>
-      `<div class="s"><div class="v">${s.v}</div><div class="l">${s.l}</div></div>`).join('');
-    const ddInitials = (name) => (name || '').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
-
-    function openDeptDrawer(d) {
-      clearTimeout(ddTimer);
+    function openDeptExpand(d) {
       const dbName = d.getAttribute('data-db');
       if (!dbName) return;
-      const myReq = ++ddReqId;
-      ddName.textContent = d.textContent.trim();
-      ddChief.textContent = '';
-      ddKpi.innerHTML = ddKpiHtml([
-        { l: 'Випадків', v: '…' }, { l: 'Пацієнтів', v: '…' }, { l: 'Летальність', v: '…' },
-        { l: 'Ліжко-день', v: '…' }, { l: 'Сер. вік', v: '…' },
-      ]);
-      ddStaff.innerHTML = '';
-      ddIcd.innerHTML = '';
-      drawer.classList.add('open');
+      closeAllExpands();
+      const exp = document.createElement('div');
+      exp.className = 'dept-expand';
+      exp.innerHTML = expandTpl;
+      // для верхнього (терапевтичного) — розгортка ПІД назвою, зсуваємо тільки смугу
+      // для нижнього (хірургічного) — розгортка ПЕРЕД назвою (НАД), весь верх + dept-list2 зсуваємо вгору
+      let pushClass = null;
+      if (bottomList && d.parentElement === bottomList) {
+        d.insertAdjacentElement('beforebegin', exp);
+        pushClass = 'expand-pushed-up';
+      } else {
+        d.insertAdjacentElement('afterend', exp);
+        if (topList && d.parentElement === topList) pushClass = 'expand-pushed';
+      }
+      if (pushClass) {
+        document.body.classList.add(pushClass);
+        requestAnimationFrame(() => {
+          const h = exp.offsetHeight;
+          if (h) document.documentElement.style.setProperty('--push', h + 'px');
+        });
+      }
 
+      const myReq = ++expReqId;
       const yp = dbName + '|' + activeParam;
       Promise.all([
         stat('deptProfileYear', yp).catch(() => []),
         stat('deptHead', dbName).catch(() => []),
-        stat('deptDocs2', dbName).catch(() => []),
-        stat('deptIcdPieYear', yp).catch(() => []),
-      ]).then(([profileRows, headRows, docRows, icdRows]) => {
-        if (myReq !== ddReqId) return; // застаріла відповідь — вже наведено на інше відділення
-
+      ]).then(([profileRows, headRows]) => {
+        if (myReq !== expReqId || !exp.isConnected) return;
         const pr = profileRows[0] || {};
         const hd = headRows[0] || {};
-        ddChief.textContent = hd.name ? ('Завідувач: ' + hd.name) : '';
-        ddKpi.innerHTML = ddKpiHtml([
-          { l: 'Випадків',    v: fmt(pr.випадків ?? 0) },
-          { l: 'Пацієнтів',   v: fmt(pr.унікальних ?? 0) },
-          { l: 'Летальність', v: dec(pr.летальність ?? 0) + '%' },
-          { l: 'Ліжко-день',  v: dec(pr.ліжкодень ?? 0) },
-          { l: 'Сер. вік',    v: dec(pr.середній_вік ?? 0) },
-        ]);
-
-        const chief = docRows.find(x => (x.посада || '').toLowerCase().includes('завідувач'));
-        const rest = docRows.filter(x => x !== chief).slice(0, 7);
-        let staffHtml = chief
-          ? `<div class="dd-staff-row chief"><div class="av">${ddInitials(chief.emp_name)}</div><div><b>${chief.emp_name}</b></div></div>`
-          : '';
-        staffHtml += rest.map(x =>
-          `<div class="dd-staff-row"><div class="av">${ddInitials(x.emp_name)}</div><div>${x.emp_name}</div></div>`).join('');
-        ddStaff.innerHTML = staffHtml || '<div style="font-size:13px;color:#aaa;">немає даних</div>';
-
-        ddIcd.innerHTML = icdRows.slice(0, 5).map(r => `
-          <div class="dd-icd-row">
-            <div class="top"><span>${r.назва || r.код}</span><span class="pct">${r.відс}%</span></div>
-            <div class="bar"><i style="width:${r.відс}%"></i></div>
-          </div>`).join('') || '<div style="font-size:13px;color:#aaa;">немає даних</div>';
+        exp.querySelector('.chief').textContent = hd.name || '—';
+        exp.querySelector('[data-f="випадків"]').textContent  = fmt(pr.випадків ?? 0);
+        exp.querySelector('[data-f="пацієнтів"]').textContent = fmt(pr.унікальних ?? 0);
+        exp.querySelector('[data-f="лікарів"]').textContent   = hd.doctors ?? '—';
+        exp.querySelector('[data-f="ліжок"]').textContent     = hd.beds ?? '—';
       });
     }
 
-    function closeDeptDrawer() {
-      ddTimer = setTimeout(() => drawer.classList.remove('open'), 150);
-    }
-    drawer.addEventListener('mouseenter', () => clearTimeout(ddTimer));
-    drawer.addEventListener('mouseleave', closeDeptDrawer);
+    [document.querySelector('.dept-list'), document.querySelector('.dept-list2')].forEach(list => {
+      if (!list) return;
+      list.addEventListener('mouseleave', closeAllExpands);
+    });
     depts.forEach(d => {
-      d.addEventListener('mouseenter', () => openDeptDrawer(d));
-      d.addEventListener('mouseleave', closeDeptDrawer);
+      d.addEventListener('mouseenter', () => openDeptExpand(d));
     });
 
     // показ полів логіна/пароля по кліку на напис «Для працівників:»
@@ -1110,6 +1138,7 @@
   </div>
 
   <div class="work-band duty-band">
+    <span class="me-logout" id="meLogout">Вийти</span>
     <span class="wb-title">Чергові лікарі:</span>
     <div class="duty-docs">
       <span data-doc="blyndu" data-home="nevrol">Блинду</span>
@@ -1152,7 +1181,6 @@
     </div>
     <div class="me-info">
       <span class="me-greet" id="meGreet"></span>
-      <span class="me-logout" id="meLogout">Вийти</span>
     </div>
   </div>
 
@@ -1164,24 +1192,5 @@
 </div>
 </div>
 
-<div class="dept-drawer" id="deptDrawer">
-  <div class="dd-inner">
-    <div class="dd-head">
-      <div class="dd-name" id="ddName">—</div>
-      <div class="dd-chief" id="ddChief"></div>
-    </div>
-    <div class="dd-kpi" id="ddKpi"></div>
-    <div class="dd-cols">
-      <div class="dd-col dd-staff">
-        <div class="dd-col-title">Ординаторська</div>
-        <div id="ddStaff"></div>
-      </div>
-      <div class="dd-col dd-icd">
-        <div class="dd-col-title">Топ МКХ-10</div>
-        <div id="ddIcd"></div>
-      </div>
-    </div>
-  </div>
-</div>
 </body>
 </html>

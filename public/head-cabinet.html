@@ -121,7 +121,7 @@
   }
   /* рядок статистики блоку (6 метрик), нижче шапки */
   .block-row {
-    top: 249px;
+    top: 281px;
     width: 1176px;
     align-items: flex-end;
   }
@@ -192,6 +192,8 @@
     white-space: nowrap;
   }
 
+  /* списки відділень приховані в кабінеті завідувача (показуємо дані лише його відділення) */
+  .dept-list, .dept-list2 { display: none !important; }
   /* список відділень: перший рядок X=217 Y=264, 380x49 */
   .dept-list {
     position: absolute;
@@ -459,7 +461,7 @@
   .dept-title {
     position: absolute;
     right: 54px;
-    top: 244px;
+    top: 262px;
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
     font-size: 25.92px;
@@ -482,19 +484,19 @@
     white-space: nowrap;
   }
 
-  /* профіль працівника — смуга між блоком «Хотинська лікарня» і пігулками років, над рядком KPI */
+  /* профіль завідувача — у правому нижньому куті */
   .me-bar {
     position: absolute;
-    left: 690px;
-    top: 64px;
+    right: 54px;
+    top: 887px;
     width: 630px;
-    height: 41px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-end;
     white-space: nowrap;
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
   }
+  .me-bar .me-info { text-align: right; }
   .me-surname {
     font-weight: 300;
     font-size: 19px;
@@ -643,6 +645,138 @@
     letter-spacing: 0.5px;
   }
 
+  /* список лікарів відділення (ординаторська) — у лівому полі, по правому краю; ділиться на колонки, щоб не накладатись на смугу */
+  /* список лікарів (ординаторська) — у лівому полі, розділений на верхню (над смугою) і нижню (під смугою) частини */
+  .dept-docs-pills, .dept-docs-pills2 {
+    position: absolute;
+    left: 40px;
+    width: 510px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
+    text-align: right;
+    z-index: 1;            /* під середньою смугою (work-band z-index:2) */
+  }
+  .dept-docs-pills  { top: 250px; }   /* верхня частина — над смугою */
+  .dept-docs-pills2 { top: 595px; }   /* нижня частина — під смугою */
+  .docs-title {
+    font-size: 20px;
+    color: #978f88;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+  }
+  .docs-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 9px;
+    max-height: 215px;     /* ≈ 7 рядків, над смугою */
+    overflow-y: auto;
+    padding: 10px 4px;
+    /* розмиті краї зверху і знизу при прокручуванні */
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .docs-list::-webkit-scrollbar { display: none; }
+  .doc-item {
+    font-size: 19px;
+    font-weight: 300;
+    color: #3a3a3a;
+    white-space: nowrap;
+  }
+  .doc-item.chief {
+    color: #b27c8b;
+    font-weight: 600;
+  }
+  .doc-item { transition: color .2s ease, text-shadow .2s ease; cursor: pointer; }
+  .doc-item.hl {
+    color: #6d93d8;
+    text-shadow: 0 0 5px rgba(109,147,216,0.3);
+  }
+  /* лікар, на якого клікнули (активний фільтр) — лишається синім */
+  .doc-item.doc-active {
+    color: #6d93d8;
+    font-weight: 600;
+    text-shadow: 0 0 6px rgba(109,147,216,0.4);
+  }
+  /* пацієнт під курсором — синій */
+  .ab-row { transition: color .2s ease; }
+  .ab-row:hover .ab-name { color: #6d93d8; }
+  .ab-row:hover .ab-meta { color: #8aa8e0; }
+
+  /* список поступивших за день — ліворуч біля вертикальної лінії, по лівому краю (клік на точку графіка) */
+  .admissions-box {
+    position: absolute;
+    left: 600px;
+    right: 54px;
+    top: 595px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .25s ease;
+    font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
+    text-align: left;
+  }
+  .admissions-box.open { opacity: 1; pointer-events: auto; }
+  .ab-title {
+    font-size: 17px;
+    color: #b27c8b;
+    text-align: left;
+    margin-bottom: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  /* клікабельні показники поступило/виписано/перебуває в заголовку */
+  .ab-flow, .ab-reset { cursor: pointer; transition: color .2s ease, text-shadow .2s ease; }
+  .ab-flow:hover, .ab-reset:hover { color: #6d93d8; }
+  .ab-flow.active, .ab-reset.active { color: #6d93d8; font-weight: 600; text-shadow: 0 0 5px rgba(109,147,216,0.35); }
+  .ab-list {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    /* зменшено знизу на один рядок (≈30px) */
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 10px 4px;
+    /* розмиті краї: вміст згасає зверху і знизу при прокручуванні */
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .ab-list::-webkit-scrollbar { display: none; }
+  .ab-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    padding-bottom: 7px;
+  }
+  .ab-info { display: flex; flex-direction: row; align-items: baseline; gap: 10px; min-width: 0; white-space: nowrap; }
+  .ab-name { font-size: 15px; color: #1a1a1a; }
+  .ab-meta { font-size: 13px; color: #978f88; }
+  .ab-repeat { color: #c0704a; }
+  /* смужка перебування: число діб + кожен сегмент = 1 доба */
+  .ab-stay { display: flex; gap: 5px; flex-shrink: 0; align-items: center; }
+  .ab-days { font-size: 13px; color: #b27c8b; text-align: left; }
+  .ab-bar { display: flex; gap: 2px; }
+  .ab-bar i {
+    width: 6px;
+    height: 12px;
+    background: #b27c8b;
+    border-radius: 1px;
+  }
+  .ab-bar i.today {
+    background: #4a7fe0;
+    box-shadow: 0 0 5px rgba(74,127,224,0.6);
+  }
+  .ab-nostay { font-size: 12px; color: #ccc; }
+  .ab-empty { font-size: 13px; color: #aaa; text-align: left; }
+
   /* кнопка «Вийти» — поряд з рядком посада · спеціалізація · ПІБ */
   .me-logout {
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
@@ -651,6 +785,13 @@
     cursor: pointer;
   }
   .me-logout:hover { text-decoration: underline; }
+  /* «Вийти» на смузі «Чергові лікарі» — ліворуч перед написом (успадковує position:absolute, top:50% від .work-band span) */
+  .work-band .me-logout {
+    left: 134px;
+    font-size: 19px;
+    z-index: 3;
+    text-align: left;
+  }
 
   /* нижня шторка — деталі відділення (винесена за межі масштабованого стейджа) */
   .dept-drawer {
@@ -748,7 +889,26 @@
   const NS = 'http://www.w3.org/2000/svg';
   const mkNS = (t) => document.createElementNS(NS, t);
 
-  function renderSpark(svg, rows, period, sharedBounds) {
+  // інерційна прокрутка контейнера так, щоб елемент опинився по центру (easeOutCubic — ефект затухання)
+  function inertialScrollToCenter(container, el, dur = 600) {
+    const cRect = container.getBoundingClientRect();
+    const eRect = el.getBoundingClientRect();
+    const target = container.scrollTop + (eRect.top - cRect.top) - (container.clientHeight / 2) + (el.offsetHeight / 2);
+    const start = container.scrollTop;
+    const dist = target - start;
+    if (Math.abs(dist) < 1) return;
+    let t0 = null;
+    function step(t) {
+      if (t0 === null) t0 = t;
+      const p = Math.min((t - t0) / dur, 1);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      container.scrollTop = start + dist * eased;
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function renderSpark(svg, rows, period, sharedBounds, onDotClick) {
     if (!svg || !rows || !rows.length) return;
     const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
     const padX = 16, padTop = 18, padBot = 18;
@@ -801,6 +961,10 @@
         valTx.classList.remove('active');
         xTx.classList.remove('active');
       });
+      if (onDotClick) {
+        dot.style.cursor = 'pointer';
+        dot.addEventListener('click', () => onDotClick(r));
+      }
       svg.appendChild(dot);
     });
   }
@@ -813,6 +977,31 @@
     const deptTitleEl = document.getElementById('deptTitle');
     if (deptTitleEl && deptParam) deptTitleEl.textContent = deptParam;
 
+    // список лікарів відділення (ординаторська) — розділений: верхня частина над смугою, нижня під смугою
+    const docsPillsEl  = document.getElementById('deptDocsPills');
+    const docsPillsEl2 = document.getElementById('deptDocsPills2');
+    if (docsPillsEl && deptParam) {
+      stat('deptDocs2', deptParam).then(rows => {
+        // завідувача прибираємо зі списку (він у профілі праворуч), решта — повне ПІБ
+        const docs = rows.filter(r => !(r.посада || '').toLowerCase().includes('завідувач'));
+        const itemHtml = (r) =>
+          `<div class="doc-item" data-doc="${(r.doc_name || '').replace(/"/g, '&quot;')}">${r.full_name || r.emp_name || r.doc_name || ''}</div>`;
+        docsPillsEl.innerHTML = '<div class="docs-title">Ординаторська</div><div class="docs-list">'
+          + docs.map(itemHtml).join('') + '</div>';
+        if (docsPillsEl2) docsPillsEl2.innerHTML = '';
+        // клік на лікаря → показати лише його пацієнтів, що перебувають на поточну обрану дату
+        document.querySelectorAll('.doc-item[data-doc]').forEach(d => {
+          const doc = d.getAttribute('data-doc');
+          if (!doc) return;
+          d.addEventListener('click', () => {
+            document.querySelectorAll('.doc-item.doc-active, .doc-item.hl').forEach(x => { x.classList.remove('doc-active'); x.classList.remove('hl'); });
+            d.classList.add('doc-active');
+            showAdmissions(lastAdmDay, doc);
+          });
+        });
+      }).catch(() => {});
+    }
+
     // профіль залогінованого працівника (для будь-якої ролі)
     // захист сторінки на клієнті — якщо немає сесії, /api/me дає 401 → назад на слайд-вхід
     fetch('/api/me').then(r => {
@@ -821,16 +1010,14 @@
     }).then(d => {
       if (!d) return;
       const name = (d.full_name || d.emp_name || d.email) || '';
-      const [surname, ...rest] = name.split(' ');
       const surEl = document.getElementById('meSurname');
       const firstEl = document.getElementById('meFirstname');
-      if (surEl) surEl.textContent = surname || '';
-      if (firstEl) firstEl.textContent = rest.join(' ');
+      if (surEl) surEl.textContent = name;       // весь ПІБ в один рядок
+      if (firstEl) firstEl.textContent = '';
 
       const greetEl = document.getElementById('meGreet');
       if (greetEl) {
-        const parts = [d.position, d.department].filter(Boolean);
-        greetEl.textContent = parts.join(' · ');
+        greetEl.textContent = d.position || '';  // під ПІБ — посада
       }
     }).catch(() => {});
 
@@ -865,7 +1052,9 @@
       }
     }
 
-    const allPill = pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ')) || pills[pills.length - 1];
+    // дефолт — рік тому від сьогодні (динамічно): 18.06.2026 → 2025
+    const defaultYear = String(new Date().getFullYear() - 1);
+    const allPill = pills.find(p => p.textContent.trim() === defaultYear) || pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ')) || pills[pills.length - 1];
     setActive(allPill);
 
     // блок-рядок (відділення завідувача)
@@ -878,7 +1067,8 @@
 
     // місячні пігулки (тільки в кабінеті завідувача) — пов'язані з обраним роком;
     // повторний клік на активний місяць знімає вибір і показує весь рік
-    let currentMonth = null;
+    // дефолт — поточний місяць (щоб дата за замовчуванням = сьогодні рік тому)
+    let currentMonth = new Date().getMonth();
     const monthNames = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру'];
     const monthSelector = document.getElementById('monthSelector');
 
@@ -946,10 +1136,113 @@
         const step = 50;
         const niceMin = Math.max(0, Math.floor(min / step) * step);
         const niceMax = Math.max(Math.ceil(max / step) * step, niceMin + step);
-        renderSpark(document.querySelector('.chart-therap'), rows, activeParam, { niceMin, niceMax });
+        // клік на точку (день) → список поступивших того дня
+        renderSpark(document.querySelector('.chart-therap'), rows, activeParam, { niceMin, niceMax }, (r) => {
+          showAdmissions(Number(r.x));
+        });
       }).catch(() => {});
     }
+
+    // показ хворих за обраний день; docFilter — показати лише пацієнтів цього лікаря (клік на лікаря)
+    let lastAdmDay = new Date().getDate();
+    function showAdmissions(day, docFilter, flowMode) {
+      const box = document.getElementById('admissionsBox');
+      if (!box || !deptParam) return;
+      lastAdmDay = day;
+      // скидаємо підсвітку й активну позначку лікаря (клік на дату/назву показує загальне перебування)
+      if (!docFilter) document.querySelectorAll('.doc-item.hl, .doc-item.doc-active').forEach(d => { d.classList.remove('hl'); d.classList.remove('doc-active'); });
+      const month = currentMonth != null ? currentMonth + 1 : 'all';
+      const dayParam = `${deptParam}|${activeParam}|${month}|${day}|all`;
+      box.classList.add('open');
+      const dayNames = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота'];
+      let dateLabel;
+      if (/^\d{4}$/.test(String(activeParam)) && month !== 'all') {
+        const dt = new Date(Number(activeParam), Number(month) - 1, day);
+        dateLabel = `${dayNames[dt.getDay()]} ${String(day).padStart(2,'0')}.${String(month).padStart(2,'0')}.${activeParam}`;
+      } else {
+        dateLabel = String(day).padStart(2,'0');
+      }
+      box.innerHTML = `<div class="ab-title">${dateLabel} · перебуває в відділенні</div><div class="ab-empty">завантаження…</div>`;
+      Promise.all([stat('periodAdmissions', dayParam), stat('periodFlow', dayParam)]).then(([rowsAll, flow]) => {
+        let rows = docFilter ? rowsAll.filter(r => (r.лікар || '') === docFilter) : rowsAll;
+        // дата-рядок обраного дня для фільтрів поступило/виписано
+        const selStr = (/^\d{4}$/.test(String(activeParam)) && month !== 'all')
+          ? `${String(day).padStart(2,'0')}.${String(month).padStart(2,'0')}.${activeParam}` : null;
+        if (flowMode === 'admitted' && selStr) rows = rows.filter(r => r.поступив === selStr);
+        if (flowMode === 'discharged' && selStr) rows = rows.filter(r => r.виписаний === selStr);
+        const f = flow[0] || {};
+        const aCls = flowMode === 'admitted' ? ' active' : '';
+        const dCls = flowMode === 'discharged' ? ' active' : '';
+        const flowStr = ` · <span class="ab-flow${aCls}" data-flow="admitted">поступило: ${f.поступило ?? 0}</span> · <span class="ab-flow${dCls}" data-flow="discharged">виписано: ${f.виписано ?? 0}</span>`;
+        const resetCls = (docFilter || flowMode) ? '' : ' active';
+        const resetSpan = `<span class="ab-reset${resetCls}">перебуває в відділенні</span>`;
+        const bindFlow = () => {
+          box.querySelectorAll('.ab-flow').forEach(el => {
+            el.addEventListener('click', () => {
+              const mode = el.getAttribute('data-flow');
+              showAdmissions(lastAdmDay, null, flowMode === mode ? null : mode);
+            });
+          });
+          // клік на «перебуває в відділенні» → скидання лічильника на загальну кількість на дату
+          box.querySelectorAll('.ab-reset').forEach(el => el.addEventListener('click', () => showAdmissions(lastAdmDay)));
+        };
+        if (!rows.length) {
+          box.innerHTML = `<div class="ab-title">${dateLabel} · ${resetSpan}${flowStr}</div><div class="ab-empty">${(docFilter || flowMode) ? 'пацієнти відсутні' : 'немає даних'}</div>`;
+          bindFlow();
+          return;
+        }
+        const head = `<div class="ab-title">${dateLabel} · ${resetSpan} · ${rows.length}${flowStr}</div>`;
+        // обрана дата (для підсвічування поточного дня на смужці)
+        const selValid = /^\d{4}$/.test(String(activeParam)) && month !== 'all';
+        const selDate = selValid ? new Date(Number(activeParam), Number(month) - 1, day) : null;
+        const list = rows.map(r => {
+          const days = Math.max(0, Number(r.днів) || 0);
+          // індекс сегмента, що відповідає обраній даті (день перебування від поступлення)
+          let todayIdx = -1;
+          if (selDate && r.поступив) {
+            const [dd, mm, yy] = String(r.поступив).split('.').map(Number);
+            if (dd && mm && yy) todayIdx = Math.round((selDate - new Date(yy, mm - 1, dd)) / 86400000);
+          }
+          const segs = Array.from({ length: Math.min(days, 60) }, (_, i) =>
+            i === todayIdx ? '<i class="today"></i>' : '<i></i>').join('');
+          const repeat = Number(r.повторні) || 0;
+          const repeatStr = repeat > 0 ? ` · <span class="ab-repeat">повторних: ${repeat}</span>` : '';
+          return `
+          <div class="ab-row" data-doc="${(r.лікар || '').replace(/"/g, '&quot;')}">
+            <div class="ab-info">
+              <span class="ab-name">${r.піб || '—'}</span>
+              <span class="ab-meta">${r.вік != null ? r.вік + ' р.' : '—'} · ${r.стать || '—'} · ${r.діагноз || r.код || '—'}${repeatStr}</span>
+            </div>
+            <div class="ab-stay" title="${days} діб">
+              <span class="ab-bar">${segs}</span>
+              <span class="ab-days">${days}</span>
+            </div>
+          </div>`;
+        }).join('');
+        box.innerHTML = head + `<div class="ab-list">${list}</div>`;
+        bindFlow();
+        // наведення на пацієнта → підсвітити його лікаря в списку ординаторської
+        // наведення на пацієнта → лише пацієнт синій (CSS :hover); клік → підсвітити лікаря + інерційна прокрутка
+        box.querySelectorAll('.ab-row[data-doc]').forEach(row => {
+          const doc = row.getAttribute('data-doc');
+          if (!doc) return;
+          row.style.cursor = 'pointer';
+          row.addEventListener('click', () => {
+            document.querySelectorAll('.doc-item.hl, .doc-item.doc-active').forEach(d => { d.classList.remove('hl'); d.classList.remove('doc-active'); });
+            document.querySelectorAll('.doc-item').forEach(d => {
+              if (d.getAttribute('data-doc') === doc) {
+                d.classList.add('hl');
+                const dl = d.closest('.docs-list');
+                if (dl) inertialScrollToCenter(dl, d);
+              }
+            });
+          });
+        });
+      }).catch(() => { box.innerHTML = `<div class="ab-title">Поступили</div><div class="ab-empty">помилка</div>`; });
+    }
     loadMain(1600, 600);
+    // авто-показ хворих, що перебувають у відділенні, станом на сьогодні рік тому (напр. 18.06.2025)
+    if (deptParam) showAdmissions(new Date().getDate());
 
     pills.forEach(p => {
       p.addEventListener('click', () => {
@@ -1186,6 +1479,9 @@
   <!-- переключувач місяців -->
   <div id="monthSelector" style="position: absolute; right: 54px; top: 467px; display: flex; gap: 4; flexWrap: wrap;"></div>
 
+  <!-- список поступивших за обраний день (клік на точку графіка) -->
+  <div class="admissions-box" id="admissionsBox"></div>
+
   <div class="year-badge"><span class="year-num">2025</span></div>
 
   <div class="dept-list">
@@ -1197,6 +1493,7 @@
   </div>
 
   <div class="work-band duty-band">
+    <span class="me-logout" id="meLogout">Вийти</span>
     <span class="wb-title">Чергові лікарі:</span>
     <div class="duty-docs">
       <span data-doc="blyndu" data-home="nevrol">Блинду</span>
@@ -1210,6 +1507,9 @@
       <span data-doc="angelska" data-home="urol">Ангельська</span>
     </div>
   </div>
+
+  <div class="dept-docs-pills" id="deptDocsPills"></div>
+  <div class="dept-docs-pills2" id="deptDocsPills2"></div>
 
   <div class="dept-list2">
     <div class="dept" data-dept="opik" data-doc="pronyaev" data-db="Опікове відділення">Опікове відділення</div>
@@ -1239,7 +1539,6 @@
     </div>
     <div class="me-info">
       <span class="me-greet" id="meGreet"></span>
-      <span class="me-logout" id="meLogout">Вийти</span>
     </div>
   </div>
 
