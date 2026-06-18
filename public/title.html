@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Текстовий блок — ЛСМД</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #eeeae4; }
+  .page { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  /* поле: x=285 y=59 w=315 h=139 */
+  .field {
+    position: absolute;
+    left: 285px;
+    top: 59px;
+    width: 315px;
+    height: 139px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .title {
+    font-family: 'ITF Devanagari', 'Noto Sans', 'Segoe UI', sans-serif;
+    font-weight: 300;
+    font-size: 32px;
+    color: #4a4a4a;
+    text-align: left;
+    line-height: 0.8;
+  }
+  .subtitle {
+    font-family: 'ITF Devanagari', 'Noto Sans', 'Segoe UI', sans-serif;
+    font-weight: 300;
+    font-size: 24px;
+    color: #4a4a4a;
+    text-align: left;
+    line-height: 0.8;
+    margin-top: 10px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="field">
+      <div class="title">ХОТИНСЬКА<br>БАГАТОПРОФІЛЬНА<br>ЛІКАРНЯ</div>
+      <div class="subtitle">турбуємось про найцінніше</div>
+    </div>
+  </div>
+</body>
+</html>

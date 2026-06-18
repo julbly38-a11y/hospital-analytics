@@ -1,0 +1,448 @@
+/* ============================================================
+   ЛСМД — Спільні UI-класи
+   Підключено в _app.js, доступно на всіх сторінках.
+   ============================================================ */
+
+/* ── Сторінка ─────────────────────────────────────────── */
+.pg {
+  min-height: 100vh;
+  background: var(--bg);
+  font-family: var(--sans);
+}
+
+/* ── Шапка з градієнтом ───────────────────────────────── */
+.pg-header {
+  background: linear-gradient(135deg, #cfe0ea 0%, #ddd0e8 30%, #eaddd0 60%, #d0e8da 100%);
+  position: relative;
+  overflow: hidden;
+  padding: 0 40px;
+}
+.pg-header-decor {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.pg-header-decor--tl {
+  top: -10%; left: -5%;
+  width: 400px; height: 400px;
+  background: rgba(255,255,255,0.1);
+}
+.pg-header-decor--br {
+  bottom: -20%; right: -5%;
+  width: 500px; height: 500px;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Бренд-бар (лого + назва + кнопка назад) ──────────── */
+.brand-bar {
+  position: relative;
+  z-index: 1;
+  padding-top: 28px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.brand-bar__plus {
+  font-size: 22px;
+  color: var(--brand);
+  font-family: var(--mono);
+  line-height: 1;
+}
+.brand-bar__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.06em;
+  font-family: var(--mono);
+}
+.brand-bar__sub {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 1px;
+}
+
+/* ── Кнопка «← Головна» / «← Назад» ─────────────────── */
+.back-btn {
+  margin-left: auto;
+  background: rgba(0,0,0,0.08);
+  border: none;
+  border-radius: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #444;
+  font-family: var(--mono);
+  transition: background var(--dur-fast) var(--ease);
+}
+.back-btn:hover { background: rgba(0,0,0,0.14); }
+
+/* ── Перемикач року (pill-кнопки) ─────────────────────── */
+.year-bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.year-btn {
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.15);
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: var(--mono);
+  color: #444;
+  transition: background var(--dur-fast) var(--ease);
+}
+.year-btn:hover   { background: rgba(0,0,0,0.07); }
+.year-btn--active { background: rgba(0,0,0,0.12); }
+
+/* ── KPI рядок ────────────────────────────────────────── */
+.kpi-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  padding-bottom: 28px;
+}
+.kpi-val {
+  font-size: 32px;
+  font-weight: 300;
+  color: var(--text);
+  font-family: var(--mono);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.kpi-val--large { font-size: 52px; }
+.kpi-lbl {
+  font-size: 9px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 6px;
+  font-family: var(--mono);
+}
+
+/* ── Тіло сторінки ────────────────────────────────────── */
+.pg-body {
+  padding: 28px 40px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Section label (маленький заголовок секції) ───────── */
+.section-label {
+  font-size: 10px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: var(--mono);
+  margin-bottom: 16px;
+}
+
+/* ── Скляна картка ────────────────────────────────────── */
+.glass-card {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 22px 28px;
+}
+
+/* ── Block pill (картка напрямку) ─────────────────────── */
+.block-pill {
+  background: rgba(255,255,255,0.45);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 14px 18px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.block-pill:hover  { background: rgba(255,255,255,0.6); }
+.block-pill--active {
+  background: rgba(255,255,255,0.75);
+  border-color: rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.block-pill__title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+.block-pill__meta {
+  font-size: 11px;
+  color: var(--text2);
+  font-family: var(--mono);
+}
+.block-pill__toggle {
+  font-size: 10px;
+  margin-top: 8px;
+  font-family: var(--mono);
+}
+
+/* ── Dept card (картка відділення) ────────────────────── */
+.dept-card {
+  background: rgba(255,255,255,0.5);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  padding: 11px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.dept-card:hover   { background: rgba(255,255,255,0.7); }
+.dept-card--active {
+  background: rgba(255,255,255,0.85);
+}
+.dept-card__name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+.dept-card__head {
+  font-size: 10px;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.dept-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dept-card__doctors {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* ── Detail panel (розгорнуті деталі відділення) ──────── */
+.detail-panel {
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  padding: 22px 28px;
+  margin-bottom: 24px;
+}
+.detail-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.detail-panel__title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+}
+.detail-panel__head {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+.detail-panel__close {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0;
+}
+.detail-panel__body {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+/* ── Stat мікро (всередині панелей) ───────────────────── */
+.stat-mini__val {
+  font-size: 24px;
+  font-weight: 300;
+  font-family: var(--mono);
+  line-height: 1;
+}
+.stat-mini__lbl {
+  font-size: 8px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+  font-family: var(--mono);
+}
+
+/* ── Топ МКХ-10 bar ───────────────────────────────────── */
+.icd-bar__row { margin-bottom: 7px; }
+.icd-bar__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.icd-bar__code {
+  font-size: 10px;
+  min-width: 34px;
+  font-family: var(--mono);
+}
+.icd-bar__name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icd-bar__pct {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+.icd-bar__track {
+  height: 2px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 1px;
+}
+.icd-bar__fill {
+  height: 100%;
+  border-radius: 1px;
+  transition: width 0.4s var(--ease);
+}
+
+/* ── Auth (login) ─────────────────────────────────────── */
+.auth-wrap {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 380px;
+}
+.auth-logo {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.auth-logo__plus {
+  font-size: 32px;
+  color: var(--accent);
+  font-family: var(--mono);
+}
+.auth-logo__title {
+  font-size: 18px;
+  font-family: var(--mono);
+  font-weight: 500;
+  margin-top: 8px;
+}
+.auth-logo__sub {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+/* ── Форма ────────────────────────────────────────────── */
+.form-field { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--mono);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input--error { border-color: var(--red) !important; }
+
+/* ── Кнопки ───────────────────────────────────────────── */
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-inv);
+  font-size: 13px;
+  font-family: var(--mono);
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 11px;
+  font-family: var(--mono);
+  cursor: pointer;
+  padding: 0;
+}
+.btn-ghost:hover { color: var(--text); }
+
+.btn-outline {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text3);
+  padding: 8px 20px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+
+/* ── Error / info boxes ───────────────────────────────── */
+.error-box {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(192,57,43,0.1);
+  border: 1px solid rgba(192,57,43,0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--red);
+}
+.empty-state {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: var(--mono);
+}
+
+/* ── Grid утиліти ─────────────────────────────────────── */
+.auto-grid-190 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+.auto-grid-190--gap-sm { gap: 10px; }
