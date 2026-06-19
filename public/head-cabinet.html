@@ -241,6 +241,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
   /* перехресна підсвітка лікар ↔ відділення */
   .dept, .duty-docs span {
@@ -260,7 +261,7 @@
     transform: none;
     font-family: 'ITFLight', 'Palatino', serif;
     font-weight: 300;
-    font-size: 19px;
+    font-size: 18px;
     color: #9a958f;
     white-space: nowrap;
   }
@@ -708,6 +709,18 @@
   .ab-row:hover .ab-name { color: #6d93d8; }
   .ab-row:hover .ab-meta { color: #8aa8e0; }
 
+  /* секторальна діаграма блоків МКХ — ліва нижня ділянка, підписи по зовнішньому колу */
+  .dept-pie {
+    position: absolute;
+    left: 0;
+    top: 493px;
+    width: 580px;
+    font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
+    z-index: 1;
+  }
+  .dp-lbl { fill: #333; font-size: 11px; }
+  .dp-lbl-pct { fill: #978f88; font-size: 11px; }
+
   /* список поступивших за день — ліворуч біля вертикальної лінії, по лівому краю (клік на точку графіка) */
   .admissions-box {
     position: absolute;
@@ -977,6 +990,37 @@
     const deptTitleEl = document.getElementById('deptTitle');
     if (deptTitleEl && deptParam) deptTitleEl.textContent = deptParam;
 
+    // Чергові лікарі — 9 блоків: терапія(1, спільно), неврологія(1), +7 хірургічних.
+    // Оновлюються при зміні обраної дати (рік/місяць/день); ротація детермінована за добою.
+    let lastDutyDate = '';
+    function loadDuty() {
+      const dutyEl = document.getElementById('dutyDocs');
+      if (!dutyEl) return;
+      const now = new Date();
+      const y = /^\d{4}$/.test(String(activeParam)) ? Number(activeParam) : now.getFullYear();
+      const mo = (currentMonth != null) ? currentMonth + 1 : now.getMonth() + 1;
+      const d = lastAdmDay || now.getDate();
+      const ds = `${y}-${mo}-${d}`;
+      if (ds === lastDutyDate) return;   // дата не змінилась — не перезавантажуємо
+      lastDutyDate = ds;
+      const blockCode = {
+        'Терапія': 'terap1', 'Неврологія': 'nevrol', 'Опікове': 'opik',
+        'Травматологія дітей': 'travmd', 'Травматологія дорослих': 'travmador',
+        'Нейрохірургія': 'neyro', 'Урологія': 'urol', 'Хірургія №2': 'hir2', 'Хірургія №1': 'hir1'
+      };
+      const order = Object.keys(blockCode);
+      stat('dutyDoctors', ds).then(rows => {
+        rows.sort((a, b) => order.indexOf(a.блок) - order.indexOf(b.блок));
+        dutyEl.innerHTML = rows.map(r => {
+          const code = blockCode[r.блок] || '';
+          const full = (r.лікар || '').trim();
+          const surname = full.split(/\s+/)[0] || full;
+          const tip = `${full} · ${r.блок}` + (r.відділення && r.відділення !== r.блок ? ` (${r.відділення})` : '');
+          return `<span data-home="${code}" title="${tip.replace(/"/g, '&quot;')}">${surname}</span>`;
+        }).join('');
+      }).catch(() => { lastDutyDate = ''; });
+    }
+
     // список лікарів відділення (ординаторська) — розділений: верхня частина над смугою, нижня під смугою
     const docsPillsEl  = document.getElementById('deptDocsPills');
     const docsPillsEl2 = document.getElementById('deptDocsPills2');
@@ -1081,6 +1125,8 @@
       allBtn.classList.add('month-all');
       if (currentMonth == null) allBtn.classList.add('active');
       allBtn.addEventListener('click', () => {
+        // при «всіх роках» місяць обов'язковий — не допускаємо стану «всі роки + всі місяці»
+        if (activeParam === 'all') return;
         currentMonth = null;
         renderMonthPills();
         loadMain(1000, 0);
@@ -1105,6 +1151,8 @@
     const periodParam = (dept) => `${dept || ''}|${activeParam}|${currentMonth != null ? currentMonth + 1 : 'all'}|all|all`;
 
     function loadMain(dur, base) {
+      // чергові лікарі — на обрану дату (рік/місяць), оновляться лише якщо дата змінилась
+      loadDuty();
       // верхня шапка — завжди вся лікарня, незалежно від відділення
       stat('periodKpi', periodParam('')).then(rows => {
         const r = rows[0] || {};
@@ -1141,6 +1189,129 @@
           showAdmissions(Number(r.x));
         });
       }).catch(() => {});
+
+      // секторальна діаграма топ-5 категорій МКХ за рік відділення
+      showPie();
+    }
+
+    // donut топ-5 категорій МКХ (ліва нижня ділянка) — кольори емблеми лікарні
+    // неактивні сегменти: градієнт сіро-зеленого (як права частина емблеми)
+    // активний сегмент: теракотово-рожевий (як ліва частина емблеми)
+    const EMBLEM_RED = '#b27c8b';
+    const SAGE_LIGHT = [176, 185, 172], SAGE_DARK = [104, 116, 103];
+    const sageShade = (k, n) => {
+      const t = n > 1 ? k / (n - 1) : 0.5;
+      const c = SAGE_LIGHT.map((v, j) => Math.round(v + (SAGE_DARK[j] - v) * t));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    };
+    function showPie() {
+      const pieEl = document.getElementById('deptPie');
+      if (!pieEl || !deptParam) return;
+      stat('deptIcdBlocksYear', `${deptParam}|${activeParam}`).then(rows => {
+        const top = (rows || []).slice(0, 6);
+        if (!top.length) { pieEl.innerHTML = ''; return; }
+        const VW = 560, VH = 490, cx = 280, cy = 285, GAP = 3;
+        const R = 124, SW = 60;
+        const C = 2 * Math.PI * R;
+        const totalCases = top.reduce((s, r) => s + (Number(r.випадків) || 0), 0);
+        let offset = 0;
+        const midById = {}, greenById = {};
+        const nDrawn = top.filter(r => (r.назва || '') !== 'Інші').length;
+        let di = 0;
+        let defs = '<defs>', arcs = '', hits = '';
+        top.forEach((r, i) => {
+          const frac = Math.max(0, Number(r.відс) || 0) / 100;
+          const arcLen = frac * C;
+          // «Інші» не малюємо — лишаємо розрив у кільці (offset все одно зсуваємо)
+          const isOther = (r.назва || '') === 'Інші';
+          const midFrac = (offset + arcLen / 2) / C;   // частка середини сегмента від верху
+          const dash = `${Math.max(0, arcLen - GAP).toFixed(1)} ${(C - arcLen + GAP).toFixed(1)}`;
+          if (!isOther) {
+            midById[i] = midFrac;
+            const shade = sageShade(di, nDrawn); greenById[i] = shade; di++;   // відтінок сіро-зеленого (градієнт)
+            // видимий сегмент в обгортці-g (обгортка зсувається при наведенні — «висування»);
+            // саме кільце обертається лише на клік; події ловить статичний хіт-шар
+            arcs += `<g class="dp-segwrap" data-i="${i}" style="transition:transform .18s ease"><circle class="dp-seg" data-i="${i}" r="${R}" cx="${cx}" cy="${cy}" fill="none" stroke="${shade}" stroke-width="${SW}" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})" style="pointer-events:none;transition:stroke .22s ease"/></g>`;
+            // статичний прозорий хіт (НЕ обертається) — наведення/клік без смикання
+            hits += `<circle class="dp-hit" data-i="${i}" r="${R}" cx="${cx}" cy="${cy}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="${SW}" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})" pointer-events="stroke" style="cursor:pointer"/>`;
+          }
+          offset += arcLen;
+        });
+        // дуга-півколо для назви над діаграмою (rainbow: текст читається зверху)
+        const Rt = 174, tA = 70 * Math.PI / 180;
+        const tlx = (cx - Rt * Math.sin(tA)).toFixed(1), tty = (cy - Rt * Math.cos(tA)).toFixed(1);
+        const trx = (cx + Rt * Math.sin(tA)).toFixed(1);
+        defs += `<path id="dpTitleArc" d="M ${tlx},${tty} A ${Rt},${Rt} 0 0 1 ${trx},${tty}" fill="none"/>`;
+        defs += '</defs>';
+        // назва вздовж півкола (оновлюється при наведенні/кліку)
+        const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="#3a3a3a"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
+        // центр кільця — кількість / частка
+        const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="#1a1a1a">${fmt(totalCases)}</text>`
+          + `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="#978f88">випадків</text>`;
+        // хіти всередині кільця — обертаються разом із сегментами (клік завжди влучає у видимий сектор);
+        // назва й центр — статичні зверху. Смикання немає, бо наведення тепер без обертання.
+        pieEl.innerHTML = `<svg width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${defs}<g id="dpRing">${arcs}${hits}</g>${header}${center}</svg>`;
+
+        // інтерактив: наведення = прев'ю, клік = зафіксувати; сектор плавно виїжджає вгору під дугу-назву
+        const titleEl = pieEl.querySelector('#dpTitle');
+        const titlePath = pieEl.querySelector('#dpTitlePath');
+        const cV = pieEl.querySelector('#dpCenterV');
+        const cL = pieEl.querySelector('#dpCenterL');
+        const ring = pieEl.querySelector('#dpRing');
+        ring.style.transformOrigin = `${cx}px ${cy}px`;
+        ring.style.transition = 'transform .55s cubic-bezier(.2,.7,.2,1)';
+        const wraps = {}, segCircles = {};
+        pieEl.querySelectorAll('.dp-segwrap').forEach(w => { wraps[Number(w.getAttribute('data-i'))] = w; });
+        pieEl.querySelectorAll('.dp-seg').forEach(c => { segCircles[Number(c.getAttribute('data-i'))] = c; });
+        const hitEls = [...pieEl.querySelectorAll('.dp-hit')];
+        let locked = null;
+
+        // активний сегмент червоніє (як на емблемі); решта — свій сіро-зелений відтінок
+        function paint(activeI) {
+          Object.keys(segCircles).forEach(k => {
+            segCircles[k].setAttribute('stroke', Number(k) === activeI ? EMBLEM_RED : greenById[k]);
+          });
+        }
+        // назва дугою + центр (БЕЗ затемнення інших)
+        function setName(i) {
+          const r = top[i];
+          paint(i);
+          titlePath.textContent = r.назва || r.код || '—';
+          titleEl.setAttribute('fill', EMBLEM_RED);
+          cV.textContent = fmt(r.випадків);
+          cL.textContent = r.відс + '% частки';
+        }
+        function clearName() {
+          paint(-1);
+          titlePath.textContent = 'Структура діагнозів';
+          titleEl.setAttribute('fill', '#3a3a3a');
+          cV.textContent = fmt(totalCases);
+          cL.textContent = 'випадків';
+        }
+        // легке висування сектора радіально назовні (у напрямку його середини)
+        const POP = 7;
+        function popOut(i) {
+          const w = wraps[i]; if (!w) return;
+          const t = (midById[i] || 0) * 2 * Math.PI;
+          w.style.transform = `translate(${(POP * Math.sin(t)).toFixed(1)}px, ${(-POP * Math.cos(t)).toFixed(1)}px)`;
+        }
+        const popIn = i => { const w = wraps[i]; if (w) w.style.transform = ''; };
+        const rotateTo = i => { ring.style.transform = `rotate(${(-(midById[i] || 0) * 360).toFixed(1)}deg)`; };
+        const rotateReset = () => { ring.style.transform = 'rotate(0deg)'; };
+
+        hitEls.forEach(hit => {
+          const i = Number(hit.getAttribute('data-i'));
+          // наведення = сектор трохи висувається + назва дугою (інші НЕ затемнюються)
+          hit.addEventListener('mouseenter', () => { setName(i); popOut(i); });
+          // відведення — сектор повертається; назва — до зафіксованого або загального
+          hit.addEventListener('mouseleave', () => { popIn(i); if (locked !== null) setName(locked); else clearName(); });
+          // клік = зафіксувати + плавно вивести сектор угору під назву (повторний клік знімає)
+          hit.addEventListener('click', () => {
+            if (locked === i) { locked = null; clearName(); rotateReset(); }
+            else { locked = i; setName(i); rotateTo(i); }
+          });
+        });
+      }).catch(() => {});
     }
 
     // показ хворих за обраний день; docFilter — показати лише пацієнтів цього лікаря (клік на лікаря)
@@ -1149,6 +1320,7 @@
       const box = document.getElementById('admissionsBox');
       if (!box || !deptParam) return;
       lastAdmDay = day;
+      loadDuty();   // день змінився → оновити чергових на цю добу (гард усередині пропустить, якщо дата та сама)
       // скидаємо підсвітку й активну позначку лікаря (клік на дату/назву показує загальне перебування)
       if (!docFilter) document.querySelectorAll('.doc-item.hl, .doc-item.doc-active').forEach(d => { d.classList.remove('hl'); d.classList.remove('doc-active'); });
       const month = currentMonth != null ? currentMonth + 1 : 'all';
@@ -1244,9 +1416,12 @@
     // авто-показ хворих, що перебувають у відділенні, станом на сьогодні рік тому (напр. 18.06.2025)
     if (deptParam) showAdmissions(new Date().getDate());
 
+
     pills.forEach(p => {
       p.addEventListener('click', () => {
         setActive(p);
+        // «всі роки» без місяця беззмістовні для денного графіка — підставляємо поточний місяць
+        if (activeParam === 'all' && currentMonth == null) currentMonth = new Date().getMonth();
         renderMonthPills();
         loadMain(1000, 0);
       });
@@ -1495,21 +1670,14 @@
   <div class="work-band duty-band">
     <span class="me-logout" id="meLogout">Вийти</span>
     <span class="wb-title">Чергові лікарі:</span>
-    <div class="duty-docs">
-      <span data-doc="blyndu" data-home="nevrol">Блинду</span>
-      <span data-doc="hidora" data-home="neyro">Гідора</span>
-      <span data-doc="pentel" data-home="travmd">Пентелейчук</span>
-      <span data-doc="bureha" data-home="hir2">Бурега</span>
-      <span data-doc="pronyaev" data-home="opik">Проняєв</span>
-      <span data-doc="kachmar" data-home="hir1">Качмар</span>
-      <span data-doc="tymchuk" data-home="travmador">Тимчук</span>
-      <span data-doc="klemeshev" data-home="gemat">Клємєшев</span>
-      <span data-doc="angelska" data-home="urol">Ангельська</span>
-    </div>
+    <div class="duty-docs" id="dutyDocs"></div>
   </div>
 
   <div class="dept-docs-pills" id="deptDocsPills"></div>
   <div class="dept-docs-pills2" id="deptDocsPills2"></div>
+
+  <!-- секторальна діаграма топ-5 категорій МКХ — ліва нижня ділянка -->
+  <div class="dept-pie" id="deptPie"></div>
 
   <div class="dept-list2">
     <div class="dept" data-dept="opik" data-doc="pronyaev" data-db="Опікове відділення">Опікове відділення</div>
@@ -1529,7 +1697,6 @@
     <div class="ypill">2022</div>
     <div class="ypill">2021</div>
     <div class="ypill">2020</div>
-    <div class="ypill ypill-all">ВСІ РОКИ</div>
   </div>
 
   <div class="me-bar">
