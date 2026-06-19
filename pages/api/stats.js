@@ -253,6 +253,129 @@ const PARAM_QUERIES = {
       WHERE l.admission_department='${esc(dept)}' AND l.icd_primary IS NOT NULL AND i.code_level1 IS NOT NULL AND ${yf}
       GROUP BY i.code_level1, i.category_level1 ORDER BY випадків DESC LIMIT 5`
   },
+  // Топ-5 блоків МКХ (2-й ступінь ієрархії) відділення за рік (param = "назва|рік" або "назва|all").
+  // Блок визначається за діапазоном рубрики (LEFT(icd_primary,3)); для невпізнаних — глава МКХ.
+  deptIcdBlocksYear: (p) => {
+    const sep = p.lastIndexOf('|')
+    const dept = sep >= 0 ? p.slice(0, sep) : p
+    const yPart = sep >= 0 ? p.slice(sep + 1) : 'all'
+    const yf = yearFilter(yPart)
+    return `WITH blocks AS (
+        SELECT CASE
+          -- Нервова система
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G00' AND 'G09' THEN 'Запальні хвороби ЦНС'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G20' AND 'G26' THEN 'Екстрапірамідні розлади'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G35' AND 'G37' THEN 'Демієлінізуючі хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G40' AND 'G47' THEN 'Епілепсія та пароксизмальні розлади'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G50' AND 'G64' THEN 'Периферична нервова система та корінці'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G80' AND 'G83' THEN 'Паралітичні синдроми'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G90' AND 'G99' THEN 'Інші розлади нервової системи'
+          -- Серцево-судинна система
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I10' AND 'I16' THEN 'Гіпертонічна хвороба'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I20' AND 'I25' THEN 'Ішемічна хвороба серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I30' AND 'I39' THEN 'Ендокардит, перикардит та вади серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I40' AND 'I43' THEN 'Кардіоміопатії та міокардит'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I44' AND 'I49' THEN 'Порушення ритму серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I50' AND 'I52' THEN 'Серцева недостатність'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I60' AND 'I69' THEN 'Цереброваскулярні хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I70' AND 'I79' THEN 'Атеросклероз та хвороби артерій'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I80' AND 'I89' THEN 'Хвороби вен та лімфатичних судин'
+          -- Органи дихання
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J10' AND 'J18' THEN 'Грип та пневмонія'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J20' AND 'J22' THEN 'Гострий бронхіт'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J40' AND 'J47' THEN 'Хронічні хвороби нижніх дихальних шляхів'
+          -- Органи травлення
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K20' AND 'K31' THEN 'Хвороби стравоходу, шлунку та ДПК'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K35' AND 'K38' THEN 'Апендицит'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K40' AND 'K46' THEN 'Грижі черевної стінки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K50' AND 'K52' THEN 'Неінфекційний ентерит та коліт'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K55' AND 'K64' THEN 'Інші хвороби кишківника'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K70' AND 'K77' THEN 'Хвороби печінки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K80' AND 'K87' THEN 'Хвороби жовчного міхура та підшлункової залози'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K90' AND 'K93' THEN 'Інші хвороби органів травлення'
+          -- Шкіра
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'L00' AND 'L08' THEN 'Гнійні та інфекційні хвороби шкіри'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'L80' AND 'L99' THEN 'Рубці, виразки та інші хвороби шкіри'
+          -- Кістково-м'язова система
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M00' AND 'M14' THEN 'Артрити та поліартропатії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M15' AND 'M19' THEN 'Артрози великих суглобів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M20' AND 'M25' THEN 'Інші хвороби суглобів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M40' AND 'M54' THEN 'Дорсопатії (хребет, корінці)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M60' AND 'M79' THEN 'Хвороби мʼяких тканин та сухожиль'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M80' AND 'M90' THEN 'Хвороби кісток'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M91' AND 'M94' THEN 'Хондропатії та хвороби росту'
+          -- Сечостатева система
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N00' AND 'N08' THEN 'Гломерулонефрити'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N10' AND 'N16' THEN 'Тубуло-інтерстиціальні нефрити та уропатії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N20' AND 'N23' THEN 'Сечокамʼяна хвороба'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N25' AND 'N29' THEN 'Інші хвороби нирок'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N30' AND 'N39' THEN 'Стриктура уретри, цистит та хвороби сечового міхура'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N40' AND 'N53' THEN 'Хвороби передміхурової залози та статевих органів'
+          -- Ендокринна система
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'E10' AND 'E14' THEN 'Діабетичні ускладнення'
+          -- Новоутворення (гематологія, урологія, хірургія, нейрохірургія)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C60' AND 'C68' THEN 'Злоякісні новоутворення сечостатевої системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C81' AND 'C96' THEN 'Злоякісні новоутворення крові та лімфатичної тканини'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C00' AND 'C59' THEN 'Злоякісні новоутворення (солідні пухлини)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C69' AND 'C80' THEN 'Злоякісні новоутворення (солідні пухлини)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D10' AND 'D36' THEN 'Доброякісні новоутворення'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D37' AND 'D44' THEN 'Новоутворення невизначеного характеру'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D45' AND 'D47' THEN 'Мієлодиспластичні синдроми та мієлопроліферативні хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D50' AND 'D64' THEN 'Анемії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D65' AND 'D69' THEN 'Порушення згортання крові'
+          -- Хвороби накопичення та амілоїдоз (гематологія: хвороба Гоше E75, амілоїдоз E85)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'E70' AND 'E90' THEN 'Хвороби накопичення та амілоїдоз'
+          -- Вроджені вади (ортопедія дітей)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'Q60' AND 'Q64' THEN 'Вроджені вади сечостатевої системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'Q65' AND 'Q79' THEN 'Вроджені вади опорно-рухового апарату'
+          -- Травми — за локалізацією
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S00' AND 'S09' THEN 'Травми голови (ЧМТ)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S10' AND 'S19' THEN 'Травми шиї'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S20' AND 'S39' THEN 'Травми грудної клітки та хребта'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S40' AND 'S49' THEN 'Травми плечового суглоба та плеча'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S50' AND 'S59' THEN 'Травми ліктьового суглоба та передпліччя'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S60' AND 'S69' THEN 'Травми запʼястка та кисті'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S70' AND 'S79' THEN 'Травми кульшового суглоба та стегна'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S80' AND 'S89' THEN 'Травми колінного суглоба та гомілки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S90' AND 'S99' THEN 'Травми гомілковостопного суглоба та стопи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T00' AND 'T07' THEN 'Множинні травми'
+          -- Опіки та відмороження
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T20' AND 'T28' THEN 'Опіки зовнішніх ділянок тіла'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T29' AND 'T32' THEN 'Опіки множинних ділянок'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T33' AND 'T35' THEN 'Відмороження'
+          -- Ускладнення медичних процедур та протезів
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T80' AND 'T88' THEN 'Ускладнення хірургічних процедур та протезів'
+          -- Інфекційні хвороби (рожа/сепсис у хірургії, гепатит у гастро)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'A30' AND 'A49' THEN 'Бактеріальні інфекції (рожа, сепсис)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'B15' AND 'B19' THEN 'Вірусний гепатит'
+          -- Дихальна недостатність та інші хвороби дихання (терапія)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J80' AND 'J99' THEN 'Інші хвороби органів дихання'
+          -- Симптоми з боку сечовидільної системи (урологія: гематурія R31, затримка сечі R33)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'R30' AND 'R39' THEN 'Симптоми з боку сечовидільної системи'
+          -- Алергічні реакції (терапія)
+          WHEN LEFT(l.icd_primary,3) = 'T78' THEN 'Алергічні реакції'
+          -- Отруєння та токсична дія (анестезіологія/ІТ)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T36' AND 'T65' THEN 'Отруєння та токсична дія'
+          -- Зовнішні причини травм (травматологія: падіння, ДТП)
+          WHEN LEFT(l.icd_primary,1) IN ('V','W','X','Y') THEN 'Зовнішні причини травм'
+          -- Інші розлади нервової системи (нейродегенеративні G30, мʼязові G70 тощо)
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G10' AND 'G14' THEN 'Інші розлади нервової системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G30' AND 'G32' THEN 'Інші розлади нервової системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G70' AND 'G73' THEN 'Інші розлади нервової системи'
+          ELSE i.category_level1
+        END as блок
+        FROM lsmd l JOIN icd_10 i ON i.icd_code=l.icd_primary
+        WHERE l.admission_department='${esc(dept)}' AND l.icd_primary IS NOT NULL AND ${yf}
+      ),
+      grouped AS (SELECT блок, COUNT(*) as cnt FROM blocks WHERE блок IS NOT NULL GROUP BY блок),
+      ranked AS (SELECT блок, cnt, ROW_NUMBER() OVER (ORDER BY cnt DESC) as rn, SUM(cnt) OVER () as total FROM grouped)
+      SELECT CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END as назва,
+        SUM(cnt) as випадків,
+        ROUND(100.0*SUM(cnt)::numeric/NULLIF(MAX(total),0),1) as відс
+      FROM ranked
+      GROUP BY CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END
+      ORDER BY MIN(rn)`
+  },
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,
   // Динаміка топ-3 діагнозів за 12 місяців (помісячно)
@@ -263,6 +386,38 @@ const PARAM_QUERIES = {
   deptDocs2: (p) => `SELECT ld.doc_name as doc_name, COALESCE(e.full_name, e.emp_name) as full_name, e.emp_name as emp_name, e.position as посада, e.specialization as спеціалізація, COALESCE(ds.total_cases, 0) as випадків FROM empl e LEFT JOIN lsmd_doctors ld ON ld.empl_name_id = e.name_id LEFT JOIN doctor_stats ds ON ds.doctor_id = ld.empl_name_id WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%' OR e.position ILIKE '%завідувач%') ORDER BY COALESCE(e.full_name, e.emp_name) ASC LIMIT 50`,
   // Ординатори (резиденти) відділення, макс 20
   deptOrdinators: (p) => `SELECT e.emp_name, e.specialization FROM empl e WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND e.position ILIKE '%ординатор%' ORDER BY e.emp_name LIMIT 20`,
+  // Чергові лікарі: 9 блоків — терапія (спільний пул терапевтичних), неврологія, +7 хірургічних.
+  // 1 черговий на блок, детермінована щоденна ротація. param = 'YYYY-MM-DD' (доба); дефолт — сьогодні.
+  dutyDoctors: (p) => {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(p || '').trim())
+    const dateExpr = m ? `make_date(${+m[1]},${+m[2]},${+m[3]})` : 'CURRENT_DATE'
+    return `WITH params AS (SELECT (${dateExpr} - DATE '2000-01-01') AS seed),
+      pool AS (
+        SELECT CASE
+            WHEN e.department IN ('Терапевтичне відділення №1','Терапевтичне відділення №2','Гастроентерологічне відділення','Гематологічне відділення') THEN 'Терапія'
+            WHEN e.department = 'Центр невідкладної неврології' THEN 'Неврологія'
+            WHEN e.department = 'Опікове відділення' THEN 'Опікове'
+            WHEN e.department = 'Травматологічне відділення для дітей' THEN 'Травматологія дітей'
+            WHEN e.department = 'Травматологічне відділення для дорослих' THEN 'Травматологія дорослих'
+            WHEN e.department = 'Нейрохірургічне відділення' THEN 'Нейрохірургія'
+            WHEN e.department = 'Урологічне відділення' THEN 'Урологія'
+            WHEN e.department = 'Хірургічне відділення №2' THEN 'Хірургія №2'
+            WHEN e.department = 'Хірургічне відділення №1' THEN 'Хірургія №1'
+          END AS блок, COALESCE(e.full_name, e.emp_name) AS doc, e.department AS dep, e.name_id
+        FROM empl e
+        WHERE (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%')
+          AND (e.emp_status IS DISTINCT FROM 'звільнений')
+      ),
+      ranked AS (
+        SELECT блок, doc, dep,
+          ROW_NUMBER() OVER (PARTITION BY блок ORDER BY name_id) AS rn,
+          COUNT(*) OVER (PARTITION BY блок) AS cnt
+        FROM pool WHERE блок IS NOT NULL
+      )
+      SELECT r.блок AS блок, r.doc AS лікар, r.dep AS відділення
+      FROM ranked r, params p
+      WHERE r.cnt > 0 AND r.rn = (p.seed % r.cnt) + 1`
+  },
   // Профіль лікаря (param = doc_name)
   docProfile: (p) => `SELECT ld.doc_name as лікар, ds.total_cases as випадків, ds.unique_patients as унікальних, ds.day_cases as денних, ds.night_cases as нічних, ds.weekend_cases as вихідних, ds.improved as поліпшення, ds.deaths as померло, ds.avg_los as ліжкодень, ds.avg_age as середній_вік, ds.first_case as перший, ds.last_case as останній FROM doctor_stats ds JOIN lsmd_doctors ld ON ld.empl_name_id = ds.doctor_id WHERE ld.doc_name = '${esc(p)}' LIMIT 1`,
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
@@ -340,7 +495,8 @@ async function supaFetch(sql) {
 const PUBLIC_KEYS = new Set([
   'ovKpiYear', 'doctorCount', 'doctorCountYear', 'therapeuticKpiYear', 'surgicalKpiYear', 'deptProfile', 'deptProfileYear', 'deptHead',
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
-  'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily',
+  'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily', 'dutyDoctors',
+  'deptIcdPie', 'deptIcdPieYear', 'deptIcdBlocksYear',
   'periodKpi', 'periodDaily', 'periodFlow',
   // periodAdmissions — НЕ тут: містить ПІБ пацієнтів, доступний лише авторизованим
 ])
