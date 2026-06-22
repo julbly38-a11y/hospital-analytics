@@ -9,6 +9,10 @@ on:
       file_url:
         description: 'Signed URL для скачування PDF'
         required: true
+      dept:
+        description: 'Відділення (необовʼязково; порожнє → авто за лікарем/діагнозом)'
+        required: false
+        default: ''
 
 jobs:
   import:
@@ -31,7 +35,8 @@ jobs:
       - name: Run import script
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: python scripts/import_helsi_cases.py import_file.pdf --commit
+          DEPT: ${{ github.event.inputs.dept }}
+        run: python scripts/import_helsi_cases.py import_file.pdf --commit --dept "$DEPT"
 
       - name: Delete PDF from Supabase Storage
         if: success()
