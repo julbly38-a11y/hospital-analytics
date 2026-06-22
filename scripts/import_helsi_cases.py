@@ -38,6 +38,11 @@ ANCHOR = re.compile(r"№\s*-?\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р
 DEPT_RE = re.compile(r"Відділення:\s*(.*?)\s*Фільтри")
 ICD_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,2})?)\b")
 
+# Виправлення номерів карток-одруків у джерелі helsi (зайва цифра тощо): сире → правильне.
+CARD_FIX = {
+    104339: 10439,  # Боднар Іван Миколайович (зайва «3»)
+}
+
 # Мапінг назв відділень: helsi-PDF → стандарт у БД/кабінеті.
 # helsi іноді дає розширену назву («…з інсультним блоком»), а в lsmd прийнятий короткий стандарт.
 # Ключі звіряються після нормалізації пробілів (без урахування початкових/кінцевих пробілів).
@@ -98,7 +103,7 @@ def parse(text, dept_override=""):
         raw_status = m.group(4).strip()
         adm_type = "Екстренна" if re.search(r"\bЕН\b", raw_status) else "Планова"
         out.append({
-            "helsi_no": int(m.group(1)), "піб": " ".join(parts).strip(),
+            "helsi_no": CARD_FIX.get(int(m.group(1)), int(m.group(1))), "піб": " ".join(parts).strip(),
             "прізвище": parts[0], "імʼя": parts[1], "побатькові": parts[2],
             "стать": gender_from_parental(parts[2]),
             "дата_народження": m.group(2), "вік": int(m.group(3)),
@@ -108,6 +113,24 @@ def parse(text, dept_override=""):
             "відділення": dept, "doc_name": short_doc(doc_full) if doc_full else "",
             "icd": icd, "діагноз": dx_txt[len(icd):].strip() if icd else dx_txt,
         })
+    return dedup_by_helsi(out)
+
+
+def dedup_by_helsi(rows):
+    """Дублі одного helsi_no в межах файлу: лишаємо найповніший запис.
+    Пріоритет: є виписка → є діагноз → є лікар (далі — перший за появою)."""
+    def score(r):
+        return (4 if r['вип_дата'] else 0) + (2 if r['icd'] else 0) + (1 if r['doc_name'] else 0)
+    best = {}
+    for r in rows:
+        h = r['helsi_no']
+        if h not in best or score(r) > score(best[h]):
+            best[h] = r
+    # зберігаємо вихідний порядок появи
+    seen, out = set(), []
+    for r in rows:
+        if r['helsi_no'] not in seen:
+            seen.add(r['helsi_no']); out.append(best[r['helsi_no']])
     return out
 
 
