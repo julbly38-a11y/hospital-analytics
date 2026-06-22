@@ -30,7 +30,10 @@ except ImportError:
         sys.exit("Встанови залежності:  pip install -r scripts/requirements.txt")
 
 # Толерантно до пробілів: pypdf розділяє поля пробілами, PyPDF2 склеює.
-ANCHOR = re.compile(r"№\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\s*(Відкритий|Закритий)")
+# Номер картки може бути з дефісом (№-8553) або без (№8552).
+# Статус (Відкритий/Закритий/На виписці/Зареєстровано в ЕСОЗ/…) беремо як будь-який текст
+# між «(вік р.)» і «Госпіталізовано» — стійко до нових значень helsi, жоден запис не губиться.
+ANCHOR = re.compile(r"№\s*-?\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\s*(.*?)(?=\s*Госпіталізовано)")
 DEPT_RE = re.compile(r"Відділення:\s*(.*?)\s*Фільтри")
 ICD_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,2})?)\b")
 
@@ -67,8 +70,12 @@ def iso(d):  # '24.03.1969' -> '1969-03-24'
     dd, mm, yy = d.split("."); return f"{yy}-{mm}-{dd}"
 
 
-def parse(text):
+def parse(text, dept_override=""):
+    # У вигляді «Випадки госпіталізації» є рядок «Відділення: … Фільтри»; у вигляді «Мої пацієнти» його немає.
+    # Тоді відділення передаємо вручну через dept_override (--dept).
     dept = normalize_dept(DEPT_RE.search(text).group(1) if DEPT_RE.search(text) else "")
+    if not dept:
+        dept = normalize_dept(dept_override)
     ms = list(ANCHOR.finditer(text))
     out = []
     for i, m in enumerate(ms):
@@ -87,11 +94,14 @@ def parse(text):
         dx_txt = (dx.group(1).strip() if dx else "")
         dx_txt = "" if dx_txt.startswith("Не призначено") else dx_txt
         icd = ICD_RE.match(dx_txt).group(1) if ICD_RE.match(dx_txt) else ""
+        raw_status = m.group(4).strip()
+        adm_type = "Екстренна" if re.search(r"\bЕН\b", raw_status) else "Планова"
         out.append({
             "helsi_no": int(m.group(1)), "піб": " ".join(parts).strip(),
             "прізвище": parts[0], "імʼя": parts[1], "побатькові": parts[2],
             "стать": gender_from_parental(parts[2]),
-            "дата_народження": m.group(2), "вік": int(m.group(3)), "статус": m.group(4),
+            "дата_народження": m.group(2), "вік": int(m.group(3)),
+            "статус": re.sub(r"\s*ЕН$", "", raw_status).strip(), "тип": adm_type,
             "пост_дата": adm.group(1) if adm else "", "пост_час": adm.group(2) if adm else "",
             "вип_дата": dis.group(1) if dis else "", "вип_час": dis.group(2) if dis else "",
             "відділення": dept, "doc_name": short_doc(doc_full) if doc_full else "",
@@ -101,29 +111,48 @@ def parse(text):
 
 
 # ── Запис у БД (параметризовано, через psycopg2) ───────────────────────────────
-PAT_SQL = """
+# Нормалізація ПІБ для звірки: нижній регістр, без апострофів, схлопнуті пробіли.
+# Захищає від дублів через дрібні розбіжності написання (пробіли/регістр/'/ʼ/’).
+def _norm(col):
+    return ("regexp_replace(regexp_replace(lower(btrim(" + col + ")), "
+            "'[ʼ''’`]', '', 'g'), '\\s+', ' ', 'g')")
+
+# Пацієнт «існує», якщо нормалізований ПІБ + дата народження вже є.
+# DISTINCT ON прибирає дублі того самого пацієнта в межах однієї партії.
+PAT_SQL = ("""
 INSERT INTO patients_best (patient_id, full_name, patient_name, patient_prename, parental, gender, age, birthday)
-SELECT (SELECT COALESCE(MAX(patient_id),0) FROM patients_best) + ROW_NUMBER() OVER (ORDER BY v.full_name),
-       v.full_name, v.sname, v.fname, v.parental, NULLIF(v.gender,''), v.age, v.birthday
-FROM ( {pv} ) AS v(full_name, sname, fname, parental, gender, age, birthday)
-WHERE NOT EXISTS (SELECT 1 FROM patients_best p WHERE p.full_name=v.full_name AND COALESCE(p.birthday,'')=v.birthday);
-"""
-CASE_SQL = """
+SELECT (SELECT COALESCE(MAX(patient_id),0) FROM patients_best) + ROW_NUMBER() OVER (ORDER BY full_name),
+       full_name, sname, fname, parental, NULLIF(gender,''), age, birthday
+FROM (
+  SELECT DISTINCT ON (""" + _norm("full_name") + """, COALESCE(birthday,''))
+         full_name, sname, fname, parental, gender, age, birthday
+  FROM ( {pv} ) AS v(full_name, sname, fname, parental, gender, age, birthday)
+  WHERE NOT EXISTS (
+    SELECT 1 FROM patients_best p
+    WHERE """ + _norm("p.full_name") + "=" + _norm("v.full_name") + """
+      AND COALESCE(p.birthday,'')=COALESCE(v.birthday,'')
+  )
+) d;
+""")
+CASE_SQL = ("""
 INSERT INTO lsmd (id_case, helsi_no, patient_name, birth_date, gender, age, birth_date_d,
   admission_date, admission_date_d, admission_ts, admission_time,
   discharge_date, discharge_date_d, discharge_ts,
-  admission_department, current_department, icd_primary, doc_name, doctor_id, patient_id, length_of_stay)
+  admission_department, current_department, icd_primary, doc_name, doctor_id, patient_id, length_of_stay, helsi_status, admission_type)
 SELECT (SELECT COALESCE(MAX(id_case),0) FROM lsmd) + ROW_NUMBER() OVER (ORDER BY v.helsi_no),
   v.helsi_no, v.full_name, v.birthday_txt, NULLIF(v.gender,''), v.age, v.birth_d::date,
   v.adm_raw, v.adm_d::date, v.adm_ts::timestamp, v.adm_time,
   v.dis_raw, v.dis_d::date, v.dis_ts::timestamp,
-  v.dept, v.dept, NULLIF(v.icd,''), NULLIF(v.doc_name,''), d.doctor_id, p.patient_id,
-  CASE WHEN v.dis_d IS NOT NULL THEN (v.dis_d::date - v.adm_d::date) END
-FROM ( {cv} ) AS v(helsi_no, full_name, birthday_txt, gender, age, birth_d, adm_raw, adm_d, adm_ts, adm_time, dis_raw, dis_d, dis_ts, dept, icd, doc_name)
-LEFT JOIN patients_best p ON p.full_name=v.full_name AND COALESCE(p.birthday,'')=v.birthday_txt
-LEFT JOIN lsmd_doctors d ON d.doc_name=NULLIF(v.doc_name,'')
+  v.dept, v.dept, NULLIF(v.icd,''), NULLIF(v.doc_name,''),
+  (SELECT min(d.doctor_id) FROM lsmd_doctors d WHERE d.doc_name=NULLIF(v.doc_name,'')),
+  (SELECT min(p.patient_id) FROM patients_best p
+     WHERE """ + _norm("p.full_name") + "=" + _norm("v.full_name") + """
+       AND COALESCE(p.birthday,'')=COALESCE(v.birthday_txt,'')),
+  CASE WHEN v.dis_d IS NOT NULL THEN (v.dis_d::date - v.adm_d::date) END,
+  NULLIF(v.helsi_status,''), NULLIF(v.adm_type,'')
+FROM ( {cv} ) AS v(helsi_no, full_name, birthday_txt, gender, age, birth_d, adm_raw, adm_d, adm_ts, adm_time, dis_raw, dis_d, dis_ts, dept, icd, doc_name, helsi_status, adm_type)
 WHERE NOT EXISTS (SELECT 1 FROM lsmd l WHERE l.helsi_no=v.helsi_no);
-"""
+""")
 
 
 def values_block(rows, cols, rowfn):
@@ -148,7 +177,7 @@ def case_row(r):
     return [r['helsi_no'], r['піб'], r['дата_народження'], r['стать'], str(r['вік']), bd,
             (r['пост_дата'] + ' ' + r['пост_час']).strip(), adm_d, adm_ts, r['пост_час'] or None,
             (r['вип_дата'] + ' ' + r['вип_час']).strip() or None, dis_d, dis_ts,
-            r['відділення'], r['icd'], r['doc_name']]
+            r['відділення'], r['icd'], r['doc_name'], r['статус'], r['тип']]
 
 
 def run_db(rows, commit):
@@ -160,7 +189,7 @@ def run_db(rows, commit):
     except ImportError as e:
         sys.exit(f"Залежності/конект: {e}\n  pip install -r scripts/requirements.txt + SUPABASE_DB_URL у .env")
     pv, pparams = values_block(rows, 7, pat_row)
-    cv, cparams = values_block(rows, 16, case_row)
+    cv, cparams = values_block(rows, 18, case_row)
     conn = psycopg.connect(DB_URL)
     try:
         cur = conn.cursor()
@@ -168,9 +197,60 @@ def run_db(rows, commit):
         pb0, l0 = cur.fetchone()
         cur.execute(PAT_SQL.format(pv=pv), pparams)
         cur.execute(CASE_SQL.format(cv=cv), cparams)
+        # Дозаповнення відділення: якщо випадок уже є в БД з порожнім відділенням,
+        # а повторний файл дає назву — проставити її (наявні непорожні не чіпаємо).
+        dept_rows = [r for r in rows if (r['відділення'] or '').strip()]
+        filled = 0
+        if dept_rows:
+            dv = "VALUES " + ",".join(["(%s,%s)"] * len(dept_rows))
+            dparams = []
+            for r in dept_rows:
+                dparams.extend([r['helsi_no'], r['відділення']])
+            cur.execute(f"""
+                UPDATE lsmd l
+                SET admission_department = v.dept, current_department = v.dept
+                FROM ( {dv} ) AS v(helsi_no, dept)
+                WHERE l.helsi_no = v.helsi_no
+                  AND COALESCE(NULLIF(btrim(l.admission_department),''),'') = ''
+            """, dparams)
+            filled = cur.rowcount
+        # Дозаповнення/оновлення helsi-статусу для наявних випадків (статус змінюється з часом:
+        # Відкритий → На виписці → Закритий), тож оновлюємо завжди, коли файл дає значення.
+        st_rows = [r for r in rows if (r['статус'] or '').strip()]
+        st_filled = 0
+        if st_rows:
+            sv = "VALUES " + ",".join(["(%s,%s)"] * len(st_rows))
+            sparams = []
+            for r in st_rows:
+                sparams.extend([r['helsi_no'], r['статус']])
+            cur.execute(f"""
+                UPDATE lsmd l
+                SET helsi_status = v.st
+                FROM ( {sv} ) AS v(helsi_no, st)
+                WHERE l.helsi_no = v.helsi_no
+                  AND COALESCE(l.helsi_status,'') <> v.st
+            """, sparams)
+            st_filled = cur.rowcount
+        # Дозаповнення типу госпіталізації (Екстренна/Планова) для наявних випадків з порожнім типом.
+        tp_rows = [r for r in rows if (r['тип'] or '').strip()]
+        tp_filled = 0
+        if tp_rows:
+            tv = "VALUES " + ",".join(["(%s,%s)"] * len(tp_rows))
+            tparams = []
+            for r in tp_rows:
+                tparams.extend([r['helsi_no'], r['тип']])
+            cur.execute(f"""
+                UPDATE lsmd l
+                SET admission_type = v.tp
+                FROM ( {tv} ) AS v(helsi_no, tp)
+                WHERE l.helsi_no = v.helsi_no
+                  AND COALESCE(NULLIF(btrim(l.admission_type),''),'') = ''
+            """, tparams)
+            tp_filled = cur.rowcount
         cur.execute("SELECT (SELECT COUNT(*) FROM patients_best),(SELECT COUNT(*) FROM lsmd)")
         pb1, l1 = cur.fetchone()
-        print(f"Нових пацієнтів: {pb1 - pb0} | нових випадків: {l1 - l0}")
+        print(f"Нових пацієнтів: {pb1 - pb0} | нових випадків: {l1 - l0} "
+              f"| відділень: {filled} | статусів: {st_filled} | типів: {tp_filled}")
         if commit:
             conn.commit(); print("✅ ЗАПИСАНО в БД.")
         else:
@@ -183,10 +263,11 @@ def main():
     ap = argparse.ArgumentParser(description="Імпорт випадків helsi (PDF) у lsmd/patients_best")
     ap.add_argument("pdf")
     ap.add_argument("--csv", help="шлях до CSV (за замовч. поряд із PDF)")
+    ap.add_argument("--dept", default="", help="назва відділення для файлів без рядка «Відділення:» (вигляд «Мої пацієнти»)")
     ap.add_argument("--check", action="store_true", help="dry-run у БД (відкат)")
     ap.add_argument("--commit", action="store_true", help="записати в БД")
     a = ap.parse_args()
-    rows = parse(pdf_text(a.pdf))
+    rows = parse(pdf_text(a.pdf), dept_override=a.dept)
     csv_path = a.csv or os.path.splitext(a.pdf)[0] + "_cases.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys())); w.writeheader(); w.writerows(rows)
