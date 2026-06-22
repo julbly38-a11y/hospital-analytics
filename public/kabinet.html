@@ -1234,6 +1234,25 @@
       <div id="helsiDropLabel" style="font-size:12px;opacity:.7;">Перетягни файл або клікни</div>
       <input type="file" id="helsiFileInput" accept=".pdf" style="display:none">
     </div>
+    <select id="helsiDept" onclick="event.stopPropagation()" style="
+      width:100%;margin-top:8px;padding:6px 8px;border-radius:8px;
+      border:1px solid #c9a9b4;background:rgba(255,255,255,0.72);
+      font-family:'Cormorant Garamond',serif;font-size:13px;color:#5a4050;">
+      <option value="">Відділення: авто (за лікарем/діагнозом)</option>
+      <option>Центр невідкладної неврології</option>
+      <option>Нейрохірургічне відділення</option>
+      <option>Хірургічне відділення №1</option>
+      <option>Хірургічне відділення №2</option>
+      <option>Урологічне відділення</option>
+      <option>Травматологічне відділення для дорослих</option>
+      <option>Травматологічне відділення для дітей</option>
+      <option>Опікове відділення</option>
+      <option>Гематологічне відділення</option>
+      <option>Гастроентерологічне відділення</option>
+      <option>Терапевтичне відділення №1</option>
+      <option>Терапевтичне відділення №2</option>
+      <option>Відділення анестезіології з ліжками інтенсивної терапії</option>
+    </select>
     <div id="helsiStatus" style="
       margin-top:8px;padding:8px 12px;border-radius:8px;
       background:rgba(255,255,255,0.6);font-family:'Cormorant Garamond',serif;
@@ -1278,7 +1297,8 @@
     setStatus('⏳ Завантаження…', '#7a7060');
     zone.style.pointerEvents = 'none';
 
-    fetch('/api/helsi-import-trigger', {
+    const dept = document.getElementById('helsiDept').value;
+    fetch('/api/helsi-import-trigger?dept=' + encodeURIComponent(dept), {
       method: 'POST',
       headers: { 'Content-Type': 'application/pdf' },
       body: file,

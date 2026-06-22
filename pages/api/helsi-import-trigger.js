@@ -85,7 +85,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         ref: 'main',
-        inputs: { file_path: fileName, file_url: fileUrl },
+        inputs: { file_path: fileName, file_url: fileUrl, dept: (req.query.dept || '').toString() },
       }),
     })
     if (!ghRes.ok) {
