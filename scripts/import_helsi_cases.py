@@ -34,6 +34,20 @@ ANCHOR = re.compile(r"№\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\
 DEPT_RE = re.compile(r"Відділення:\s*(.*?)\s*Фільтри")
 ICD_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,2})?)\b")
 
+# Мапінг назв відділень: helsi-PDF → стандарт у БД/кабінеті.
+# helsi іноді дає розширену назву («…з інсультним блоком»), а в lsmd прийнятий короткий стандарт.
+# Ключі звіряються після нормалізації пробілів (без урахування початкових/кінцевих пробілів).
+# TODO: перевірити решту відділень на розбіжності і дописати сюди.
+DEPT_MAP = {
+    "Центр невідкладної неврології з інсультним блоком": "Центр невідкладної неврології",
+}
+
+
+def normalize_dept(dept):
+    """helsi-назву відділення приводимо до стандарту БД (мапінг + чистка пробілів)."""
+    d = re.sub(r"\s+", " ", (dept or "")).strip()
+    return DEPT_MAP.get(d, d)
+
 
 def pdf_text(path):
     return re.sub(r"\s+", " ", " ".join((pg.extract_text() or "") for pg in PdfReader(path).pages))
@@ -54,7 +68,7 @@ def iso(d):  # '24.03.1969' -> '1969-03-24'
 
 
 def parse(text):
-    dept = (DEPT_RE.search(text).group(1).strip() if DEPT_RE.search(text) else "")
+    dept = normalize_dept(DEPT_RE.search(text).group(1) if DEPT_RE.search(text) else "")
     ms = list(ANCHOR.finditer(text))
     out = []
     for i, m in enumerate(ms):

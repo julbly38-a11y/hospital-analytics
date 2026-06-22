@@ -1,0 +1,46 @@
+name: Import Helsi PDF
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_path:
+        description: 'Шлях до файлу в Supabase Storage (helsi-imports/...)'
+        required: true
+      file_url:
+        description: 'Signed URL для скачування PDF'
+        required: true
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Download PDF
+        run: curl -L -o import_file.pdf "${{ github.event.inputs.file_url }}"
+
+      - name: Run import script
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: python scripts/import_helsi_cases.py import_file.pdf --commit
+
+      - name: Delete PDF from Supabase Storage
+        if: success()
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FILE_PATH: ${{ github.event.inputs.file_path }}
+        run: |
+          curl -X DELETE \
+            "${SUPABASE_URL}/storage/v1/object/helsi-imports/${FILE_PATH}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_KEY}" \
+            -H "apikey: ${SUPABASE_SERVICE_KEY}"

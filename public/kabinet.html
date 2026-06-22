@@ -1222,8 +1222,100 @@
     <div class="tagline">ТУРБУЄМОСЬ ПРО НАЙЦІННІШЕ</div>
   </div>
 
+  <!-- ── Адмін: імпорт helsi PDF ───────────────────────────── -->
+  <div id="helsiImportPanel" style="display:none;position:absolute;bottom:28px;right:36px;z-index:200;">
+    <div id="helsiDropZone" style="
+      width:260px;padding:18px 20px;border-radius:14px;
+      background:rgba(255,255,255,0.72);backdrop-filter:blur(12px);
+      border:2px dashed #c9a9b4;cursor:pointer;text-align:center;
+      font-family:'Cormorant Garamond',serif;color:#7a5060;transition:border-color .2s,background .2s;">
+      <div style="font-size:28px;margin-bottom:6px;">📄</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px;">Імпорт helsi PDF</div>
+      <div id="helsiDropLabel" style="font-size:12px;opacity:.7;">Перетягни файл або клікни</div>
+      <input type="file" id="helsiFileInput" accept=".pdf" style="display:none">
+    </div>
+    <div id="helsiStatus" style="
+      margin-top:8px;padding:8px 12px;border-radius:8px;
+      background:rgba(255,255,255,0.6);font-family:'Cormorant Garamond',serif;
+      font-size:13px;color:#5a4050;display:none;line-height:1.5;">
+    </div>
+  </div>
+
 </div>
 </div>
+
+<script>
+(function () {
+  const panel = document.getElementById('helsiImportPanel');
+  const zone  = document.getElementById('helsiDropZone');
+  const input = document.getElementById('helsiFileInput');
+  const label = document.getElementById('helsiDropLabel');
+  const status = document.getElementById('helsiStatus');
+
+  // Показуємо панель тільки адміну
+  fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => {
+    if (d && d.role === 'admin') panel.style.display = 'block';
+  }).catch(() => {});
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#9a6070'; zone.style.background = 'rgba(255,255,255,0.88)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = '#c9a9b4'; zone.style.background = 'rgba(255,255,255,0.72)'; });
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.style.borderColor = '#c9a9b4'; zone.style.background = 'rgba(255,255,255,0.72)'; const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
+  input.addEventListener('change', () => { if (input.files[0]) uploadFile(input.files[0]); });
+
+  function setStatus(msg, color) {
+    status.style.display = 'block';
+    status.style.color = color || '#5a4050';
+    status.innerHTML = msg;
+  }
+
+  let pollTimer = null;
+
+  function uploadFile(file) {
+    if (!file.name.endsWith('.pdf')) return setStatus('⚠️ Потрібен PDF-файл', '#b05050');
+    label.textContent = file.name;
+    setStatus('⏳ Завантаження…', '#7a7060');
+    zone.style.pointerEvents = 'none';
+
+    fetch('/api/helsi-import-trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/pdf' },
+      body: file,
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return setStatus(`❌ ${d.error}`, '#b05050');
+      setStatus('🚀 Скрипт запущено, чекаємо результату…', '#507060');
+      if (d.runId) pollStatus(d.runId);
+    })
+    .catch(e => setStatus(`❌ ${e.message}`, '#b05050'))
+    .finally(() => { zone.style.pointerEvents = ''; input.value = ''; });
+  }
+
+  function pollStatus(runId) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(async function check() {
+      try {
+        const r = await fetch(`/api/helsi-import-status?runId=${runId}`);
+        const d = await r.json();
+        if (d.status === 'completed') {
+          if (d.conclusion === 'success') {
+            setStatus(`✅ Імпорт завершено успішно.<br><a href="${d.url}" target="_blank" style="color:#507060">Переглянути лог →</a>`, '#507060');
+          } else {
+            setStatus(`❌ Помилка імпорту.<br><a href="${d.url}" target="_blank" style="color:#b05050">Переглянути лог →</a>`, '#b05050');
+          }
+          label.textContent = 'Перетягни файл або клікни';
+        } else {
+          setStatus(`⏳ ${d.status === 'in_progress' ? 'Виконується…' : 'У черзі…'}`, '#7a7060');
+          pollTimer = setTimeout(check, 5000);
+        }
+      } catch (e) {
+        setStatus(`⚠️ Не вдалося отримати статус: ${e.message}`, '#b05050');
+      }
+    }, 5000);
+  }
+})();
+</script>
 
 </body>
 </html>
