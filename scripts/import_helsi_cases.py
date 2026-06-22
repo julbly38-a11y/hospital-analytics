@@ -167,7 +167,9 @@ SELECT (SELECT COALESCE(MAX(id_case),0) FROM lsmd) + ROW_NUMBER() OVER (ORDER BY
   v.helsi_no, v.full_name, v.birthday_txt, NULLIF(v.gender,''), v.age, v.birth_d::date,
   v.adm_raw, v.adm_d::date, v.adm_ts::timestamp, v.adm_time,
   v.dis_raw, v.dis_d::date, v.dis_ts::timestamp,
-  v.dept, v.dept, NULLIF(v.icd,''), NULLIF(v.doc_name,''),
+  v.dept, v.dept, NULLIF(v.icd,''),
+  -- FK lsmd.doc_name → empl.emp_name: пишемо ім'я лише якщо воно є в empl, інакше NULL (новий лікар, ще не в empl)
+  (SELECT e.emp_name FROM empl e WHERE e.emp_name=NULLIF(v.doc_name,'') LIMIT 1),
   (SELECT min(d.doctor_id) FROM lsmd_doctors d WHERE d.doc_name=NULLIF(v.doc_name,'')),
   (SELECT min(p.patient_id) FROM patients_best p
      WHERE """ + _norm("p.full_name") + "=" + _norm("v.full_name") + """
