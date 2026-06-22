@@ -232,6 +232,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
   }
   /* перехресна підсвітка лікар ↔ відділення */
   .dept, .duty-docs span {
@@ -251,7 +252,7 @@
     transform: none;
     font-family: 'ITFLight', 'Palatino', serif;
     font-weight: 300;
-    font-size: 19px;
+    font-size: 18px;
     color: #9a958f;
     white-space: nowrap;
   }
@@ -891,6 +892,38 @@
           renderSpark(document.querySelector('.chart-surg'), sRows, param, bounds);
         })
         .catch(() => {});
+
+      // чергові лікарі — на обраний рік + сьогоднішній день/місяць
+      loadDuty();
+    }
+
+    // Чергові лікарі — 9 блоків: терапія(1, спільно), неврологія(1), +7 хірургічних.
+    // Оновлюються при зміні року; ротація детермінована за добою (рік + сьогоднішній день).
+    let lastDutyDate = '';
+    function loadDuty() {
+      const dutyEl = document.getElementById('dutyDocs');
+      if (!dutyEl) return;
+      const now = new Date();
+      const y = /^\d{4}$/.test(String(activeParam)) ? Number(activeParam) : now.getFullYear();
+      const ds = `${y}-${now.getMonth() + 1}-${now.getDate()}`;
+      if (ds === lastDutyDate) return;   // дата не змінилась — не перезавантажуємо
+      lastDutyDate = ds;
+      const blockCode = {
+        'Терапія': 'terap1', 'Неврологія': 'nevrol', 'Опікове': 'opik',
+        'Травматологія дітей': 'travmd', 'Травматологія дорослих': 'travmador',
+        'Нейрохірургія': 'neyro', 'Урологія': 'urol', 'Хірургія №2': 'hir2', 'Хірургія №1': 'hir1'
+      };
+      const order = Object.keys(blockCode);
+      stat('dutyDoctors', ds).then(rows => {
+        rows.sort((a, b) => order.indexOf(a.блок) - order.indexOf(b.блок));
+        dutyEl.innerHTML = rows.map(r => {
+          const code = blockCode[r.блок] || '';
+          const full = (r.лікар || '').trim();
+          const surname = full.split(/\s+/)[0] || full;
+          const tip = `${full} · ${r.блок}` + (r.відділення && r.відділення !== r.блок ? ` (${r.відділення})` : '');
+          return `<span data-home="${code}" title="${tip.replace(/"/g, '&quot;')}">${surname}</span>`;
+        }).join('');
+      }).catch(() => { lastDutyDate = ''; });
     }
     loadMain(activeParam, 1600, 600);
 
@@ -901,18 +934,28 @@
       });
     });
 
-    // для завідувачів: клік на назву свого відділення → перехід до кабінету
+    // клік на назву відділення → кабінет.
+    // admin — у будь-який кабінет завідувача; head_dept — у свій кабінет завідувача; doctor — у свій кабінет лікаря.
     fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => {
-      if (d?.role === 'head_dept' && d?.department) {
-        const deptElements = [...document.querySelectorAll('.dept[data-db]')];
-        deptElements.forEach(el => {
-          if (el.getAttribute('data-db') === d.department) {
-            el.style.cursor = 'pointer';
-            el.style.textDecoration = 'underline';
-            el.addEventListener('click', () => {
-              window.location.href = `/head-cabinet.html?dept=${encodeURIComponent(d.department)}`;
-            });
-          }
+      if (!d) return;
+      const deptElements = [...document.querySelectorAll('.dept[data-db]')];
+      const linkTo = (el, href) => {
+        el.style.cursor = 'pointer';
+        el.style.textDecoration = 'underline';
+        el.addEventListener('click', () => { window.location.href = href; });
+      };
+      if (d.role === 'admin') {
+        deptElements.forEach(el =>                                  // адмін — у будь-який кабінет завідувача
+          linkTo(el, `/head-cabinet.html?dept=${encodeURIComponent(el.getAttribute('data-db'))}`));
+      } else if (d.role === 'head_dept' && d.department) {
+        deptElements.forEach(el => {                                // завідувач — лише свій
+          if (el.getAttribute('data-db') === d.department)
+            linkTo(el, `/head-cabinet.html?dept=${encodeURIComponent(d.department)}`);
+        });
+      } else if (d.role === 'doctor' && d.department && d.doc_name) {
+        deptElements.forEach(el => {                                // лікар — клік по своєму відділенню → свій кабінет
+          if (el.getAttribute('data-db') === d.department)
+            linkTo(el, `/doctor-cabinet.html?doc=${encodeURIComponent(d.doc_name)}&dept=${encodeURIComponent(d.department)}`);
         });
       }
     }).catch(() => {});
@@ -1140,17 +1183,7 @@
   <div class="work-band duty-band">
     <span class="me-logout" id="meLogout">Вийти</span>
     <span class="wb-title">Чергові лікарі:</span>
-    <div class="duty-docs">
-      <span data-doc="blyndu" data-home="nevrol">Блинду</span>
-      <span data-doc="hidora" data-home="neyro">Гідора</span>
-      <span data-doc="pentel" data-home="travmd">Пентелейчук</span>
-      <span data-doc="bureha" data-home="hir2">Бурега</span>
-      <span data-doc="pronyaev" data-home="opik">Проняєв</span>
-      <span data-doc="kachmar" data-home="hir1">Качмар</span>
-      <span data-doc="tymchuk" data-home="travmador">Тимчук</span>
-      <span data-doc="klemeshev" data-home="gemat">Клємєшев</span>
-      <span data-doc="angelska" data-home="urol">Ангельська</span>
-    </div>
+    <div class="duty-docs" id="dutyDocs"></div>
   </div>
 
   <div class="dept-list2">

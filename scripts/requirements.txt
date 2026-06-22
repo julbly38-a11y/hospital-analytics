@@ -2,6 +2,9 @@
 psycopg[binary]>=3.2.0
 python-dotenv>=1.0.0
 
+# PDF import (import_helsi_cases.py)
+pypdf>=4.0
+
 # API clients
 requests>=2.31.0
 
