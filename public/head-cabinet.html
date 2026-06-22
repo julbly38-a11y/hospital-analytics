@@ -1462,6 +1462,8 @@
           if (selDate && r.поступив) {
             const [dd, mm, yy] = String(r.поступив).split('.').map(Number);
             if (dd && mm && yy) todayIdx = Math.round((selDate - new Date(yy, mm - 1, dd)) / 86400000);
+            // обрана дата = останній день перебування; якщо індекс вийшов за межі смужки — кламп до останнього сегмента
+            if (todayIdx >= days) todayIdx = days - 1;
           }
           const segs = Array.from({ length: Math.min(days, 60) }, (_, i) =>
             i === todayIdx ? '<i class="today"></i>' : '<i></i>').join('');
