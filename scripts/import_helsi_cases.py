@@ -63,8 +63,13 @@ def pdf_text(path):
 
 
 def short_doc(full):
+    # Формат як у empl.emp_name: «Прізвище І. Б.» з доповненням порожніх (напр. «Маталега І. .»).
     p = full.split(",")[0].strip().split()
-    return f"{p[0]} {p[1][0]}. {p[2][0]}." if len(p) >= 3 else " ".join(p)
+    if not p:
+        return ""
+    while len(p) < 3:
+        p.append("")
+    return f"{p[0]} {p[1][0] if p[1] else ''}. {p[2][0] if p[2] else ''}.".strip()
 
 
 def gender_from_parental(par):
