@@ -464,8 +464,10 @@
 <script>
   function scaleSlide() {
     const w = document.querySelector('.slide-wrapper');
-    const s = window.innerWidth / 1920;
-    w.style.transform = `scale(${s})`;
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    const x = (window.innerWidth - 1920 * s) / 2;
+    const y = (window.innerHeight - 1080 * s) / 2;
+    w.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
   }
   window.addEventListener('load', scaleSlide);
   window.addEventListener('resize', scaleSlide);
