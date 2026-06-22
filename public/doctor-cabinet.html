@@ -121,7 +121,7 @@
   }
   /* рядок статистики блоку (6 метрик), нижче шапки */
   .block-row {
-    top: 281px;
+    top: 244px;          /* піднято під верхню лінію (ПІБ лікаря прибрано) */
     width: 1176px;
     align-items: flex-end;
   }
@@ -703,6 +703,22 @@
     -ms-overflow-style: none;
   }
   .docs-list::-webkit-scrollbar { display: none; }
+  /* кнопка «всі» — показати всіх пацієнтів лікаря за всі роки (скидання рік-фільтра) */
+  .pat-all {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: #9a958f;
+    cursor: pointer;
+    border-bottom: 1px dashed #b9b3ac;
+    margin-left: 6px;
+    transition: color .2s ease;
+  }
+  .pat-all:hover { color: #6d93d8; }
+  .pat-all.active { color: #6d93d8; border-bottom-color: #6d93d8; font-weight: 600; }
+  /* пацієнт у списку лікаря (на місці ординаторської) */
+  .pat-item { text-align: right; line-height: 1.15; max-width: 100%; }
+  .pat-item .pi-name { display: block; font-size: 16px; font-weight: 300; color: #3a3a3a; white-space: nowrap; }
+  .pat-item .pi-meta { display: block; font-size: 11px; color: #978f88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 480px; }
   .doc-item {
     font-size: 19px;
     font-weight: 300;
@@ -713,6 +729,8 @@
     color: #b27c8b;
     font-weight: 600;
   }
+  /* власник кабінету у списку — виділяємо (клік по ньому → лише його хворі) */
+  .doc-item.me-doc { color: #6d93d8; font-weight: 600; }
   .doc-item { transition: color .2s ease, text-shadow .2s ease; cursor: pointer; }
   .doc-item.hl {
     color: #6d93d8;
@@ -1006,13 +1024,69 @@
     });
   }
 
+  // Графік лікаря: ГІСТОГРАМА — на кожну категорію (місяць) один складений стовпець із 3 нозологій.
+  // rows = [{<field>, блок, випадків}]; field = 'місяць' або 'рік'; cats = категорії осі X (фіксовані).
+  const DOC_TREND_COLORS = ['#b27c8b', '#6d8c6a', '#6d93d8'];   // теракота / шавлія / синій
+  function renderDocTrend(svg, rows, field, cats, labels) {
+    if (!svg) return;
+    const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height;
+    const escA = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const trunc = s => s.length > 30 ? s.slice(0, 29) + '…' : s;
+    const padL = 22, padR = 16, padTop = 22, padBot = 16;
+    const plotW = W - padL - padR, plotH = H - padTop - padBot, baseY = H - padBot;
+    const slot = plotW / cats.length;
+    const barW = Math.min(slot * 0.62, 30);
+    const xC = i => padL + slot * (i + 0.5);
+    let g = `<line x1="${padL}" x2="${W - padR}" y1="${baseY}" y2="${baseY}" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`;
+    cats.forEach((c, i) => {
+      g += `<text x="${xC(i).toFixed(1)}" y="${(baseY + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="#978f88" font-family="'ITFLight','Palatino',serif">${labels[i]}</text>`;
+    });
+    const totals = {};
+    (rows || []).forEach(r => { totals[r.блок] = (totals[r.блок] || 0) + Number(r.випадків || 0); });
+    const blocks = Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
+    const series = {}; blocks.forEach(b => series[b] = {});
+    (rows || []).forEach(r => { if (series[r.блок]) series[r.блок][Number(r[field])] = Number(r.випадків || 0); });
+    // масштаб — за найбільшою сумою стовпця (бо сегменти складаються)
+    let maxSum = 1;
+    cats.forEach(c => { let s = 0; blocks.forEach(b => s += series[b][c] || 0); if (s > maxSum) maxSum = s; });
+    const hFor = v => (v / maxSum) * plotH;
+    // складені стовпці: найбільша нозологія знизу
+    cats.forEach((c, i) => {
+      const x = xC(i) - barW / 2;
+      let yTop = baseY, sum = 0;
+      blocks.forEach((b, bi) => {
+        const v = series[b][c] || 0; if (v <= 0) return;
+        const h = hFor(v); const y = yTop - h;
+        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${DOC_TREND_COLORS[bi % 3]}"><title>${escA(b)}: ${v}</title></rect>`;
+        yTop = y; sum += v;
+      });
+      if (sum > 0) g += `<text x="${xC(i).toFixed(1)}" y="${(yTop - 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#5a5550" font-family="'ITFLight','Palatino',serif">${sum}</text>`;
+    });
+    // легенда (3 нозології)
+    const segW = plotW / 3;
+    blocks.forEach((b, bi) => {
+      const lx = padL + bi * segW;
+      g += `<rect x="${lx.toFixed(1)}" y="4.5" width="8" height="8" rx="1.5" fill="${DOC_TREND_COLORS[bi % 3]}"/>`;
+      g += `<text x="${(lx + 12).toFixed(1)}" y="11" font-size="9.5" fill="#5a5550" font-family="'ITFLight','Palatino',serif">${escA(trunc(b))}</text>`;
+    });
+    svg.innerHTML = g;
+  }
+
   window.addEventListener('DOMContentLoaded', () => {
     // отримай параметр відділення з URL
     const urlParams = new URLSearchParams(window.location.search);
-    const deptParam = urlParams.get('dept');
+    const docName = urlParams.get('doc');            // лікар — для персональних KPI та назви кабінету
+    let deptParam = urlParams.get('dept');           // відділення — увесь палатний скоуп (перебуваючі/графік/донат/ординаторська як у завідувача)
+    // якщо відділення не передали явно — визначаємо по лікарю і перезаходимо з обома параметрами
+    if (!deptParam && docName) {
+      stat('docDept', docName).then(dd => {
+        const dep = (dd[0] || {}).відділення;
+        if (dep) location.replace(`/doctor-cabinet.html?doc=${encodeURIComponent(docName)}&dept=${encodeURIComponent(dep)}`);
+      });
+    }
 
     const deptTitleEl = document.getElementById('deptTitle');
-    if (deptTitleEl && deptParam) deptTitleEl.textContent = deptParam;
+    if (deptTitleEl) deptTitleEl.textContent = '';   // ПІБ лікаря під лінією прибрано (є у профілі внизу)
 
     // Чергові лікарі — 9 блоків: терапія(1, спільно), неврологія(1), +7 хірургічних.
     // Оновлюються при зміні обраної дати (рік/місяць/день); ротація детермінована за добою.
@@ -1045,29 +1119,47 @@
       }).catch(() => { lastDutyDate = ''; });
     }
 
-    // список лікарів відділення (ординаторська) — розділений: верхня частина над смугою, нижня під смугою
+    // лівий блок (на місці ординаторської) — пацієнти лікаря. За обраний рік або ВСІ (кнопка «всі»).
     const docsPillsEl  = document.getElementById('deptDocsPills');
     const docsPillsEl2 = document.getElementById('deptDocsPills2');
-    if (docsPillsEl && deptParam) {
-      stat('deptDocs2', deptParam).then(rows => {
-        // завідувача прибираємо зі списку (він у профілі праворуч), решта — повне ПІБ
-        const docs = rows.filter(r => !(r.посада || '').toLowerCase().includes('завідувач'));
-        const itemHtml = (r) =>
-          `<div class="doc-item" data-doc="${(r.doc_name || '').replace(/"/g, '&quot;')}">${r.full_name || r.emp_name || r.doc_name || ''}</div>`;
-        docsPillsEl.innerHTML = '<div class="docs-title">Ординаторська</div><div class="docs-list">'
-          + docs.map(itemHtml).join('') + '</div>';
-        if (docsPillsEl2) docsPillsEl2.innerHTML = '';
-        // клік на лікаря → показати лише його пацієнтів, що перебувають на поточну обрану дату
-        document.querySelectorAll('.doc-item[data-doc]').forEach(d => {
-          const doc = d.getAttribute('data-doc');
-          if (!doc) return;
-          d.addEventListener('click', () => {
-            document.querySelectorAll('.doc-item.doc-active, .doc-item.hl').forEach(x => { x.classList.remove('doc-active'); x.classList.remove('hl'); });
-            d.classList.add('doc-active');
-            showAdmissions(lastAdmDay, doc);
-          });
+    if (docsPillsEl2) docsPillsEl2.innerHTML = '';
+    let patAllMode = false;   // true → показувати всіх пацієнтів лікаря за всі роки (скидання рік-фільтра)
+    let lastPatKey = '';
+    function renderDocPatients() {
+      if (!docsPillsEl || !docName) return;
+      const y = patAllMode ? 'all' : activeParam;
+      if (y === lastPatKey) return;   // та сама вибірка — не перезавантажуємо
+      lastPatKey = y;
+      stat('docPatients', `${docName}|${y}|all|all|all`).then(rows => {
+        const itemHtml = (r) => {
+          const meta = [r.поступив, r.діагноз].filter(Boolean).join(' · ');
+          const tip = `${r.піб || '—'} · ${meta}${r.статус ? ' · ' + r.статус : ''}`;
+          return `<div class="pat-item" title="${tip.replace(/"/g, '&quot;')}"><span class="pi-name">${r.піб || '—'}</span><span class="pi-meta">${meta}</span></div>`;
+        };
+        const allCls = patAllMode ? ' active' : '';
+        docsPillsEl.innerHTML = `<div class="docs-title">Пацієнти · ${rows.length} <span class="pat-all${allCls}">всі</span></div><div class="docs-list">`
+          + rows.map(itemHtml).join('') + '</div>';
+        const allBtn = docsPillsEl.querySelector('.pat-all');
+        if (allBtn) allBtn.addEventListener('click', () => {
+          patAllMode = !patAllMode;     // увімк/вимк режим «всі роки»
+          lastPatKey = '__force__';     // змусити перерендер
+          renderDocPatients();
         });
-      }).catch(() => {});
+      }).catch(() => { lastPatKey = ''; });
+    }
+
+    // графік лікаря — 12 місяців обраного року для 3 топових нозологій; оновлюється при зміні року
+    const MONTH_LBL = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер', 'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру'];
+    const MONTH_CATS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    let lastChartYear = '';
+    function renderDocChart() {
+      if (!docName) return;
+      const y = activeParam;
+      if (y === lastChartYear) return;   // той самий рік — не перезавантажуємо графік
+      lastChartYear = y;
+      stat('docMonthlyTopBlocks', `${docName}|${y}`).then(rows => {
+        renderDocTrend(document.querySelector('.chart-therap'), rows, 'місяць', MONTH_CATS, MONTH_LBL);
+      }).catch(() => { lastChartYear = ''; });
     }
 
     // профіль залогінованого працівника (для будь-якої ролі)
@@ -1180,8 +1272,9 @@
     function loadMain(dur, base) {
       // чергові лікарі — на обрану дату (рік/місяць), оновляться лише якщо дата змінилась
       loadDuty();
-      // верхня шапка — завжди вся лікарня, незалежно від відділення
-      stat('periodKpi', periodParam('')).then(rows => {
+      renderDocPatients();   // список усіх пацієнтів лікаря за обраний рік (гард усередині — лише при зміні року)
+      // верхня шапка — персональні KPI лікаря за весь рік
+      stat('docKpi', `${docName}|${activeParam}|all|all|all`).then(rows => {
         const r = rows[0] || {};
         countUp(elHosp, num(Number(r.total_cases), 0), dur, base);
         countUp(elPat,  num(Number(r.unique_patients), 0), dur, base + 100);
@@ -1192,8 +1285,8 @@
 
       if (!deptParam) return;
 
-      // блок під лінією — те саме відділення, рік і місяць
-      stat('periodKpi', periodParam(deptParam)).then(rows => {
+      // блок під лінією — персональні KPI лікаря за обраний період
+      stat('docKpi', periodParam(docName)).then(rows => {
         const r = rows[0] || {};
         countUp(bHosp, num(Number(r.total_cases), 0), dur, base);
         countUp(bPat,  num(Number(r.unique_patients), 0), dur, base + 100);
@@ -1203,19 +1296,8 @@
         bLet.textContent = dec(r.death_rate_pct) + '%';
       }).catch(() => {});
 
-      // графік по днях — та сама комбінація фільтрів
-      stat('periodDaily', periodParam(deptParam)).then(rows => {
-        const vals = rows.map(r => Number(r.y) || 0);
-        const max = Math.max(...vals, 1);
-        const min = Math.min(...vals);
-        const step = 50;
-        const niceMin = Math.max(0, Math.floor(min / step) * step);
-        const niceMax = Math.max(Math.ceil(max / step) * step, niceMin + step);
-        // клік на точку (день) → список поступивших того дня
-        renderSpark(document.querySelector('.chart-therap'), rows, activeParam, { niceMin, niceMax }, (r) => {
-          showAdmissions(Number(r.x));
-        });
-      }).catch(() => {});
+      // графік лікаря — динаміка по роках для 3 топових нозологій (рендериться один раз, гард усередині)
+      renderDocChart();
 
       // секторальна діаграма топ-5 категорій МКХ за рік відділення
       showPie();
@@ -1521,6 +1603,7 @@
     pills.forEach(p => {
       p.addEventListener('click', () => {
         setActive(p);
+        patAllMode = false; lastPatKey = '';   // вибір року вимикає режим «всі пацієнти» → список за цей рік
         // «всі роки» без місяця беззмістовні для денного графіка — підставляємо поточний місяць
         if (activeParam === 'all' && currentMonth == null) currentMonth = new Date().getMonth();
         renderMonthPills();
@@ -1747,7 +1830,7 @@
 
   <!-- хірургічний блок видалений -->
 
-  <!-- графік: госпіталізації по днях місяця -->
+  <!-- графік лікаря: динаміка по роках для 3 топових нозологій -->
   <svg class="spark chart-therap" viewBox="0 0 1176 110" width="1176" height="110">
     <line class="spark-base" x1="0" x2="1176" y1="68" y2="68"></line>
     <path class="spark-line"></path>

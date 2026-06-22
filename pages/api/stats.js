@@ -1,5 +1,89 @@
 import { createServerClient } from '@supabase/ssr'
 
+// Спільний CASE-вираз для визначення блоку МКХ (аліаси l=lsmd, i=icd_10)
+const ICD_BLOCK_CASE = `CASE
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G00' AND 'G09' THEN 'Запальні хвороби ЦНС'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G20' AND 'G26' THEN 'Екстрапірамідні розлади'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G35' AND 'G37' THEN 'Демієлінізуючі хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G40' AND 'G47' THEN 'Епілепсія та пароксизмальні розлади'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G50' AND 'G64' THEN 'Периферична нервова система та корінці'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G80' AND 'G83' THEN 'Паралітичні синдроми'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G90' AND 'G99' THEN 'Інші розлади нервової системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I10' AND 'I16' THEN 'Гіпертонічна хвороба'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I20' AND 'I25' THEN 'Ішемічна хвороба серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I30' AND 'I39' THEN 'Ендокардит, перикардит та вади серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I40' AND 'I43' THEN 'Кардіоміопатії та міокардит'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I44' AND 'I49' THEN 'Порушення ритму серця'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I50' AND 'I52' THEN 'Серцева недостатність'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I60' AND 'I69' THEN 'Цереброваскулярні хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I70' AND 'I79' THEN 'Атеросклероз та хвороби артерій'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'I80' AND 'I89' THEN 'Хвороби вен та лімфатичних судин'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J10' AND 'J18' THEN 'Грип та пневмонія'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J20' AND 'J22' THEN 'Гострий бронхіт'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J40' AND 'J47' THEN 'Хронічні хвороби нижніх дихальних шляхів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'J80' AND 'J99' THEN 'Інші хвороби органів дихання'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K20' AND 'K31' THEN 'Хвороби стравоходу, шлунку та ДПК'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K35' AND 'K38' THEN 'Апендицит'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K40' AND 'K46' THEN 'Грижі черевної стінки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K50' AND 'K52' THEN 'Неінфекційний ентерит та коліт'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K55' AND 'K64' THEN 'Інші хвороби кишківника'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K70' AND 'K77' THEN 'Хвороби печінки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K80' AND 'K87' THEN 'Хвороби жовчного міхура та підшлункової залози'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'K90' AND 'K93' THEN 'Інші хвороби органів травлення'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'L00' AND 'L08' THEN 'Гнійні та інфекційні хвороби шкіри'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'L80' AND 'L99' THEN 'Рубці, виразки та інші хвороби шкіри'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M00' AND 'M14' THEN 'Артрити та поліартропатії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M15' AND 'M19' THEN 'Артрози великих суглобів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M20' AND 'M25' THEN 'Інші хвороби суглобів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M40' AND 'M54' THEN 'Дорсопатії (хребет, корінці)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M60' AND 'M79' THEN 'Хвороби мʼяких тканин та сухожиль'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M80' AND 'M90' THEN 'Хвороби кісток'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'M91' AND 'M94' THEN 'Хондропатії та хвороби росту'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N00' AND 'N08' THEN 'Гломерулонефрити'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N10' AND 'N16' THEN 'Тубуло-інтерстиціальні нефрити та уропатії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N20' AND 'N23' THEN 'Сечокамʼяна хвороба'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N25' AND 'N29' THEN 'Інші хвороби нирок'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N30' AND 'N39' THEN 'Стриктура уретри, цистит та хвороби сечового міхура'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'N40' AND 'N53' THEN 'Хвороби передміхурової залози та статевих органів'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'E10' AND 'E14' THEN 'Діабетичні ускладнення'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'E70' AND 'E90' THEN 'Хвороби накопичення та амілоїдоз'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C60' AND 'C68' THEN 'Злоякісні новоутворення сечостатевої системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C81' AND 'C96' THEN 'Злоякісні новоутворення крові та лімфатичної тканини'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C00' AND 'C59' THEN 'Злоякісні новоутворення (солідні пухлини)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'C69' AND 'C80' THEN 'Злоякісні новоутворення (солідні пухлини)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D10' AND 'D36' THEN 'Доброякісні новоутворення'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D37' AND 'D44' THEN 'Новоутворення невизначеного характеру'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D45' AND 'D47' THEN 'Мієлодиспластичні синдроми та мієлопроліферативні хвороби'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D50' AND 'D64' THEN 'Анемії'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'D65' AND 'D69' THEN 'Порушення згортання крові'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'Q60' AND 'Q64' THEN 'Вроджені вади сечостатевої системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'Q65' AND 'Q79' THEN 'Вроджені вади опорно-рухового апарату'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S00' AND 'S09' THEN 'Травми голови (ЧМТ)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S10' AND 'S19' THEN 'Травми шиї'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S20' AND 'S39' THEN 'Травми грудної клітки та хребта'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S40' AND 'S49' THEN 'Травми плечового суглоба та плеча'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S50' AND 'S59' THEN 'Травми ліктьового суглоба та передпліччя'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S60' AND 'S69' THEN 'Травми запʼястка та кисті'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S70' AND 'S79' THEN 'Травми кульшового суглоба та стегна'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S80' AND 'S89' THEN 'Травми колінного суглоба та гомілки'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'S90' AND 'S99' THEN 'Травми гомілковостопного суглоба та стопи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T00' AND 'T07' THEN 'Множинні травми'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T20' AND 'T28' THEN 'Опіки зовнішніх ділянок тіла'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T29' AND 'T32' THEN 'Опіки множинних ділянок'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T33' AND 'T35' THEN 'Відмороження'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T80' AND 'T88' THEN 'Ускладнення хірургічних процедур та протезів'
+          WHEN LEFT(l.icd_primary,3) = 'T78' THEN 'Алергічні реакції'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'T36' AND 'T65' THEN 'Отруєння та токсична дія'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'A30' AND 'A49' THEN 'Бактеріальні інфекції (рожа, сепсис)'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'B15' AND 'B19' THEN 'Вірусний гепатит'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'R30' AND 'R39' THEN 'Симптоми з боку сечовидільної системи'
+          WHEN LEFT(l.icd_primary,1) IN ('V','W','X','Y') THEN 'Зовнішні причини травм'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G10' AND 'G14' THEN 'Інші розлади нервової системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G30' AND 'G32' THEN 'Інші розлади нервової системи'
+          WHEN LEFT(l.icd_primary,3) BETWEEN 'G70' AND 'G73' THEN 'Інші розлади нервової системи'
+          ELSE i.category_level1
+        END`
+
 // Whitelist: клієнт шле тільки КЛЮЧ, сервер сам обирає SQL.
 // Жодного довільного SQL від клієнта — це закриває діру з відкритим execute_sql.
 const QUERIES = {
@@ -50,10 +134,10 @@ const yearFilter = (p) => {
 // Універсальний розбір періоду "відділення|рік|місяць|день|тиждень" — будь-яка частина може бути
 // порожньою або 'all'. Відділення порожнє = вся лікарня. Тиждень, якщо заданий, має пріоритет
 // над місяцем/днем (взаємовиключні — тиждень ISO не комбінується з конкретним днем місяця).
-const parsePeriod = (p) => {
-  const [dept = '', year = 'all', month = 'all', day = 'all', week = 'all'] = String(p || '').split('|')
+const buildScope = (p, col = 'admission_department') => {
+  const [scope = '', year = 'all', month = 'all', day = 'all', week = 'all'] = String(p || '').split('|')
   const conditions = ['admission_date_d IS NOT NULL']
-  if (dept) conditions.push(`admission_department = '${esc(dept)}'`)
+  if (scope) conditions.push(`${col} = '${esc(scope)}'`)
   const ys = String(year).trim().toLowerCase()
   if (ys && ys !== 'all' && ys !== 'усі') {
     const y = parseInt(ys, 10)
@@ -77,6 +161,8 @@ const parsePeriod = (p) => {
   }
   return conditions.join(' AND ')
 }
+const parsePeriod = (p) => buildScope(p, 'admission_department')   // 1-й слот = відділення
+const parseDoc = (p) => buildScope(p, 'doc_name')                  // 1-й слот = лікар (doc_name)
 const PARAM_QUERIES = {
   // КПІ за будь-яку комбінацію відділення/рік/місяць/день/тиждень.
   // param = "відділення|рік|місяць|день|тиждень" (відділення порожнє = вся лікарня)
@@ -124,13 +210,164 @@ const PARAM_QUERIES = {
         TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
         TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
         CASE WHEN l.patient_id IS NULL THEN 0
-          ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні
+          ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні,
+        ${ICD_BLOCK_CASE} as блок
       FROM lsmd l
       LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
       LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
       WHERE ${conds.join(' AND ')}
       ORDER BY pb.full_name ASC NULLS LAST LIMIT 100`
   },
+  // Розподіл МКХ-блоків для пацієнтів, що ПЕРЕБУВАЮТЬ у відділенні на конкретну дату
+  // param = "відділення|рік|місяць|день" (публічний — лише агрегати, без ПІБ)
+  periodIcdBlocks: (p) => {
+    const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const deptCond = dept ? `AND l.admission_department = '${esc(dept)}'` : ''
+    return `WITH blocks AS (
+        SELECT ${ICD_BLOCK_CASE} as блок
+        FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code=l.icd_primary
+        WHERE l.admission_date_d <= ${dateExpr}
+          AND (l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)
+          AND l.icd_primary IS NOT NULL ${deptCond}
+      ),
+      grouped AS (SELECT блок, COUNT(*) as cnt FROM blocks WHERE блок IS NOT NULL GROUP BY блок),
+      ranked AS (SELECT блок, cnt, ROW_NUMBER() OVER (ORDER BY cnt DESC) as rn, SUM(cnt) OVER () as total FROM grouped)
+      SELECT CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END as назва,
+        SUM(cnt) as випадків,
+        ROUND(100.0*SUM(cnt)::numeric/NULLIF(MAX(total),0),1) as відс
+      FROM ranked
+      GROUP BY CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END, (rn <= 5)
+      ORDER BY MIN(rn)`
+  },
+
+  // ── Лікарські дзеркала period* (1-й слот param = doc_name замість відділення) ──
+  // KPI конкретного лікаря. param = "лікар|рік|місяць|день|тиждень"
+  docKpi: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
+      ROUND(AVG(length_of_stay),1) as avg_bed_days,
+      ROUND(AVG(age::numeric) FILTER (WHERE age ~ '^\\d+$'),1) as avg_age,
+      ROUND(100.0*SUM((discharge_status='Помер')::int)::numeric/NULLIF(COUNT(*),0)::numeric,2) as death_rate_pct,
+      ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct
+    FROM lsmd WHERE ${parseDoc(p)}`,
+  // Графік по днях для лікаря (x=день, y=кількість)
+  docDaily: (p) => `SELECT EXTRACT(day FROM admission_date_d)::int as x, COUNT(*) as y
+    FROM lsmd WHERE ${parseDoc(p)} GROUP BY x ORDER BY x`,
+  // Рух лікаря за конкретну дату (лікар|рік|місяць|день): поступило/виписано саме цим лікарем
+  docFlow: (p) => {
+    const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const valid = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = valid ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const docCond = doc ? `AND doc_name='${esc(doc)}'` : ''
+    return `SELECT
+      (SELECT COUNT(*) FROM lsmd WHERE admission_date_d=${dateExpr} ${docCond}) as поступило,
+      (SELECT COUNT(*) FROM lsmd WHERE discharge_date_d=${dateExpr} ${docCond}) as виписано`
+  },
+  // Пацієнти лікаря, що ПЕРЕБУВАЮТЬ на обрану дату (лікар|рік|місяць|день). НЕ публічний (ПІБ).
+  docAdmissions: (p) => {
+    const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const conds = [
+      `l.admission_date_d <= ${dateExpr}`,
+      `(l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)`,
+    ]
+    if (doc) conds.push(`l.doc_name = '${esc(doc)}'`)
+    return `SELECT
+        COALESCE(pb.full_name, '—') as піб,
+        CASE WHEN l.age ~ '^\\d+$' THEN l.age ELSE NULL END as вік,
+        l.gender as стать,
+        COALESCE(i.diagnosis_level3, i.diagnosis_level2, i.category_level1, l.icd_primary, '—') as діагноз,
+        l.icd_primary as код,
+        l.length_of_stay as днів,
+        l.doc_name as лікар,
+        TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
+        TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
+        CASE WHEN l.patient_id IS NULL THEN 0
+          ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні,
+        ${ICD_BLOCK_CASE} as блок
+      FROM lsmd l
+      LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
+      LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
+      WHERE ${conds.join(' AND ')}
+      ORDER BY pb.full_name ASC NULLS LAST LIMIT 100`
+  },
+  // Розподіл МКХ-блоків пацієнтів лікаря, що ПЕРЕБУВАЮТЬ на дату (лікар|рік|місяць|день)
+  docIcdBlocks: (p) => {
+    const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
+    const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
+    const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const docCond = doc ? `AND l.doc_name = '${esc(doc)}'` : ''
+    return `WITH blocks AS (
+        SELECT ${ICD_BLOCK_CASE} as блок
+        FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code=l.icd_primary
+        WHERE l.admission_date_d <= ${dateExpr}
+          AND (l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)
+          AND l.icd_primary IS NOT NULL ${docCond}
+      ),
+      grouped AS (SELECT блок, COUNT(*) as cnt FROM blocks WHERE блок IS NOT NULL GROUP BY блок),
+      ranked AS (SELECT блок, cnt, ROW_NUMBER() OVER (ORDER BY cnt DESC) as rn, SUM(cnt) OVER () as total FROM grouped)
+      SELECT CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END as назва,
+        SUM(cnt) as випадків,
+        ROUND(100.0*SUM(cnt)::numeric/NULLIF(MAX(total),0),1) as відс
+      FROM ranked
+      GROUP BY CASE WHEN rn <= 5 THEN блок ELSE 'Інші' END, (rn <= 5)
+      ORDER BY MIN(rn)`
+  },
+  // Основне відділення лікаря (найчастіше) — для контексту/ординаторської. param = doc_name
+  docDept: (p) => `SELECT admission_department as відділення, COUNT(*) as cnt
+    FROM lsmd WHERE doc_name = '${esc(p)}' AND admission_department IS NOT NULL
+    GROUP BY admission_department ORDER BY cnt DESC LIMIT 1`,
+  // Усі пацієнти, яких пролікував лікар (param = "лікар|рік|місяць|день|тиждень"). НЕ публічний (ПІБ).
+  docPatients: (p) => `SELECT
+      COALESCE(pb.full_name, '—') as піб,
+      CASE WHEN l.age ~ '^\\d+$' THEN l.age ELSE NULL END as вік,
+      l.gender as стать,
+      COALESCE(i.diagnosis_level3, i.diagnosis_level2, i.category_level1, l.icd_primary, '—') as діагноз,
+      l.icd_primary as код,
+      l.length_of_stay as днів,
+      TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
+      TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
+      l.discharge_status as статус
+    FROM lsmd l
+    LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
+    LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
+    WHERE ${parseDoc(p)}
+    ORDER BY l.admission_date_d DESC NULLS LAST LIMIT 300`,
+  // Динаміка по 12 МІСЯЦЯХ обраного року для 3 топових нозологій лікаря. param = "лікар|рік" (рік або 'all'). Публічний.
+  // → рядки {місяць, блок, випадків} лише для топ-3 блоків лікаря за цей рік
+  docMonthlyTopBlocks: (p) => {
+    const [doc = '', year = 'all'] = String(p || '').split('|')
+    const ys = String(year).trim().toLowerCase()
+    const yearCond = /^\d{4}$/.test(ys) ? `AND EXTRACT(year FROM l.admission_date_d) = ${parseInt(ys, 10)}` : ''
+    return `WITH mb AS (
+        SELECT EXTRACT(month FROM l.admission_date_d)::int as місяць, ${ICD_BLOCK_CASE} as блок
+        FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
+        WHERE l.doc_name = '${esc(doc)}' AND l.admission_date_d IS NOT NULL AND l.icd_primary IS NOT NULL ${yearCond}
+      ),
+      counts AS (SELECT місяць, блок, COUNT(*) as cnt FROM mb WHERE блок IS NOT NULL GROUP BY місяць, блок),
+      top3 AS (SELECT блок FROM counts GROUP BY блок ORDER BY SUM(cnt) DESC LIMIT 3)
+      SELECT c.місяць as місяць, c.блок as блок, c.cnt as випадків
+      FROM counts c JOIN top3 t ON t.блок = c.блок
+      ORDER BY c.місяць, c.блок`
+  },
+  // Динаміка по роках для 3 топових нозологій (блоків МКХ) лікаря. param = doc_name. Публічний (агрегати).
+  // → рядки {рік, блок, випадків} лише для топ-3 блоків лікаря за весь час
+  docYearlyTopBlocks: (p) => `WITH yb AS (
+      SELECT EXTRACT(year FROM l.admission_date_d)::int as рік, ${ICD_BLOCK_CASE} as блок
+      FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
+      WHERE l.doc_name = '${esc(p)}' AND l.admission_date_d IS NOT NULL AND l.icd_primary IS NOT NULL
+    ),
+    counts AS (SELECT рік, блок, COUNT(*) as cnt FROM yb WHERE блок IS NOT NULL GROUP BY рік, блок),
+    top3 AS (SELECT блок FROM counts GROUP BY блок ORDER BY SUM(cnt) DESC LIMIT 3)
+    SELECT c.рік as рік, c.блок as блок, c.cnt as випадків
+    FROM counts c JOIN top3 t ON t.блок = c.блок
+    ORDER BY c.рік, c.блок`,
+
   // Кількість лікарів за рік (distinct doctor_id з lsmd; param = рік або 'all')
   doctorCountYear: (p) => `SELECT COUNT(DISTINCT doctor_id) as cnt FROM lsmd WHERE doctor_id IS NOT NULL AND ${yearFilter(p)}`,
   // KPI терапевтичного блоку (сума 5 відділень; param = рік або 'all')
@@ -497,7 +734,8 @@ const PUBLIC_KEYS = new Set([
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
   'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily', 'dutyDoctors',
   'deptIcdPie', 'deptIcdPieYear', 'deptIcdBlocksYear',
-  'periodKpi', 'periodDaily', 'periodFlow',
+  'periodKpi', 'periodDaily', 'periodFlow', 'periodIcdBlocks',
+  'docKpi', 'docDaily', 'docFlow', 'docIcdBlocks', 'docDept', 'docYearlyTopBlocks', 'docMonthlyTopBlocks',  // лікарські (docAdmissions/docPatients — НЕ тут: містять ПІБ)
   // periodAdmissions — НЕ тут: містить ПІБ пацієнтів, доступний лише авторизованим
 ])
 
