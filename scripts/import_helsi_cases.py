@@ -30,10 +30,11 @@ except ImportError:
         sys.exit("Встанови залежності:  pip install -r scripts/requirements.txt")
 
 # Толерантно до пробілів: pypdf розділяє поля пробілами, PyPDF2 склеює.
-# Номер картки може бути з дефісом (№-8553) або без (№8552).
+# Номер картки: з префіксним дефісом (№-8553) або без (№8552). Лише числові картки.
+# Нестандартні номери з дефісом усередині (напр. №13-2026) НЕ матчаться → запис пропускається.
 # Статус (Відкритий/Закритий/На виписці/Зареєстровано в ЕСОЗ/…) беремо як будь-який текст
-# між «(вік р.)» і «Госпіталізовано» — стійко до нових значень helsi, жоден запис не губиться.
-ANCHOR = re.compile(r"№\s*-?\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\s*(.*?)(?=\s*Госпіталізовано)")
+# між «(вік р.)» і найближчим маркером — стійко до нових значень helsi.
+ANCHOR = re.compile(r"№\s*-?\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\s*(.*?)(?=\s*(?:Госпіталізовано|Призначення|Щоденник|Місце надання))")
 DEPT_RE = re.compile(r"Відділення:\s*(.*?)\s*Фільтри")
 ICD_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,2})?)\b")
 
@@ -214,6 +215,45 @@ def run_db(rows, commit):
                   AND COALESCE(NULLIF(btrim(l.admission_department),''),'') = ''
             """, dparams)
             filled = cur.rowcount
+        # Авто-відділення за лікарем: для випадків батчу з порожнім відділенням
+        # підставляємо відділення лікуючого лікаря (lsmd_doctors → empl.department).
+        helsi_ids = [r['helsi_no'] for r in rows]
+        by_doc = 0
+        if helsi_ids:
+            hv = "VALUES " + ",".join(["(%s)"] * len(helsi_ids))
+            cur.execute(f"""
+                UPDATE lsmd l
+                SET admission_department = e.department, current_department = e.department
+                FROM lsmd_doctors d
+                JOIN empl e ON e.name_id = d.empl_name_id
+                WHERE l.doctor_id = d.doctor_id
+                  AND l.helsi_no IN ( SELECT * FROM ( {hv} ) AS t(helsi_no) )
+                  AND COALESCE(NULLIF(btrim(l.admission_department),''),'') = ''
+                  AND COALESCE(NULLIF(btrim(e.department),''),'') <> ''
+            """, helsi_ids)
+            by_doc = cur.rowcount
+        # Авто-відділення за діагнозом (фолбек, коли лікаря немає): підставляємо відділення,
+        # яке історично найчастіше лікує цей код МКХ (перші 3 символи) — за реальними даними lsmd.
+        by_icd = 0
+        if helsi_ids:
+            cur.execute(f"""
+                UPDATE lsmd l
+                SET admission_department = m.dept, current_department = m.dept
+                FROM (
+                  SELECT icd3, dept FROM (
+                    SELECT LEFT(icd_primary,3) AS icd3, admission_department AS dept,
+                           ROW_NUMBER() OVER (PARTITION BY LEFT(icd_primary,3) ORDER BY count(*) DESC) rn
+                    FROM lsmd
+                    WHERE COALESCE(admission_department,'')<>'' AND COALESCE(icd_primary,'')<>''
+                    GROUP BY LEFT(icd_primary,3), admission_department
+                  ) t WHERE rn=1
+                ) m
+                WHERE LEFT(l.icd_primary,3) = m.icd3
+                  AND l.helsi_no IN ( SELECT * FROM ( {hv} ) AS t(helsi_no) )
+                  AND COALESCE(NULLIF(btrim(l.admission_department),''),'') = ''
+                  AND COALESCE(l.icd_primary,'')<>''
+            """, helsi_ids)
+            by_icd = cur.rowcount
         # Дозаповнення/оновлення helsi-статусу для наявних випадків (статус змінюється з часом:
         # Відкритий → На виписці → Закритий), тож оновлюємо завжди, коли файл дає значення.
         st_rows = [r for r in rows if (r['статус'] or '').strip()]
@@ -250,7 +290,8 @@ def run_db(rows, commit):
         cur.execute("SELECT (SELECT COUNT(*) FROM patients_best),(SELECT COUNT(*) FROM lsmd)")
         pb1, l1 = cur.fetchone()
         print(f"Нових пацієнтів: {pb1 - pb0} | нових випадків: {l1 - l0} "
-              f"| відділень: {filled} | статусів: {st_filled} | типів: {tp_filled}")
+              f"| відділень(файл): {filled} | відділень(лікар): {by_doc} | відділень(діагноз): {by_icd} "
+              f"| статусів: {st_filled} | типів: {tp_filled}")
         if commit:
             conn.commit(); print("✅ ЗАПИСАНО в БД.")
         else:
