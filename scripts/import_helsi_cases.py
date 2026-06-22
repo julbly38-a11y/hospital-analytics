@@ -20,6 +20,8 @@
 import sys, re, csv, os, argparse
 
 try:
+    import logging
+    logging.getLogger("pypdf").setLevel(logging.ERROR)  # глушимо спам "Ignoring wrong pointing object"
     from pypdf import PdfReader
 except ImportError:
     try:
@@ -27,7 +29,8 @@ except ImportError:
     except ImportError:
         sys.exit("Встанови залежності:  pip install -r scripts/requirements.txt")
 
-ANCHOR = re.compile(r"№(\d+?)(\d{2}\.\d{2}\.\d{4})\s*\((\d+)\s*р\.\)\s*(Відкритий|Закритий)")
+# Толерантно до пробілів: pypdf розділяє поля пробілами, PyPDF2 склеює.
+ANCHOR = re.compile(r"№\s*(\d+)\s*(\d{2}\.\d{2}\.\d{4})\s*\(\s*(\d+)\s*р\.\)\s*(Відкритий|Закритий)")
 DEPT_RE = re.compile(r"Відділення:\s*(.*?)\s*Фільтри")
 ICD_RE = re.compile(r"\b([A-Z]\d{2}(?:\.\d{1,2})?)\b")
 
@@ -85,10 +88,10 @@ def parse(text):
 
 # ── Запис у БД (параметризовано, через psycopg2) ───────────────────────────────
 PAT_SQL = """
-INSERT INTO patients_best (patient_id, full_name, patient_name, patient_prename, parental, gender, age, birthday, short_name)
+INSERT INTO patients_best (patient_id, full_name, patient_name, patient_prename, parental, gender, age, birthday)
 SELECT (SELECT COALESCE(MAX(patient_id),0) FROM patients_best) + ROW_NUMBER() OVER (ORDER BY v.full_name),
-       v.full_name, v.sname, v.fname, v.parental, NULLIF(v.gender,''), v.age, v.birthday, v.short_name
-FROM ( {pv} ) AS v(full_name, sname, fname, parental, gender, age, birthday, short_name)
+       v.full_name, v.sname, v.fname, v.parental, NULLIF(v.gender,''), v.age, v.birthday
+FROM ( {pv} ) AS v(full_name, sname, fname, parental, gender, age, birthday)
 WHERE NOT EXISTS (SELECT 1 FROM patients_best p WHERE p.full_name=v.full_name AND COALESCE(p.birthday,'')=v.birthday);
 """
 CASE_SQL = """
@@ -97,16 +100,15 @@ INSERT INTO lsmd (id_case, helsi_no, patient_name, birth_date, gender, age, birt
   discharge_date, discharge_date_d, discharge_ts,
   admission_department, current_department, icd_primary, doc_name, doctor_id, patient_id, length_of_stay)
 SELECT (SELECT COALESCE(MAX(id_case),0) FROM lsmd) + ROW_NUMBER() OVER (ORDER BY v.helsi_no),
-  v.helsi_no, v.full_name, v.birthday_txt, NULLIF(v.gender,''), v.age, v.birth_d,
-  v.adm_raw, v.adm_d, v.adm_ts, v.adm_time,
-  v.dis_raw, v.dis_d, v.dis_ts,
+  v.helsi_no, v.full_name, v.birthday_txt, NULLIF(v.gender,''), v.age, v.birth_d::date,
+  v.adm_raw, v.adm_d::date, v.adm_ts::timestamp, v.adm_time,
+  v.dis_raw, v.dis_d::date, v.dis_ts::timestamp,
   v.dept, v.dept, NULLIF(v.icd,''), NULLIF(v.doc_name,''), d.doctor_id, p.patient_id,
-  CASE WHEN v.dis_d IS NOT NULL THEN (v.dis_d - v.adm_d) END
+  CASE WHEN v.dis_d IS NOT NULL THEN (v.dis_d::date - v.adm_d::date) END
 FROM ( {cv} ) AS v(helsi_no, full_name, birthday_txt, gender, age, birth_d, adm_raw, adm_d, adm_ts, adm_time, dis_raw, dis_d, dis_ts, dept, icd, doc_name)
 LEFT JOIN patients_best p ON p.full_name=v.full_name AND COALESCE(p.birthday,'')=v.birthday_txt
 LEFT JOIN lsmd_doctors d ON d.doc_name=NULLIF(v.doc_name,'')
-WHERE NOT EXISTS (SELECT 1 FROM lsmd l WHERE l.helsi_no=v.helsi_no)
-ON CONFLICT (helsi_no) DO NOTHING;
+WHERE NOT EXISTS (SELECT 1 FROM lsmd l WHERE l.helsi_no=v.helsi_no);
 """
 
 
@@ -120,8 +122,7 @@ def values_block(rows, cols, rowfn):
 
 
 def pat_row(r):
-    sn = f"{r['прізвище']} {r['імʼя'][:1]}. {r['побатькові'][:1]}." if r['імʼя'] else r['прізвище']
-    return [r['піб'], r['прізвище'], r['імʼя'], r['побатькові'], r['стать'], r['вік'], r['дата_народження'], sn]
+    return [r['піб'], r['прізвище'], r['імʼя'], r['побатькові'], r['стать'], r['вік'], r['дата_народження']]
 
 
 def case_row(r):
@@ -144,7 +145,7 @@ def run_db(rows, commit):
         from lsmd_db import DB_URL
     except ImportError as e:
         sys.exit(f"Залежності/конект: {e}\n  pip install -r scripts/requirements.txt + SUPABASE_DB_URL у .env")
-    pv, pparams = values_block(rows, 8, pat_row)
+    pv, pparams = values_block(rows, 7, pat_row)
     cv, cparams = values_block(rows, 16, case_row)
     conn = psycopg.connect(DB_URL)
     try:
