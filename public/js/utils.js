@@ -49,9 +49,14 @@ async function stat(key, param, ttl = 0) {
 }
 
 // Пакетний запит: 1 HTTP roundtrip замість N.
-// queries = [{ key, param? }, ...]
+// queries = [{ key, param? }, ...]  ttl = мілісекунди кешу (0 = без кешу)
 // Повертає масив rows[] у тому самому порядку.
-async function statBatch(queries) {
+async function statBatch(queries, ttl = 0) {
+  const cacheKey = ttl > 0 ? 'batch|' + queries.map(q => `${q.key}|${q.param ?? ''}`).join(',') : null;
+  if (cacheKey) {
+    const hit = _statCache.get(cacheKey);
+    if (hit && Date.now() < hit.exp) return hit.data;
+  }
   const r = await fetch('/api/stats-batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +64,9 @@ async function statBatch(queries) {
   });
   if (!r.ok) throw new Error('stats-batch ' + r.status);
   const d = await r.json();
-  return d.results || queries.map(() => []);
+  const results = d.results || queries.map(() => []);
+  if (cacheKey) _statCache.set(cacheKey, { data: results, exp: Date.now() + ttl });
+  return results;
 }
 
 function inertialScrollToCenter(container, el, dur = 600) {

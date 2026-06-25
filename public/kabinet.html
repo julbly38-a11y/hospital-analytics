@@ -749,50 +749,53 @@
     const sImp  = document.querySelector('.kpi-num[data-s="imp"]');
     const sLet  = document.querySelector('.kpi-num[data-s="let"]');
 
+    const TTL_YEAR = 5 * 60 * 1000; // річні KPI кешуємо 5 хвилин
+
     function loadMain(param, dur, base) {
-      stat('ovKpiYear', param).then(rows => {
-        const r = rows[0] || {};
-        countUp(elHosp, num(Number(r.total_cases), 0), dur, base);
-        countUp(elPat,  num(Number(r.unique_patients), 0), dur, base + 100);
-        elBed.textContent = dec(r.avg_bed_days);
-        elAge.textContent = dec(r.avg_age);
-        elLet.textContent = dec(r.death_rate_pct) + '%';
+      // 5 запитів → 1 roundtrip; річні дані кешуються 5 хв
+      statBatch([
+        { key: 'ovKpiYear',          param },
+        { key: 'therapeuticKpiYear', param },
+        { key: 'surgicalKpiYear',    param },
+        { key: 'therapeuticTrend',   param },
+        { key: 'surgicalTrend',      param },
+      ], TTL_YEAR).then(([ovRows, thRows, srRows, tRows, sRows]) => {
+        // загальні KPI
+        const o = ovRows[0] || {};
+        countUp(elHosp, num(Number(o.total_cases), 0), dur, base);
+        countUp(elPat,  num(Number(o.unique_patients), 0), dur, base + 100);
+        elBed.textContent = dec(o.avg_bed_days);
+        elAge.textContent = dec(o.avg_age);
+        elLet.textContent = dec(o.death_rate_pct) + '%';
+
+        // терапевтичний блок
+        const th = thRows[0] || {};
+        countUp(bHosp, num(Number(th.total_cases), 0), dur, base);
+        countUp(bPat,  num(Number(th.unique_patients), 0), dur, base + 100);
+        bBed.textContent = dec(th.avg_bed_days);
+        bAge.textContent = dec(th.avg_age);
+        bImp.textContent = dec(th.improved_pct) + '%';
+        bLet.textContent = dec(th.death_rate_pct) + '%';
+
+        // хірургічний блок
+        const sr = srRows[0] || {};
+        countUp(sHosp, num(Number(sr.total_cases), 0), dur, base);
+        countUp(sPat,  num(Number(sr.unique_patients), 0), dur, base + 100);
+        sBed.textContent = dec(sr.avg_bed_days);
+        sAge.textContent = dec(sr.avg_age);
+        sImp.textContent = dec(sr.improved_pct) + '%';
+        sLet.textContent = dec(sr.death_rate_pct) + '%';
+
+        // графіки — спільна шкала
+        const step = param === 'all' ? 10000 : 1000;
+        const allVals = [...tRows, ...sRows].map(r => Number(r.y));
+        const niceMin = Math.floor(Math.min(...allVals, 0) / step) * step;
+        const niceMax = Math.max(Math.ceil(Math.max(...allVals, 1) / step) * step, niceMin + step);
+        const bounds = { niceMin, niceMax };
+        renderSpark(document.querySelector('.chart-therap'), tRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+        renderSpark(document.querySelector('.chart-surg'),   sRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
       }).catch(() => {});
 
-      stat('therapeuticKpiYear', param).then(rows => {
-        const r = rows[0] || {};
-        countUp(bHosp, num(Number(r.total_cases), 0), dur, base);
-        countUp(bPat,  num(Number(r.unique_patients), 0), dur, base + 100);
-        bBed.textContent = dec(r.avg_bed_days);
-        bAge.textContent = dec(r.avg_age);
-        bImp.textContent = dec(r.improved_pct) + '%';
-        bLet.textContent = dec(r.death_rate_pct) + '%';
-      }).catch(() => {});
-
-      stat('surgicalKpiYear', param).then(rows => {
-        const r = rows[0] || {};
-        countUp(sHosp, num(Number(r.total_cases), 0), dur, base);
-        countUp(sPat,  num(Number(r.unique_patients), 0), dur, base + 100);
-        sBed.textContent = dec(r.avg_bed_days);
-        sAge.textContent = dec(r.avg_age);
-        sImp.textContent = dec(r.improved_pct) + '%';
-        sLet.textContent = dec(r.death_rate_pct) + '%';
-      }).catch(() => {});
-
-      // графіки динаміки — спільна шкала для обох блоків (видно реальну різницю масштабу)
-      Promise.all([stat('therapeuticTrend', param), stat('surgicalTrend', param)])
-        .then(([tRows, sRows]) => {
-          const step = param === 'all' ? 10000 : 1000;
-          const allVals = [...tRows, ...sRows].map(r => Number(r.y));
-          const niceMin = Math.floor(Math.min(...allVals) / step) * step;
-          const niceMax = Math.max(Math.ceil(Math.max(...allVals) / step) * step, niceMin + step);
-          const bounds = { niceMin, niceMax };
-          renderSpark(document.querySelector('.chart-therap'), tRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
-          renderSpark(document.querySelector('.chart-surg'), sRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
-        })
-        .catch(() => {});
-
-      // чергові лікарі — на обраний рік + сьогоднішній день/місяць
       loadDuty();
     }
 
