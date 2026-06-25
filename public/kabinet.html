@@ -662,6 +662,8 @@
     margin-top: 4px;
   }
 </style>
+<script src="/js/utils.js"></script>
+<script src="/js/spark-chart.js"></script>
 <script>
   function scaleSlide() {
     const w = document.querySelector('.slide-wrapper');
@@ -671,112 +673,9 @@
   window.addEventListener('load', scaleSlide);
   window.addEventListener('resize', scaleSlide);
 
-  function fmt(n) {
-    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  }
-  function countUp(el, target, dur, delay) {
-    el.textContent = '0';
-    setTimeout(() => {
-      const start = performance.now();
-      function tick(now) {
-        const p = Math.min((now - start) / dur, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = fmt(Math.round(target * eased));
-        if (p < 1) requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-    }, delay);
-    // фолбек: гарантовано виставити фінальне число (якщо rAF призупинено — фон/неактивна вкладка)
-    setTimeout(() => { el.textContent = fmt(target); }, delay + dur + 120);
-  }
-
-  // ── живі дані з /api/stats (whitelist-ключі, без логіну) ──
-  async function stat(key, param) {
-    const body = (param !== undefined) ? { key, param } : { key };
-    const r = await fetch('/api/stats', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error('stats ' + r.status);
-    const d = await r.json();
-    return d.rows || [];
-  }
 
   // KPI шапки: Госпіталізацій, Пацієнтів, Ліжко-день, Середній вік, Летальність
   const dec = (v) => (v == null || isNaN(v)) ? '—' : String(v).replace('.', ',');
-
-  // ── згладжений шлях (Catmull-Rom → Безьє) для спарклайна ──
-  function smoothPath(pts) {
-    if (pts.length < 2) return pts.length ? `M${pts[0].x},${pts[0].y}` : '';
-    let d = `M${pts[0].x},${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
-      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
-      const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-    }
-    return d;
-  }
-  const NS = 'http://www.w3.org/2000/svg';
-  const mkNS = (t) => document.createElementNS(NS, t);
-
-  function renderSpark(svg, rows, period, sharedBounds) {
-    if (!svg || !rows || !rows.length) return;
-    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
-    const padX = 16, padTop = 18, padBot = 18;
-    const values = rows.map(r => Number(r.y));
-    const max = Math.max(...values), n = values.length;
-    const min = Math.min(...values);
-    const yearly = Number(rows[0].x) >= 1000;
-    const step = yearly ? 10000 : 1000;
-    const niceMin = sharedBounds ? sharedBounds.niceMin : Math.floor(min / step) * step;
-    const niceMax = sharedBounds ? sharedBounds.niceMax : Math.max(Math.ceil(max / step) * step, niceMin + step);
-    const span = niceMax - niceMin;
-    const drawH = h - padTop - padBot;
-    const zeroY = h - padBot;                      // базова лінія — низ області (= niceMin)
-    const xFor = i => n === 1 ? w / 2 : padX + i * (w - 2 * padX) / (n - 1);
-    const yFor = v => zeroY - ((v - niceMin) / span) * drawH;
-    const pts = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
-    svg.querySelector('.spark-line').setAttribute('d', smoothPath(pts));
-    const base = svg.querySelector('.spark-base');
-    base.setAttribute('x1', '0'); base.setAttribute('x2', String(w));
-    base.setAttribute('y1', zeroY.toFixed(1)); base.setAttribute('y2', zeroY.toFixed(1));
-
-    // прибрати старі маркери
-    svg.querySelectorAll('.spark-dot, .spark-labels').forEach(e => e.remove());
-
-    rows.forEach((r, i) => {
-      const cx = pts[i].x, cy = pts[i].y;
-      const dot = mkNS('circle'); dot.setAttribute('class', 'spark-dot');
-      dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1)); dot.setAttribute('r', '6');
-
-      // постійний підпис кількості над точкою
-      const valTx = mkNS('text'); valTx.setAttribute('class', 'spark-labels spark-val');
-      valTx.setAttribute('x', cx.toFixed(1)); valTx.setAttribute('y', (cy - 10).toFixed(1));
-      valTx.textContent = fmt(values[i]);
-      svg.appendChild(valTx);
-
-      // постійний підпис під базовою лінією: місяць у форматі 01,02… або рік
-      const xLabel = yearly ? String(r.x) : String(Number(r.x)).padStart(2, '0');
-      const xTx = mkNS('text'); xTx.setAttribute('class', 'spark-labels spark-xlabel');
-      xTx.setAttribute('x', cx.toFixed(1)); xTx.setAttribute('y', (zeroY + 13).toFixed(1));
-      xTx.textContent = xLabel;
-      svg.appendChild(xTx);
-
-      dot.addEventListener('mouseenter', () => {
-        dot.setAttribute('r', '9');
-        valTx.classList.add('active');
-        xTx.classList.add('active');
-      });
-      dot.addEventListener('mouseleave', () => {
-        dot.setAttribute('r', '6');
-        valTx.classList.remove('active');
-        xTx.classList.remove('active');
-      });
-      svg.appendChild(dot);
-    });
-  }
 
   window.addEventListener('DOMContentLoaded', () => {
     // профіль залогінованого працівника (для будь-якої ролі)
@@ -888,8 +787,8 @@
           const niceMin = Math.floor(Math.min(...allVals) / step) * step;
           const niceMax = Math.max(Math.ceil(Math.max(...allVals) / step) * step, niceMin + step);
           const bounds = { niceMin, niceMax };
-          renderSpark(document.querySelector('.chart-therap'), tRows, param, bounds);
-          renderSpark(document.querySelector('.chart-surg'), sRows, param, bounds);
+          renderSpark(document.querySelector('.chart-therap'), tRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+          renderSpark(document.querySelector('.chart-surg'), sRows, param, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
         })
         .catch(() => {});
 
