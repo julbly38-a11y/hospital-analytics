@@ -801,6 +801,7 @@
 
     // Чергові лікарі — 9 блоків: терапія(1, спільно), неврологія(1), +7 хірургічних.
     // Оновлюються при зміні року; ротація детермінована за добою (рік + сьогоднішній день).
+    const clearHl = () => document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
     let lastDutyDate = '';
     function loadDuty() {
       const dutyEl = document.getElementById('dutyDocs');
@@ -825,6 +826,16 @@
           const tip = `${full} · ${r.блок}` + (r.відділення && r.відділення !== r.блок ? ` (${r.відділення})` : '');
           return `<span data-home="${code}" title="${tip.replace(/"/g, '&quot;')}">${surname}</span>`;
         }).join('');
+        dutyEl.querySelectorAll('span[data-home]').forEach(span => {
+          span.addEventListener('mouseenter', () => {
+            span.classList.add('hl');
+            const home = span.getAttribute('data-home');
+            document.querySelectorAll('.dept[data-dept]').forEach(d => {
+              if (d.getAttribute('data-dept') === home) d.classList.add('hl');
+            });
+          });
+          span.addEventListener('mouseleave', clearHl);
+        });
       }).catch(() => { lastDutyDate = ''; });
     }
     loadMain(activeParam, 1600, 600);
@@ -862,25 +873,15 @@
       }
     }).catch(() => {});
 
-    // перехресна підсвітка лікар ↔ відділення
-    // лікар → лише його рідне відділення; відділення → черговий лікар блоку
-    const docs = [...document.querySelectorAll('.duty-docs span[data-doc]')];
+    // перехресна підсвітка відділення → черговий лікар (live-query, бо спани — async)
     const depts = [...document.querySelectorAll('.dept[data-dept]')];
-    const clearHl = () => document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
-
-    docs.forEach(doc => {
-      doc.addEventListener('mouseenter', () => {
-        doc.classList.add('hl');
-        const home = doc.getAttribute('data-home');
-        depts.forEach(d => { if (d.getAttribute('data-dept') === home) d.classList.add('hl'); });
-      });
-      doc.addEventListener('mouseleave', clearHl);
-    });
     depts.forEach(d => {
       d.addEventListener('mouseenter', () => {
         d.classList.add('hl');
-        const id = d.getAttribute('data-doc');
-        docs.forEach(x => { if (x.getAttribute('data-doc') === id) x.classList.add('hl'); });
+        const dept = d.getAttribute('data-dept');
+        document.querySelectorAll('.duty-docs span[data-home]').forEach(x => {
+          if (x.getAttribute('data-home') === dept) x.classList.add('hl');
+        });
       });
       d.addEventListener('mouseleave', clearHl);
     });
@@ -1125,7 +1126,9 @@
   </div>
 
   <!-- ── Адмін: імпорт helsi PDF (в один рядок перед надписом власника) ── -->
-  <div id="helsiImportPanel" style="display:none;position:absolute;top:846px;right:300px;width:240px;z-index:9999;text-align:right;">
+  <div id="helsiImportPanel" style="display:none;position:absolute;top:846px;right:60px;width:auto;z-index:9999;text-align:right;">
+    <!-- Дві кнопки в один горизонтальний ряд, вирівняні вправо -->
+    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;">
     <div id="helsiDropZone" style="
       display:inline-flex;align-items:center;gap:8px;
       padding:7px 14px;border-radius:10px;
@@ -1136,6 +1139,18 @@
       <span style="font-size:17px;">📄</span>
       <span id="helsiDropLabel">Імпорт helsi PDF</span>
       <input type="file" id="helsiFileInput" accept=".pdf" style="display:none">
+    </div>
+    <!-- Кнопка: запуск імпорту з helsi через Claude (Chrome) -->
+    <div id="helsiClaudeBtn" style="
+      display:inline-flex;align-items:center;gap:8px;
+      padding:7px 14px;border-radius:10px;
+      background:rgba(255,255,255,0.72);backdrop-filter:blur(12px);
+      border:1px solid #c9a9b4;cursor:pointer;white-space:nowrap;
+      font-family:'Cormorant Garamond',serif;color:#7a5060;font-size:15px;
+      transition:border-color .2s,background .2s;">
+      <span style="font-size:17px;">🤖</span>
+      <span>Імпорт з helsi (Claude)</span>
+    </div>
     </div>
     <!-- шкала прогресу під кнопкою -->
     <div id="helsiProgress" style="display:none;margin-top:6px;height:4px;width:100%;border-radius:3px;background:rgba(201,169,180,0.25);overflow:hidden;">
@@ -1169,6 +1184,29 @@
   zone.addEventListener('dragleave', () => { zone.style.borderColor = '#c9a9b4'; zone.style.background = 'rgba(255,255,255,0.72)'; });
   zone.addEventListener('drop', e => { e.preventDefault(); zone.style.borderColor = '#c9a9b4'; zone.style.background = 'rgba(255,255,255,0.72)'; const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
   input.addEventListener('change', () => { if (input.files[0]) uploadFile(input.files[0]); });
+
+  // ── Кнопка «Імпорт з helsi (Claude)» ──
+  // Веб-сторінка НЕ може запустити Claude напряму, тож кнопка: відкриває helsi у
+  // новій вкладці + копіює готову команду в буфер. Користувач вставляє її в чат
+  // Claude Code, і Claude через Chrome збирає сторінки helsi й ллє в БД.
+  const claudeBtn = document.getElementById('helsiClaudeBtn');
+  const HELSI_URL = 'https://helsi.pro/hospital/cases?__my_patient=false';
+  const CLAUDE_CMD = 'Залий нові випадки госпіталізації з helsi. Я залогінений, '
+    + 'сторінка відкрита: ' + HELSI_URL + ' . Збери сторінки і залий через '
+    + 'scripts/import_helsi_web.py --since-db (сам візьме останню дату з БД, без дублів).';
+  if (claudeBtn) {
+    claudeBtn.addEventListener('mouseenter', () => { claudeBtn.style.borderColor = '#9a6070'; claudeBtn.style.background = 'rgba(255,255,255,0.88)'; });
+    claudeBtn.addEventListener('mouseleave', () => { claudeBtn.style.borderColor = '#c9a9b4'; claudeBtn.style.background = 'rgba(255,255,255,0.72)'; });
+    claudeBtn.addEventListener('click', async () => {
+      window.open(HELSI_URL, '_blank');
+      try {
+        await navigator.clipboard.writeText(CLAUDE_CMD);
+        setStatus('✅ Залогінься в helsi · команду скопійовано — встав у чат Claude Code', '#507060');
+      } catch (e) {
+        setStatus('helsi відкрито. Команда для Claude:<br><span style="user-select:all">' + CLAUDE_CMD + '</span>', '#7a5060');
+      }
+    });
+  }
 
   function setStatus(msg, color) {
     status.style.display = msg ? 'block' : 'none';
