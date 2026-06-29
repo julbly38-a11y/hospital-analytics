@@ -885,6 +885,10 @@
   .dd-icd-row .bar { height: 5px; border-radius: 3px; background: rgba(0,0,0,0.06); overflow: hidden; }
   .dd-icd-row .bar i { display: block; height: 100%; background: #8d978c; }
 </style>
+<script src="/js/utils.js"></script>
+<script src="/js/spark-chart.js"></script>
+<script src="/js/doc-trend.js"></script>
+<script src="/js/dept-pie.js"></script>
 <script>
   function scaleSlide() {
     const w = document.querySelector('.slide-wrapper');
@@ -894,183 +898,9 @@
   window.addEventListener('load', scaleSlide);
   window.addEventListener('resize', scaleSlide);
 
-  function fmt(n) {
-    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  }
-  function countUp(el, target, dur, delay) {
-    el.textContent = '0';
-    setTimeout(() => {
-      const start = performance.now();
-      function tick(now) {
-        const p = Math.min((now - start) / dur, 1);
-        const eased = 1 - Math.pow(1 - p, 3);
-        el.textContent = fmt(Math.round(target * eased));
-        if (p < 1) requestAnimationFrame(tick);
-      }
-      requestAnimationFrame(tick);
-    }, delay);
-    // фолбек: гарантовано виставити фінальне число (якщо rAF призупинено — фон/неактивна вкладка)
-    setTimeout(() => { el.textContent = fmt(target); }, delay + dur + 120);
-  }
-
-  // ── живі дані з /api/stats (whitelist-ключі, без логіну) ──
-  async function stat(key, param) {
-    const body = (param !== undefined) ? { key, param } : { key };
-    const r = await fetch('/api/stats', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!r.ok) throw new Error('stats ' + r.status);
-    const d = await r.json();
-    return d.rows || [];
-  }
-
   // KPI шапки: Госпіталізацій, Пацієнтів, Ліжко-день, Середній вік, Летальність
   const dec = (v) => (v == null || isNaN(v)) ? '—' : String(v).replace('.', ',');
 
-  // ── згладжений шлях (Catmull-Rom → Безьє) для спарклайна ──
-  function smoothPath(pts) {
-    if (pts.length < 2) return pts.length ? `M${pts[0].x},${pts[0].y}` : '';
-    let d = `M${pts[0].x},${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || pts[i + 1];
-      const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
-      const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-    }
-    return d;
-  }
-  const NS = 'http://www.w3.org/2000/svg';
-  const mkNS = (t) => document.createElementNS(NS, t);
-
-  // інерційна прокрутка контейнера так, щоб елемент опинився по центру (easeOutCubic — ефект затухання)
-  function inertialScrollToCenter(container, el, dur = 600) {
-    const cRect = container.getBoundingClientRect();
-    const eRect = el.getBoundingClientRect();
-    const target = container.scrollTop + (eRect.top - cRect.top) - (container.clientHeight / 2) + (el.offsetHeight / 2);
-    const start = container.scrollTop;
-    const dist = target - start;
-    if (Math.abs(dist) < 1) return;
-    let t0 = null;
-    function step(t) {
-      if (t0 === null) t0 = t;
-      const p = Math.min((t - t0) / dur, 1);
-      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
-      container.scrollTop = start + dist * eased;
-      if (p < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  function renderSpark(svg, rows, period, sharedBounds, onDotClick) {
-    if (!svg || !rows || !rows.length) return;
-    const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
-    const padX = 16, padTop = 18, padBot = 18;
-    const values = rows.map(r => Number(r.y));
-    const max = Math.max(...values), n = values.length;
-    const min = Math.min(...values);
-    const yearly = Number(rows[0].x) >= 1000;
-    const step = yearly ? 10000 : 1000;
-    const niceMin = sharedBounds ? sharedBounds.niceMin : Math.floor(min / step) * step;
-    const niceMax = sharedBounds ? sharedBounds.niceMax : Math.max(Math.ceil(max / step) * step, niceMin + step);
-    const span = niceMax - niceMin;
-    const drawH = h - padTop - padBot;
-    const zeroY = h - padBot;                      // базова лінія — низ області (= niceMin)
-    const xFor = i => n === 1 ? w / 2 : padX + i * (w - 2 * padX) / (n - 1);
-    const yFor = v => zeroY - ((v - niceMin) / span) * drawH;
-    const pts = values.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
-    svg.querySelector('.spark-line').setAttribute('d', smoothPath(pts));
-    const base = svg.querySelector('.spark-base');
-    base.setAttribute('x1', '0'); base.setAttribute('x2', String(w));
-    base.setAttribute('y1', zeroY.toFixed(1)); base.setAttribute('y2', zeroY.toFixed(1));
-
-    // прибрати старі маркери
-    svg.querySelectorAll('.spark-dot, .spark-labels').forEach(e => e.remove());
-
-    rows.forEach((r, i) => {
-      const cx = pts[i].x, cy = pts[i].y;
-      const dot = mkNS('circle'); dot.setAttribute('class', 'spark-dot');
-      dot.setAttribute('cx', cx.toFixed(1)); dot.setAttribute('cy', cy.toFixed(1)); dot.setAttribute('r', '4');
-
-      // постійний підпис кількості над точкою
-      const valTx = mkNS('text'); valTx.setAttribute('class', 'spark-labels spark-val');
-      valTx.setAttribute('x', cx.toFixed(1)); valTx.setAttribute('y', (cy - 7).toFixed(1));
-      valTx.textContent = fmt(values[i]);
-      svg.appendChild(valTx);
-
-      // постійний підпис під базовою лінією: місяць у форматі 01,02… або рік
-      const xLabel = yearly ? String(r.x) : String(Number(r.x)).padStart(2, '0');
-      const xTx = mkNS('text'); xTx.setAttribute('class', 'spark-labels spark-xlabel');
-      xTx.setAttribute('x', cx.toFixed(1)); xTx.setAttribute('y', (zeroY + 11).toFixed(1));
-      xTx.textContent = xLabel;
-      svg.appendChild(xTx);
-
-      dot.addEventListener('mouseenter', () => {
-        dot.setAttribute('r', '6');
-        valTx.classList.add('active');
-        xTx.classList.add('active');
-      });
-      dot.addEventListener('mouseleave', () => {
-        dot.setAttribute('r', '4');
-        valTx.classList.remove('active');
-        xTx.classList.remove('active');
-      });
-      if (onDotClick) {
-        dot.style.cursor = 'pointer';
-        dot.addEventListener('click', () => onDotClick(r));
-      }
-      svg.appendChild(dot);
-    });
-  }
-
-  // Графік лікаря: ГІСТОГРАМА — на кожну категорію (місяць) один складений стовпець із 3 нозологій.
-  // rows = [{<field>, блок, випадків}]; field = 'місяць' або 'рік'; cats = категорії осі X (фіксовані).
-  const DOC_TREND_COLORS = ['#b27c8b', '#6d8c6a', '#6d93d8'];   // теракота / шавлія / синій
-  function renderDocTrend(svg, rows, field, cats, labels) {
-    if (!svg) return;
-    const vb = svg.viewBox.baseVal, W = vb.width, H = vb.height;
-    const escA = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    const trunc = s => s.length > 30 ? s.slice(0, 29) + '…' : s;
-    const padL = 22, padR = 16, padTop = 22, padBot = 16;
-    const plotW = W - padL - padR, plotH = H - padTop - padBot, baseY = H - padBot;
-    const slot = plotW / cats.length;
-    const barW = Math.min(slot * 0.62, 30);
-    const xC = i => padL + slot * (i + 0.5);
-    let g = `<line x1="${padL}" x2="${W - padR}" y1="${baseY}" y2="${baseY}" stroke="rgba(0,0,0,0.12)" stroke-width="1"/>`;
-    cats.forEach((c, i) => {
-      g += `<text x="${xC(i).toFixed(1)}" y="${(baseY + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="#978f88" font-family="'ITFLight','Palatino',serif">${labels[i]}</text>`;
-    });
-    const totals = {};
-    (rows || []).forEach(r => { totals[r.блок] = (totals[r.блок] || 0) + Number(r.випадків || 0); });
-    const blocks = Object.keys(totals).sort((a, b) => totals[b] - totals[a]).slice(0, 3);
-    const series = {}; blocks.forEach(b => series[b] = {});
-    (rows || []).forEach(r => { if (series[r.блок]) series[r.блок][Number(r[field])] = Number(r.випадків || 0); });
-    // масштаб — за найбільшою сумою стовпця (бо сегменти складаються)
-    let maxSum = 1;
-    cats.forEach(c => { let s = 0; blocks.forEach(b => s += series[b][c] || 0); if (s > maxSum) maxSum = s; });
-    const hFor = v => (v / maxSum) * plotH;
-    // складені стовпці: найбільша нозологія знизу
-    cats.forEach((c, i) => {
-      const x = xC(i) - barW / 2;
-      let yTop = baseY, sum = 0;
-      blocks.forEach((b, bi) => {
-        const v = series[b][c] || 0; if (v <= 0) return;
-        const h = hFor(v); const y = yTop - h;
-        g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" fill="${DOC_TREND_COLORS[bi % 3]}"><title>${escA(b)}: ${v}</title></rect>`;
-        yTop = y; sum += v;
-      });
-      if (sum > 0) g += `<text x="${xC(i).toFixed(1)}" y="${(yTop - 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#5a5550" font-family="'ITFLight','Palatino',serif">${sum}</text>`;
-    });
-    // легенда (3 нозології)
-    const segW = plotW / 3;
-    blocks.forEach((b, bi) => {
-      const lx = padL + bi * segW;
-      g += `<rect x="${lx.toFixed(1)}" y="4.5" width="8" height="8" rx="1.5" fill="${DOC_TREND_COLORS[bi % 3]}"/>`;
-      g += `<text x="${(lx + 12).toFixed(1)}" y="11" font-size="9.5" fill="#5a5550" font-family="'ITFLight','Palatino',serif">${escA(trunc(b))}</text>`;
-    });
-    svg.innerHTML = g;
-  }
 
   window.addEventListener('DOMContentLoaded', () => {
     // отримай параметр відділення з URL
@@ -1270,49 +1100,48 @@
     const periodParam = (dept) => `${dept || ''}|${activeParam}|${currentMonth != null ? currentMonth + 1 : 'all'}|all|all`;
 
     function loadMain(dur, base) {
-      // чергові лікарі — на обрану дату (рік/місяць), оновляться лише якщо дата змінилась
       loadDuty();
-      renderDocPatients();   // список усіх пацієнтів лікаря за обраний рік (гард усередині — лише при зміні року)
-      // верхня шапка — персональні KPI лікаря за весь рік
-      stat('docKpi', `${docName}|${activeParam}|all|all|all`).then(rows => {
-        const r = rows[0] || {};
-        countUp(elHosp, num(Number(r.total_cases), 0), dur, base);
-        countUp(elPat,  num(Number(r.unique_patients), 0), dur, base + 100);
-        elBed.textContent = dec(r.avg_bed_days);
-        elAge.textContent = dec(r.avg_age);
-        elLet.textContent = dec(r.death_rate_pct) + '%';
+      renderDocPatients();
+
+      if (!deptParam) {
+        stat('docKpi', `${docName}|${activeParam}|all|all|all`).then(rows => {
+          const r = rows[0] || {};
+          countUp(elHosp, num(Number(r.total_cases), 0), dur, base);
+          countUp(elPat,  num(Number(r.unique_patients), 0), dur, base + 100);
+          elBed.textContent = dec(r.avg_bed_days);
+          elAge.textContent = dec(r.avg_age);
+          elLet.textContent = dec(r.death_rate_pct) + '%';
+        }).catch(() => {});
+        return;
+      }
+
+      // 2 KPI запити об'єднуємо в 1 roundtrip
+      statBatch([
+        { key: 'docKpi', param: `${docName}|${activeParam}|all|all|all` },
+        { key: 'docKpi', param: periodParam(docName) },
+      ]).then(([yearRows, periodRows]) => {
+        // верхня шапка — весь рік
+        const y = yearRows[0] || {};
+        countUp(elHosp, num(Number(y.total_cases), 0), dur, base);
+        countUp(elPat,  num(Number(y.unique_patients), 0), dur, base + 100);
+        elBed.textContent = dec(y.avg_bed_days);
+        elAge.textContent = dec(y.avg_age);
+        elLet.textContent = dec(y.death_rate_pct) + '%';
+
+        // блок під лінією — обраний період
+        const p = periodRows[0] || {};
+        countUp(bHosp, num(Number(p.total_cases), 0), dur, base);
+        countUp(bPat,  num(Number(p.unique_patients), 0), dur, base + 100);
+        bBed.textContent = dec(p.avg_bed_days);
+        bAge.textContent = dec(p.avg_age);
+        bImp.textContent = dec(p.improved_pct) + '%';
+        bLet.textContent = dec(p.death_rate_pct) + '%';
       }).catch(() => {});
 
-      if (!deptParam) return;
-
-      // блок під лінією — персональні KPI лікаря за обраний період
-      stat('docKpi', periodParam(docName)).then(rows => {
-        const r = rows[0] || {};
-        countUp(bHosp, num(Number(r.total_cases), 0), dur, base);
-        countUp(bPat,  num(Number(r.unique_patients), 0), dur, base + 100);
-        bBed.textContent = dec(r.avg_bed_days);
-        bAge.textContent = dec(r.avg_age);
-        bImp.textContent = dec(r.improved_pct) + '%';
-        bLet.textContent = dec(r.death_rate_pct) + '%';
-      }).catch(() => {});
-
-      // графік лікаря — динаміка по роках для 3 топових нозологій (рендериться один раз, гард усередині)
       renderDocChart();
-
-      // секторальна діаграма топ-5 категорій МКХ за рік відділення
       showPie();
     }
 
-    // donut топ-5 категорій МКХ (ліва нижня ділянка) — кольори емблеми лікарні
-    // неактивні сегменти: градієнт сіро-зеленого (як права частина емблеми)
-    // активний сегмент: теракотово-рожевий (як ліва частина емблеми)
-    const EMBLEM_RED = '#b27c8b';
-    const SAGE_LIGHT = [176, 185, 172], SAGE_DARK = [104, 116, 103];
-    const sageShade = (k, n) => {
-      const t = n > 1 ? k / (n - 1) : 0.5;
-      const c = SAGE_LIGHT.map((v, j) => Math.round(v + (SAGE_DARK[j] - v) * t));
-      return `rgb(${c[0]},${c[1]},${c[2]})`;
-    };
     function showPie(day) {
       const pieEl = document.getElementById('deptPie');
       if (!pieEl || !deptParam) return;
@@ -1327,127 +1156,18 @@
       if (pieKey === lastPieKey) return;   // та сама дата/період — не перебудовуємо (зберігаємо фіксацію сегмента)
       lastPieKey = pieKey;
       stat('periodIcdBlocks', pieKey).then(rows => {
-        const top = (rows || []).slice(0, 6);
-        if (!top.length) { pieEl.innerHTML = ''; return; }
-        const VW = 560, VH = 490, cx = 280, cy = 285, GAP = 3;
-        const R = 124, SW = 60;
-        const C = 2 * Math.PI * R;
-        const totalCases = top.reduce((s, r) => s + (Number(r.випадків) || 0), 0);
-        let offset = 0;
-        const midById = {}, greenById = {};
-        const nDrawn = top.filter(r => (r.назва || '') !== 'Інші').length;
-        let di = 0;
-        let defs = '<defs>', arcs = '', hits = '';
-        top.forEach((r, i) => {
-          const frac = Math.max(0, Number(r.відс) || 0) / 100;
-          const arcLen = frac * C;
-          // «Інші» не малюємо — лишаємо розрив у кільці (offset все одно зсуваємо)
-          const isOther = (r.назва || '') === 'Інші';
-          const midFrac = (offset + arcLen / 2) / C;   // частка середини сегмента від верху
-          const dash = `${Math.max(0, arcLen - GAP).toFixed(1)} ${(C - arcLen + GAP).toFixed(1)}`;
-          if (!isOther) {
-            midById[i] = midFrac;
-            const shade = sageShade(di, nDrawn); greenById[i] = shade; di++;   // відтінок сіро-зеленого (градієнт)
-            // видимий сегмент в обгортці-g (обгортка зсувається при наведенні — «висування»);
-            // саме кільце обертається лише на клік; події ловить статичний хіт-шар
-            arcs += `<g class="dp-segwrap" data-i="${i}" style="transition:transform .18s ease"><circle class="dp-seg" data-i="${i}" r="${R}" cx="${cx}" cy="${cy}" fill="none" stroke="${shade}" stroke-width="${SW}" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})" style="pointer-events:none;transition:stroke .22s ease"/></g>`;
-            // статичний прозорий хіт (НЕ обертається) — наведення/клік без смикання
-            hits += `<circle class="dp-hit" data-i="${i}" r="${R}" cx="${cx}" cy="${cy}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="${SW}" stroke-dasharray="${dash}" stroke-dashoffset="${(-offset).toFixed(1)}" transform="rotate(-90 ${cx} ${cy})" pointer-events="stroke" style="cursor:pointer"/>`;
-          }
-          offset += arcLen;
+        if (!(rows || []).length) { pieEl.innerHTML = ''; return; }
+        const api = renderDeptPie(pieEl, rows, {
+          fmt,
+          lockedBlok,
+          onSegmentClick: row => {
+            lockedBlok = row ? (row.назва || null) : null;
+            showAdmissions(lastAdmDay);
+          },
         });
-        // дуга-півколо для назви над діаграмою (rainbow: текст читається зверху)
-        const Rt = 174, tA = 70 * Math.PI / 180;
-        const tlx = (cx - Rt * Math.sin(tA)).toFixed(1), tty = (cy - Rt * Math.cos(tA)).toFixed(1);
-        const trx = (cx + Rt * Math.sin(tA)).toFixed(1);
-        defs += `<path id="dpTitleArc" d="M ${tlx},${tty} A ${Rt},${Rt} 0 0 1 ${trx},${tty}" fill="none"/>`;
-        defs += '</defs>';
-        // назва вздовж півкола (оновлюється при наведенні/кліку)
-        const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="#3a3a3a"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
-        // центр кільця — кількість / частка
-        const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="#1a1a1a">${fmt(totalCases)}</text>`
-          + `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="#978f88">випадків</text>`;
-        // хіти всередині кільця — обертаються разом із сегментами (клік завжди влучає у видимий сектор);
-        // назва й центр — статичні зверху. Смикання немає, бо наведення тепер без обертання.
-        pieEl.innerHTML = `<svg width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${defs}<g id="dpRing">${arcs}${hits}</g>${header}${center}</svg>`;
-
-        // інтерактив: наведення = прев'ю, клік = зафіксувати; сектор плавно виїжджає вгору під дугу-назву
-        const titleEl = pieEl.querySelector('#dpTitle');
-        const titlePath = pieEl.querySelector('#dpTitlePath');
-        const cV = pieEl.querySelector('#dpCenterV');
-        const cL = pieEl.querySelector('#dpCenterL');
-        const ring = pieEl.querySelector('#dpRing');
-        ring.style.transformOrigin = `${cx}px ${cy}px`;
-        ring.style.transition = 'transform .55s cubic-bezier(.2,.7,.2,1)';
-        const wraps = {}, segCircles = {};
-        pieEl.querySelectorAll('.dp-segwrap').forEach(w => { wraps[Number(w.getAttribute('data-i'))] = w; });
-        pieEl.querySelectorAll('.dp-seg').forEach(c => { segCircles[Number(c.getAttribute('data-i'))] = c; });
-        const hitEls = [...pieEl.querySelectorAll('.dp-hit')];
-        let locked = null;
-
-        // активний сегмент червоніє (як на емблемі); решта — свій сіро-зелений відтінок
-        function paint(activeI) {
-          Object.keys(segCircles).forEach(k => {
-            segCircles[k].setAttribute('stroke', Number(k) === activeI ? EMBLEM_RED : greenById[k]);
-          });
-        }
-        // назва дугою + центр (БЕЗ затемнення інших)
-        function setName(i) {
-          const r = top[i];
-          paint(i);
-          titlePath.textContent = r.назва || r.код || '—';
-          titleEl.setAttribute('fill', EMBLEM_RED);
-          cV.textContent = fmt(r.випадків);
-          cL.textContent = r.відс + '% частки';
-        }
-        function clearName() {
-          paint(-1);
-          titlePath.textContent = 'Структура діагнозів';
-          titleEl.setAttribute('fill', '#3a3a3a');
-          cV.textContent = fmt(totalCases);
-          cL.textContent = 'випадків';
-        }
-        // легке висування сектора радіально назовні (у напрямку його середини)
-        const POP = 7;
-        function popOut(i) {
-          const w = wraps[i]; if (!w) return;
-          const t = (midById[i] || 0) * 2 * Math.PI;
-          w.style.transform = `translate(${(POP * Math.sin(t)).toFixed(1)}px, ${(-POP * Math.cos(t)).toFixed(1)}px)`;
-        }
-        const popIn = i => { const w = wraps[i]; if (w) w.style.transform = ''; };
-        const rotateTo = i => { ring.style.transform = `rotate(${(-(midById[i] || 0) * 360).toFixed(1)}deg)`; };
-        const rotateReset = () => { ring.style.transform = 'rotate(0deg)'; };
-
-        hitEls.forEach(hit => {
-          const i = Number(hit.getAttribute('data-i'));
-          // наведення = сектор трохи висувається + назва дугою (інші НЕ затемнюються)
-          hit.addEventListener('mouseenter', () => { setName(i); popOut(i); });
-          // відведення — сектор повертається; назва — до зафіксованого або загального
-          hit.addEventListener('mouseleave', () => { popIn(i); if (locked !== null) setName(locked); else clearName(); });
-          // клік = зафіксувати + плавно вивести сектор угору під назву (повторний клік знімає)
-          hit.addEventListener('click', () => {
-            if (locked === i) {
-              locked = null; lockedBlok = null; clearName(); rotateReset();
-            } else {
-              locked = i; lockedBlok = top[i] ? (top[i].назва || null) : null;
-              setName(i); rotateTo(i);
-            }
-            showAdmissions(lastAdmDay);   // переприменить фільтр списку за блоком (дата та сама → донат не перебудовується)
-          });
-        });
-        // прокидаємо interaction API для hover пацієнтів → підсвітка сегмента
-        const byName = {};
-        top.forEach((r, idx) => { if ((r.назва || '') !== 'Інші') byName[r.назва] = idx; });
-        pieHighlight = {
-          byName, setName, clearName, popOut, popIn,
-          getLocked: () => locked,
-          unlock: () => { locked = null; lockedBlok = null; clearName(); rotateReset(); },
-        };
-        // відновити фіксацію сегмента після перебудови (зміна дати/періоду) — щоб фільтр «тримався»
-        if (lockedBlok != null && byName[lockedBlok] !== undefined) {
-          locked = byName[lockedBlok];
-          setName(locked); rotateTo(locked);
-        }
+        pieHighlight = api
+          ? { ...api, unlock: () => { lockedBlok = null; api.unlock(); } }
+          : null;
       }).catch(() => { lastPieKey = ''; });
     }
 
