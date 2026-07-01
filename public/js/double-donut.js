@@ -32,6 +32,7 @@ function renderDoubleDonut(selector, data) {
     grand, tTot, sTot,
     tLabel = 'Терапевт.\nнапрямок',
     sLabel = 'Хірург.\nнапрямок',
+    centerSub = 'госпіталізацій',
     therapeutic: T, surgical: S
   } = data;
 
@@ -43,7 +44,7 @@ function renderDoubleDonut(selector, data) {
   const fmt = v => v.toLocaleString('uk-UA');
 
   const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('viewBox', '0 0 900 900');
+  svg.setAttribute('viewBox', '-80 0 1060 900');
   svg.setAttribute('width', '100%');
   svg.setAttribute('role', 'img');
   svg.style.cssText = 'display:block;max-width:700px;margin:0 auto';
@@ -79,7 +80,7 @@ function renderDoubleDonut(selector, data) {
   }).forEach(([k, v]) => cSub.setAttribute(k, v));
   cg.appendChild(cSub);
 
-  const reset = () => { cVal.textContent = fmt(grand); cSub.textContent = 'госпіталізацій'; };
+  const reset = () => { cVal.textContent = fmt(grand); cSub.textContent = centerSub; };
   reset();
 
   function addSeg(ri, ro, a1, a2, fill, name, n) {
@@ -134,13 +135,13 @@ function renderDoubleDonut(selector, data) {
   T.forEach(d => {
     const sp = tSpan * (d.n / tTot);
     addSeg(R2i, R2o, a, a + sp, d.c, d.name, d.n);
-    outerLabel(d.s, a + sp / 2, d.c);
+    if (d.s) outerLabel(d.s, a + sp / 2, d.c);
     a += sp;
   });
   S.forEach(d => {
     const sp = sSpan * (d.n / sTot);
     addSeg(R2i, R2o, a, a + sp, d.c, d.name, d.n);
-    outerLabel(d.s, a + sp / 2, d.c);
+    if (d.s) outerLabel(d.s, a + sp / 2, d.c);
     a += sp;
   });
 

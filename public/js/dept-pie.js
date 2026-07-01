@@ -115,7 +115,11 @@ function renderDeptPie(container, rows, opts) {
   const wraps = {}, segCircles = {};
   el.querySelectorAll('.dp-segwrap').forEach(w => { wraps[Number(w.getAttribute('data-i'))] = w; });
   el.querySelectorAll('.dp-seg').forEach(c => { segCircles[Number(c.getAttribute('data-i'))] = c; });
-  let locked = null;
+  let locked = null, scrolling = false;
+  const beginRotate = () => {
+    scrolling = true;
+    ring.addEventListener('transitionend', () => { scrolling = false; }, { once: true });
+  };
 
   function paint(activeI) {
     Object.keys(segCircles).forEach(k => {
@@ -149,16 +153,16 @@ function renderDeptPie(container, rows, opts) {
 
   el.querySelectorAll('.dp-hit').forEach(hit => {
     const i = Number(hit.getAttribute('data-i'));
-    hit.addEventListener('mouseenter', () => { setName(i); popOut(i); });
-    hit.addEventListener('mouseleave', () => { popIn(i); if (locked !== null) setName(locked); else clearName(); });
+    hit.addEventListener('mouseenter', () => { if (scrolling) return; setName(i); popOut(i); });
+    hit.addEventListener('mouseleave', () => { popIn(i); if (scrolling) return; if (locked !== null) setName(locked); else clearName(); });
     hit.addEventListener('click', () => {
       if (locked === i) {
         locked = null;
-        clearName(); rotateReset();
+        beginRotate(); clearName(); rotateReset();
         if (onSegmentClick) onSegmentClick(null);
       } else {
         locked = i;
-        setName(i); rotateTo(i);
+        beginRotate(); setName(i); rotateTo(i);
         if (onSegmentClick) onSegmentClick(top[i]);
       }
     });
