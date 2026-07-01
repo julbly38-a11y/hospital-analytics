@@ -1197,13 +1197,29 @@
   if (claudeBtn) {
     claudeBtn.addEventListener('mouseenter', () => { claudeBtn.style.borderColor = '#9a6070'; claudeBtn.style.background = 'rgba(255,255,255,0.88)'; });
     claudeBtn.addEventListener('mouseleave', () => { claudeBtn.style.borderColor = '#c9a9b4'; claudeBtn.style.background = 'rgba(255,255,255,0.72)'; });
-    claudeBtn.addEventListener('click', async () => {
-      window.open(HELSI_URL, '_blank');
+    // Синхронне копіювання через execCommand: працює в межах кліку, поки документ
+    // у фокусі, і НЕ ламає ні user-gesture, ні наступний window.open.
+    // (navigator.clipboard.writeText тут ненадійний: await розриває gesture, а window.open
+    //  забирає фокус → clipboard падає з "Document is not focused".)
+    function copyCmdSync() {
       try {
-        await navigator.clipboard.writeText(CLAUDE_CMD);
+        const ta = document.createElement('textarea');
+        ta.value = CLAUDE_CMD;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+      } catch (e) { return false; }
+    }
+    claudeBtn.addEventListener('click', () => {
+      const copied = copyCmdSync();       // копіюємо СИНХРОННО, до відкриття вкладки
+      window.open(HELSI_URL, '_blank');
+      if (copied) {
         setStatus('✅ Залогінься в helsi · команду скопійовано — встав у чат Claude Code', '#507060');
-      } catch (e) {
-        setStatus('helsi відкрито. Команда для Claude:<br><span style="user-select:all">' + CLAUDE_CMD + '</span>', '#7a5060');
+      } else {
+        setStatus('helsi відкрито. Скопіюй команду вручну:<br><span style="user-select:all">' + CLAUDE_CMD + '</span>', '#7a5060');
       }
     });
   }
