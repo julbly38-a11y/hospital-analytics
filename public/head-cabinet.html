@@ -1423,18 +1423,10 @@
       d.addEventListener('mouseleave', closeDeptDrawer);
     });
 
-    // показ полів логіна/пароля по кліку на напис «Для працівників:»
+    // показ полів логіна/пароля по кліку на напис «Для працівників:» — сам toggle вже в utils.js (initStaffFields)
     const title = document.querySelector('.wb-title');
     const fields = document.querySelector('.staff-fields');
     if (title && fields) {
-      title.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fields.classList.toggle('open');
-        // форсуємо перемальовування (фікс відкладеного рендеру в Safari)
-        void fields.offsetHeight;
-        fields.style.transform = 'translateZ(0)';
-        requestAnimationFrame(() => { fields.style.transform = 'translateZ(0)'; });
-      });
       document.addEventListener('click', (e) => {
         if (e.target !== title && !fields.contains(e.target)) {
           fields.classList.remove('open');

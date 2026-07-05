@@ -239,7 +239,7 @@
     cursor: pointer;
     transition: color .2s ease, text-shadow .2s ease;
   }
-  .dept.hl, .duty-docs span.hl {
+  .dept.hl, .duty-docs span.hl, .dept.dept-active {
     color: #b27c8b !important;
     text-shadow:
       0 0 6px rgba(178,124,139,0.55),
@@ -888,6 +888,7 @@
 
     // нижня шторка з деталями відділення (перенесено зі старого кабінету: KPI, ординаторська, топ МКХ-10)
     let expReqId = 0;
+    let expandedDept = null;
     const topList = document.querySelector('.dept-list');
     const bottomList = document.querySelector('.dept-list2');
     const closeAllExpands = () => {
@@ -945,26 +946,32 @@
       });
     }
 
-    [document.querySelector('.dept-list'), document.querySelector('.dept-list2')].forEach(list => {
-      if (!list) return;
-      list.addEventListener('mouseleave', closeAllExpands);
-    });
     depts.forEach(d => {
-      d.addEventListener('mouseenter', () => openDeptExpand(d));
+      d.addEventListener('click', () => {
+        if (expandedDept === d) {
+          closeAllExpands();
+          d.classList.remove('dept-active');
+          expandedDept = null;
+        } else {
+          if (expandedDept) expandedDept.classList.remove('dept-active');
+          openDeptExpand(d);
+          d.classList.add('dept-active');
+          expandedDept = d;
+        }
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (expandedDept && !e.target.closest('.dept') && !e.target.closest('.dept-expand')) {
+        closeAllExpands();
+        expandedDept.classList.remove('dept-active');
+        expandedDept = null;
+      }
     });
 
-    // показ полів логіна/пароля по кліку на напис «Для працівників:»
+    // показ полів логіна/пароля по кліку на напис «Для працівників:» — сам toggle вже в utils.js (initStaffFields)
     const title = document.querySelector('.wb-title');
     const fields = document.querySelector('.staff-fields');
     if (title && fields) {
-      title.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fields.classList.toggle('open');
-        // форсуємо перемальовування (фікс відкладеного рендеру в Safari)
-        void fields.offsetHeight;
-        fields.style.transform = 'translateZ(0)';
-        requestAnimationFrame(() => { fields.style.transform = 'translateZ(0)'; });
-      });
       document.addEventListener('click', (e) => {
         if (e.target !== title && !fields.contains(e.target)) {
           fields.classList.remove('open');

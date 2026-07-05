@@ -338,22 +338,17 @@ const PARAM_QUERIES = {
     LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
     WHERE ${parseDoc(p)}
     ORDER BY l.admission_date_d DESC NULLS LAST LIMIT 300`,
-  // Динаміка по 12 МІСЯЦЯХ обраного року для 3 топових нозологій лікаря. param = "лікар|рік" (рік або 'all'). Публічний.
-  // → рядки {місяць, блок, випадків} лише для топ-3 блоків лікаря за цей рік
-  docMonthlyTopBlocks: (p) => {
+  // Динаміка по 12 МІСЯЦЯХ обраного року: загальна кількість випадків (пацієнтів) лікаря.
+  // param = "лікар|рік" (рік або 'all'). Публічний. → рядки {місяць, випадків}
+  docMonthlyCases: (p) => {
     const [doc = '', year = 'all'] = String(p || '').split('|')
     const ys = String(year).trim().toLowerCase()
-    const yearCond = /^\d{4}$/.test(ys) ? `AND EXTRACT(year FROM l.admission_date_d) = ${parseInt(ys, 10)}` : ''
-    return `WITH mb AS (
-        SELECT EXTRACT(month FROM l.admission_date_d)::int as місяць, ${ICD_BLOCK_CASE} as блок
-        FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
-        WHERE l.doc_name = '${esc(doc)}' AND l.admission_date_d IS NOT NULL AND l.icd_primary IS NOT NULL ${yearCond}
-      ),
-      counts AS (SELECT місяць, блок, COUNT(*) as cnt FROM mb WHERE блок IS NOT NULL GROUP BY місяць, блок),
-      top3 AS (SELECT блок FROM counts GROUP BY блок ORDER BY SUM(cnt) DESC LIMIT 3)
-      SELECT c.місяць as місяць, c.блок as блок, c.cnt as випадків
-      FROM counts c JOIN top3 t ON t.блок = c.блок
-      ORDER BY c.місяць, c.блок`
+    const yearCond = /^\d{4}$/.test(ys) ? `AND EXTRACT(year FROM admission_date_d) = ${parseInt(ys, 10)}` : ''
+    return `SELECT EXTRACT(month FROM admission_date_d)::int as місяць, COUNT(*) as випадків
+      FROM lsmd
+      WHERE doc_name = '${esc(doc)}' AND admission_date_d IS NOT NULL ${yearCond}
+      GROUP BY місяць
+      ORDER BY місяць`
   },
   // Динаміка по роках для 3 топових нозологій (блоків МКХ) лікаря. param = doc_name. Публічний (агрегати).
   // → рядки {рік, блок, випадків} лише для топ-3 блоків лікаря за весь час
@@ -404,6 +399,8 @@ const PARAM_QUERIES = {
       return `SELECT EXTRACT(year FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
     return `SELECT EXTRACT(month FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
   },
+  // --- Остання дата з даними ---
+  maxDataDate: () => `SELECT EXTRACT(year FROM MAX(admission_date_d))::int as year, EXTRACT(month FROM MAX(admission_date_d))::int as month, EXTRACT(day FROM MAX(admission_date_d))::int as day FROM lsmd WHERE admission_date_d IS NOT NULL`,
   // --- Огляд із фільтром по року (param = рік як рядок, або 'all') ---
   ovKpiYear: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
       ROUND(AVG(length_of_stay),1) as avg_bed_days,
@@ -730,12 +727,12 @@ async function supaFetch(sql) {
 
 // Публічні запити — доступні без авторизації (тільки агреговані дані, без ПІБ)
 const PUBLIC_KEYS = new Set([
-  'ovKpiYear', 'doctorCount', 'doctorCountYear', 'therapeuticKpiYear', 'surgicalKpiYear', 'deptProfile', 'deptProfileYear', 'deptHead',
+  'maxDataDate','ovKpiYear', 'doctorCount', 'doctorCountYear', 'therapeuticKpiYear', 'surgicalKpiYear', 'deptProfile', 'deptProfileYear', 'deptHead',
   'therapeuticMonthly', 'surgicalMonthly', 'hospitalMonthly', 'allYears',
   'therapeuticTrend', 'surgicalTrend', 'deptOrdinators', 'deptDocs2', 'deptDaily', 'dutyDoctors',
   'deptIcdPie', 'deptIcdPieYear', 'deptIcdBlocksYear',
   'periodKpi', 'periodDaily', 'periodFlow', 'periodIcdBlocks',
-  'docKpi', 'docDaily', 'docFlow', 'docIcdBlocks', 'docDept', 'docYearlyTopBlocks', 'docMonthlyTopBlocks',  // лікарські (docAdmissions/docPatients — НЕ тут: містять ПІБ)
+  'docKpi', 'docDaily', 'docFlow', 'docIcdBlocks', 'docDept', 'docYearlyTopBlocks', 'docMonthlyCases',  // лікарські (docAdmissions/docPatients — НЕ тут: містять ПІБ)
   // periodAdmissions — НЕ тут: містить ПІБ пацієнтів, доступний лише авторизованим
 ])
 
