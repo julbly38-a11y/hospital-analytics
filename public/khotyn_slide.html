@@ -164,6 +164,11 @@
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
   }
+  @keyframes wbtitlepulse {
+    0%, 100% { color: #3a3a3a; -webkit-text-stroke: 0.7px #3a3a3a; text-shadow: none; }
+    50%       { color: #b27c8b; -webkit-text-stroke: 0.7px #b27c8b;
+                text-shadow: 0 0 12px rgba(141,151,140,0.9), 0 0 30px rgba(141,151,140,0.65), 0 0 60px rgba(141,151,140,0.4); }
+  }
   .wb-title {
     right: 1390px;
     font-size: 26px;
@@ -171,6 +176,11 @@
     -webkit-text-stroke: 0.7px #3a3a3a;
     cursor: pointer;
     pointer-events: auto;
+    animation: wbtitlepulse 1.8s ease-in-out infinite;
+  }
+  .wb-title.no-pulse {
+    animation: none;
+    text-shadow: none;
   }
   .wb-login { left: 740px; }
   .wb-pass  { left: 1180px; }
@@ -461,6 +471,7 @@
     border-color: #3a3a3a;
   }
 </style>
+<script src="/js/utils.js"></script>
 <script>
   function scaleSlide() {
     const w = document.querySelector('.slide-wrapper');
@@ -558,24 +569,10 @@
       });
     });
 
-    // показ полів логіна/пароля по кліку на напис «Для працівників:»
-    const title = document.querySelector('.wb-title');
-    const fields = document.querySelector('.staff-fields');
-    if (title && fields) {
-      title.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fields.classList.toggle('open');
-        // форсуємо перемальовування (фікс відкладеного рендеру в Safari)
-        void fields.offsetHeight;
-        fields.style.transform = 'translateZ(0)';
-        requestAnimationFrame(() => { fields.style.transform = 'translateZ(0)'; });
-      });
-      document.addEventListener('click', (e) => {
-        if (e.target !== title && !fields.contains(e.target)) {
-          fields.classList.remove('open');
-        }
-      });
-    }
+
+    // зупиняємо блимання після першого кліку на «Для працівників»
+    const wbTitle = document.querySelector('.wb-title');
+    if (wbTitle) wbTitle.addEventListener('click', () => wbTitle.classList.add('no-pulse'), { once: true });
 
     // ── авторизація: «Увійти» → редірект у кабінет ──
     const loginEl = document.querySelector('.f-login');
@@ -693,8 +690,8 @@
   </div>
 
   <div class="name-block">
-    <div class="title">ХОТИНСЬКА<br>БАГАТОПРОФІЛЬНА<br>ЛІКАРНЯ</div>
-    <div class="tagline">ТУРБУЄМОСЬ ПРО НАЙЦІННІШЕ</div>
+    <div class="title"></div>
+    <div class="tagline"></div>
   </div>
 
 </div>

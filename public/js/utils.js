@@ -69,6 +69,126 @@ async function statBatch(queries, ttl = 0) {
   return results;
 }
 
+function initStaffFields() {
+  const title  = document.querySelector('.wb-title');
+  const fields = document.querySelector('.staff-fields');
+  if (!title || !fields) return;
+  title.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fields.classList.toggle('open');
+    void fields.offsetHeight;
+    fields.style.transform = 'translateZ(0)';
+    requestAnimationFrame(() => { fields.style.transform = 'translateZ(0)'; });
+  });
+}
+const HOSPITAL_NAME   = 'ХОТИНСЬКА<br>БАГАТОПРОФІЛЬНА<br>ЛІКАРНЯ';
+const HOSPITAL_TAGLINE = 'ТУРБУЄМОСЬ ПРО НАЙЦІННІШЕ';
+
+// ── Підсвітка чергових лікарів ↔ відділень ──
+(function injectDutyStyles() {
+  const s = document.createElement('style');
+  s.textContent = `
+    .duty-docs span {
+      font-family: 'ITFLight','Palatino',serif;
+      font-weight: 300;
+      font-size: 21px;
+      color: #4a4a4a;
+      white-space: nowrap;
+      letter-spacing: 0.3px;
+      -webkit-text-stroke: 0.4px #4a4a4a;
+      cursor: pointer;
+      transition: color .2s ease, text-shadow .2s ease;
+    }
+    .dept, .duty-docs span { cursor: pointer; transition: text-shadow .2s ease; }
+    .dept.hl, .duty-docs span.hl {
+      text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30); }
+  `;
+  document.head.appendChild(s);
+})();
+
+function clearHl() { document.querySelectorAll('.hl').forEach(e => e.classList.remove('hl')); }
+
+function initCrossHighlight() {
+  const depts = [...document.querySelectorAll('.dept[data-dept]')];
+
+  // duty-docs span — підвантажуються асинхронно, тому спостерігаємо за контейнером
+  const dutyEl = document.getElementById('dutyDocs');
+  if (dutyEl) {
+    new MutationObserver(() => {
+      dutyEl.querySelectorAll('span[data-home]').forEach(span => {
+        if (span._hlBound) return;
+        span._hlBound = true;
+        span.addEventListener('mouseenter', () => {
+          span.classList.add('hl');
+          const home = span.getAttribute('data-home');
+          depts.forEach(d => { if (d.getAttribute('data-dept') === home) d.classList.add('hl'); });
+        });
+        span.addEventListener('mouseleave', clearHl);
+      });
+    }).observe(dutyEl, { childList: true, subtree: true });
+  }
+
+  depts.forEach(d => {
+    d.addEventListener('mouseenter', () => {
+      d.classList.add('hl');
+      const dept = d.getAttribute('data-dept');
+      document.querySelectorAll('.duty-docs span[data-home]').forEach(x => {
+        if (x.getAttribute('data-home') === dept) x.classList.add('hl');
+      });
+    });
+    d.addEventListener('mouseleave', clearHl);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initCrossHighlight);
+
+function initHospitalName() {
+  const title   = document.querySelector('.name-block .title');
+  const tagline = document.querySelector('.name-block .tagline');
+  if (title)   title.innerHTML  = HOSPITAL_NAME;
+  if (tagline) tagline.textContent = HOSPITAL_TAGLINE;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initStaffFields();
+  initHospitalName();
+});
+
+// Ініціалізує фільтр років (.year-filter .ypill + .year-num).
+// Повертає { getParam } — функцію що дає поточно обраний параметр ('all' або '2025' тощо).
+// onchange(param) — викликається при кліку на пігулку.
+function initYearFilter(onchange) {
+  const pills   = [...document.querySelectorAll('.year-filter .ypill')];
+  const yearNum = document.querySelector('.year-num');
+  if (!pills.length || !yearNum) return { getParam: () => 'all' };
+
+  let activeParam = 'all';
+
+  function setActive(pill) {
+    pills.forEach(x => x.classList.remove('active'));
+    pill.classList.add('active');
+    const t = pill.textContent.trim();
+    if (/^\d{4}$/.test(t)) {
+      yearNum.textContent = t; yearNum.classList.remove('small'); activeParam = t;
+    } else {
+      yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); activeParam = 'all';
+    }
+  }
+
+  const defaultYear = String(new Date().getFullYear() - 1);
+  const defaultPill = pills.find(p => p.textContent.trim() === defaultYear)
+    || pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ'))
+    || pills[pills.length - 1];
+  setActive(defaultPill);
+
+  pills.forEach(p => p.addEventListener('click', () => {
+    setActive(p);
+    if (onchange) onchange(activeParam);
+  }));
+
+  return { getParam: () => activeParam };
+}
+
 function inertialScrollToCenter(container, el, dur = 600) {
   const cRect = container.getBoundingClientRect();
   const eRect = el.getBoundingClientRect();
