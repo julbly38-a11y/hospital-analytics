@@ -98,27 +98,39 @@ def parse_text(text):
         helsi_raw = int(m.group(1))
         helsi_no = CARD_FIX.get(helsi_raw, helsi_raw)
 
-        # ПІБ — рядок безпосередньо перед №
-        pib = lines[hi - 1] if hi > 0 else ""
-
-        # Далі: дата народж., статус, [ЕН], Госпіталізовано…
-        j = hi + 1
         dob = age = ""
-        if j < len(lines):
-            dm = DOB_RE.match(lines[j])
-            if dm:
-                dob, age = dm.group(1), int(dm.group(2))
-                j += 1
-
         status = ""
-        if j < len(lines) and lines[j] in STATUSES:
-            status = lines[j]
-            j += 1
-
         en = False
-        if j < len(lines) and lines[j] == "ЕН":
+
+        # Новий порядок (list-view helsi.pro, 2026-07+): ПІБ, ДН(вік), Статус, [ЕН], №, поля…
+        cursor = hi - 1
+        if cursor >= 0 and lines[cursor] == "ЕН":
             en = True
-            j += 1
+            cursor -= 1
+        if cursor >= 0 and lines[cursor] in STATUSES:
+            status = lines[cursor]
+            cursor -= 1
+        dm_back = DOB_RE.match(lines[cursor]) if cursor >= 0 else None
+        if dm_back:
+            dob, age = dm_back.group(1), int(dm_back.group(2))
+            cursor -= 1
+            pib = lines[cursor] if cursor >= 0 else ""
+            j = hi + 1
+        else:
+            # Старий порядок (card-view): ПІБ, №, ДН, Статус, [ЕН], поля…
+            pib = lines[hi - 1] if hi > 0 else ""
+            j = hi + 1
+            if j < len(lines):
+                dm = DOB_RE.match(lines[j])
+                if dm:
+                    dob, age = dm.group(1), int(dm.group(2))
+                    j += 1
+            if j < len(lines) and lines[j] in STATUSES:
+                status = lines[j]
+                j += 1
+            if j < len(lines) and lines[j] == "ЕН":
+                en = True
+                j += 1
 
         # Поля з мітками (можуть йти в довільному порядку, але зазвичай так):
         adm_date = adm_time = dis_date = dis_time = ""

@@ -1059,8 +1059,9 @@
       loadDuty();
 
       if (!deptParam) {
-        // без відділення — лише шапка лікарні (1 запит)
-        stat('periodKpi', periodParam('')).then(rows => {
+        // без відділення — лише шапка лікарні (1 запит); рік-only, як на kabinet.html/doctor-cabinet.html —
+        // шапка НЕ має змінюватись від місячних пігулок (ті фільтрують лише блок відділення нижче)
+        stat('ovKpiYear', activeParam).then(rows => {
           const r = rows[0] || {};
           countUp(elHosp, num(Number(r.total_cases), 0), dur, base);
           countUp(elPat,  num(Number(r.unique_patients), 0), dur, base + 100);
@@ -1073,7 +1074,7 @@
 
       // з відділенням — 3 запити об'єднуємо в 1 roundtrip
       statBatch([
-        { key: 'periodKpi',   param: periodParam('') },
+        { key: 'ovKpiYear',   param: activeParam },
         { key: 'periodKpi',   param: periodParam(deptParam) },
         { key: 'periodDaily', param: periodParam(deptParam) },
       ]).then(([hospRows, deptRows, dailyRows]) => {
