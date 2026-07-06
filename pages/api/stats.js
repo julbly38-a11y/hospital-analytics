@@ -100,7 +100,7 @@ const QUERIES = {
   ovHours:     'SELECT hour as година, cases as випадків, deaths as померло FROM v_peak_by_hour ORDER BY hour',
   ovStatus:    "SELECT discharge_status as статус, COUNT(*) as випадків, ROUND(COUNT(*)*100.0/SUM(COUNT(*)) OVER (),2) as відс FROM lsmd WHERE discharge_status IN ('З поліпшенням','Помер','Без змін','Переведений в інший заклад','Лікується','З погіршенням') GROUP BY discharge_status ORDER BY випадків DESC",
   ovIcd:       "SELECT LEFT(icd_primary,1) as розділ, COUNT(*) as випадків FROM lsmd WHERE icd_primary IS NOT NULL AND icd_primary ~ '^[A-Z]' GROUP BY LEFT(icd_primary,1) ORDER BY випадків DESC LIMIT 7",
-  ovYears:     "SELECT DISTINCT EXTRACT(year FROM admission_date_d)::int as рік FROM lsmd WHERE admission_date_d IS NOT NULL ORDER BY рік DESC",
+  ovYears:     "SELECT DISTINCT EXTRACT(year FROM admission_day_d)::int as рік FROM lsmd WHERE admission_day_d IS NOT NULL ORDER BY рік DESC",
   // --- Хвиля 1: Відділення / Пацієнти / Піки(дні) / Ургентність ---
   wDept:       'SELECT department as відділення, total_cases as випадків, unique_patients as унікальних, avg_bed_days as ліжкодень, death_rate_pct as летальність, operations as операцій, surgical_activity_pct as хір_активність FROM v_department_stats ORDER BY total_cases DESC',
   wPat:        "SELECT gender as стать, age_group as вік, cases as випадків FROM v_patient_stats WHERE gender IN ('Ч','Ж')",
@@ -115,7 +115,7 @@ const QUERIES = {
   orgDepts: `SELECT b.name as block, d.dept_name as відділення, d.doctors_count as лікарів, d.staff_count as персонал FROM departments d LEFT JOIN clinical_blocks b ON b.id = d.block_id ORDER BY b.name, d.dept_name`,
   orgDocs:  `SELECT emp_name as лікар, COALESCE(specialization,'—') as спеціалізація, position as посада, department as відділення FROM empl WHERE (emp_status IS DISTINCT FROM 'звільнений') AND (position ILIKE '%лікар%' OR position ILIKE '%ординатор%' OR position ILIKE '%завідувач%') ORDER BY department, (position ILIKE '%завідувач%') DESC, emp_name LIMIT 500`,
   doctorCount: `SELECT COUNT(DISTINCT doctor_id) as cnt FROM doctor_stats WHERE total_cases > 0`,
-  allYears: `SELECT DISTINCT EXTRACT(year FROM admission_date_d)::int as year FROM lsmd WHERE admission_date_d IS NOT NULL ORDER BY year DESC`,
+  allYears: `SELECT DISTINCT EXTRACT(year FROM admission_day_d)::int as year FROM lsmd WHERE admission_day_d IS NOT NULL ORDER BY year DESC`,
   // --- Хвиля 3: Географія ---
   wGeo:        "SELECT region as область, COALESCE(district,'(центр / без деталізації)') as район, SUM(cases) as випадків, SUM(unique_patients) as пацієнтів, ROUND(AVG(avg_bed_days::numeric),1) as ліжкодень, SUM(deaths) as померло FROM v_region_stats GROUP BY region, district ORDER BY випадків DESC LIMIT 25",
 }
@@ -129,34 +129,34 @@ const yearFilter = (p) => {
   if (!s || s === 'all' || s === 'усі') return '1=1'
   const y = parseInt(s, 10)
   if (!/^\d{4}$/.test(s) || y < 2000 || y > 2100) return '1=1'
-  return `EXTRACT(year FROM admission_date_d) = ${y}`
+  return `EXTRACT(year FROM admission_day_d) = ${y}`
 }
 // Універсальний розбір періоду "відділення|рік|місяць|день|тиждень" — будь-яка частина може бути
 // порожньою або 'all'. Відділення порожнє = вся лікарня. Тиждень, якщо заданий, має пріоритет
 // над місяцем/днем (взаємовиключні — тиждень ISO не комбінується з конкретним днем місяця).
 const buildScope = (p, col = 'admission_department') => {
   const [scope = '', year = 'all', month = 'all', day = 'all', week = 'all'] = String(p || '').split('|')
-  const conditions = ['admission_date_d IS NOT NULL']
+  const conditions = ['admission_day_d IS NOT NULL']
   if (scope) conditions.push(`${col} = '${esc(scope)}'`)
   const ys = String(year).trim().toLowerCase()
   if (ys && ys !== 'all' && ys !== 'усі') {
     const y = parseInt(ys, 10)
-    if (/^\d{4}$/.test(ys) && y >= 2000 && y <= 2100) conditions.push(`EXTRACT(year FROM admission_date_d) = ${y}`)
+    if (/^\d{4}$/.test(ys) && y >= 2000 && y <= 2100) conditions.push(`EXTRACT(year FROM admission_day_d) = ${y}`)
   }
   const ws = String(week).trim().toLowerCase()
   if (ws && ws !== 'all') {
     const w = parseInt(ws, 10)
-    if (w >= 1 && w <= 53) conditions.push(`EXTRACT(week FROM admission_date_d) = ${w}`)
+    if (w >= 1 && w <= 53) conditions.push(`EXTRACT(week FROM admission_day_d) = ${w}`)
   } else {
     const ms = String(month).trim().toLowerCase()
     if (ms && ms !== 'all') {
       const m = parseInt(ms, 10)
-      if (m >= 1 && m <= 12) conditions.push(`EXTRACT(month FROM admission_date_d) = ${m}`)
+      if (m >= 1 && m <= 12) conditions.push(`EXTRACT(month FROM admission_day_d) = ${m}`)
     }
     const ds = String(day).trim().toLowerCase()
     if (ds && ds !== 'all') {
       const d = parseInt(ds, 10)
-      if (d >= 1 && d <= 31) conditions.push(`EXTRACT(day FROM admission_date_d) = ${d}`)
+      if (d >= 1 && d <= 31) conditions.push(`EXTRACT(day FROM admission_day_d) = ${d}`)
     }
   }
   return conditions.join(' AND ')
@@ -173,18 +173,18 @@ const PARAM_QUERIES = {
       ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct
     FROM lsmd WHERE ${parsePeriod(p)}`,
   // Графік по днях для тієї ж комбінації фільтрів (x=день, y=кількість — формат для renderSpark)
-  periodDaily: (p) => `SELECT EXTRACT(day FROM admission_date_d)::int as x, COUNT(*) as y
+  periodDaily: (p) => `SELECT EXTRACT(day FROM admission_day_d)::int as x, COUNT(*) as y
     FROM lsmd WHERE ${parsePeriod(p)} GROUP BY x ORDER BY x`,
   // Рух за конкретну дату (відділення|рік|місяць|день): скільки поступило і скільки виписано саме в цей день
   periodFlow: (p) => {
     const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const valid = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = valid ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = valid ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const deptCond = dept ? `AND admission_department='${esc(dept)}'` : ''
     return `SELECT
-      (SELECT COUNT(*) FROM lsmd WHERE admission_date_d=${dateExpr} ${deptCond}) as поступило,
-      (SELECT COUNT(*) FROM lsmd WHERE discharge_date_d=${dateExpr} ${deptCond}) as виписано`
+      (SELECT COUNT(*) FROM lsmd WHERE admission_day_d=${dateExpr} ${deptCond}) as поступило,
+      (SELECT COUNT(*) FROM lsmd WHERE discharge_day_d=${dateExpr} ${deptCond}) as виписано`
   },
   // Хворі, що ПЕРЕБУВАЮТЬ у відділенні станом на обрану дату (відділення|рік|місяць|день).
   // Поступили <= дати і ще не виписані (або виписані >= дати). ПІБ/вік/діагноз/днів перебування.
@@ -193,10 +193,10 @@ const PARAM_QUERIES = {
     const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const conds = [
-      `l.admission_date_d <= ${dateExpr}`,
-      `(l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)`,
+      `l.admission_day_d <= ${dateExpr}`,
+      `(l.discharge_day_d > ${dateExpr} OR l.discharge_day_d IS NULL)`,
     ]
     if (dept) conds.push(`l.admission_department = '${esc(dept)}'`)
     return `SELECT
@@ -205,18 +205,19 @@ const PARAM_QUERIES = {
         l.gender as стать,
         COALESCE(i.diagnosis_level3, i.diagnosis_level2, i.category_level1, l.icd_primary, '—') as діагноз,
         l.icd_primary as код,
-        COALESCE(l.length_of_stay, (${dateExpr} - l.admission_date_d)) as днів,
+        COALESCE(l.length_of_stay, (${dateExpr} - l.admission_day_d)) as днів,
         l.doc_name as лікар,
         TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
         TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
         CASE WHEN l.patient_id IS NULL THEN 0
           ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні,
-        ${ICD_BLOCK_CASE} as блок
+        ${ICD_BLOCK_CASE} as блок,
+        COUNT(*) OVER () as всього
       FROM lsmd l
       LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
       LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
       WHERE ${conds.join(' AND ')}
-      ORDER BY pb.full_name ASC NULLS LAST LIMIT 100`
+      ORDER BY pb.full_name ASC NULLS LAST LIMIT 500`
   },
   // Розподіл МКХ-блоків для пацієнтів, що ПЕРЕБУВАЮТЬ у відділенні на конкретну дату
   // param = "відділення|рік|місяць|день" (публічний — лише агрегати, без ПІБ)
@@ -224,13 +225,13 @@ const PARAM_QUERIES = {
     const [dept = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const deptCond = dept ? `AND l.admission_department = '${esc(dept)}'` : ''
     return `WITH blocks AS (
         SELECT ${ICD_BLOCK_CASE} as блок
         FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code=l.icd_primary
-        WHERE l.admission_date_d <= ${dateExpr}
-          AND (l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)
+        WHERE l.admission_day_d <= ${dateExpr}
+          AND (l.discharge_day_d > ${dateExpr} OR l.discharge_day_d IS NULL)
           AND l.icd_primary IS NOT NULL ${deptCond}
       ),
       grouped AS (SELECT блок, COUNT(*) as cnt FROM blocks WHERE блок IS NOT NULL GROUP BY блок),
@@ -252,28 +253,28 @@ const PARAM_QUERIES = {
       ROUND(100.0*SUM((discharge_status='З поліпшенням')::int)::numeric/NULLIF(COUNT(*),0),1) as improved_pct
     FROM lsmd WHERE ${parseDoc(p)}`,
   // Графік по днях для лікаря (x=день, y=кількість)
-  docDaily: (p) => `SELECT EXTRACT(day FROM admission_date_d)::int as x, COUNT(*) as y
+  docDaily: (p) => `SELECT EXTRACT(day FROM admission_day_d)::int as x, COUNT(*) as y
     FROM lsmd WHERE ${parseDoc(p)} GROUP BY x ORDER BY x`,
   // Рух лікаря за конкретну дату (лікар|рік|місяць|день): поступило/виписано саме цим лікарем
   docFlow: (p) => {
     const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const valid = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = valid ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = valid ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const docCond = doc ? `AND doc_name='${esc(doc)}'` : ''
     return `SELECT
-      (SELECT COUNT(*) FROM lsmd WHERE admission_date_d=${dateExpr} ${docCond}) as поступило,
-      (SELECT COUNT(*) FROM lsmd WHERE discharge_date_d=${dateExpr} ${docCond}) as виписано`
+      (SELECT COUNT(*) FROM lsmd WHERE admission_day_d=${dateExpr} ${docCond}) as поступило,
+      (SELECT COUNT(*) FROM lsmd WHERE discharge_day_d=${dateExpr} ${docCond}) as виписано`
   },
   // Пацієнти лікаря, що ПЕРЕБУВАЮТЬ на обрану дату (лікар|рік|місяць|день). НЕ публічний (ПІБ).
   docAdmissions: (p) => {
     const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const conds = [
-      `l.admission_date_d <= ${dateExpr}`,
-      `(l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)`,
+      `l.admission_day_d <= ${dateExpr}`,
+      `(l.discharge_day_d > ${dateExpr} OR l.discharge_day_d IS NULL)`,
     ]
     if (doc) conds.push(`l.doc_name = '${esc(doc)}'`)
     return `SELECT
@@ -282,31 +283,32 @@ const PARAM_QUERIES = {
         l.gender as стать,
         COALESCE(i.diagnosis_level3, i.diagnosis_level2, i.category_level1, l.icd_primary, '—') as діагноз,
         l.icd_primary as код,
-        COALESCE(l.length_of_stay, (${dateExpr} - l.admission_date_d)) as днів,
+        COALESCE(l.length_of_stay, (${dateExpr} - l.admission_day_d)) as днів,
         l.doc_name as лікар,
         TO_CHAR(l.admission_date_d, 'DD.MM.YYYY') as поступив,
         TO_CHAR(l.discharge_date_d, 'DD.MM.YYYY') as виписаний,
         CASE WHEN l.patient_id IS NULL THEN 0
           ELSE (SELECT COUNT(*) FROM lsmd l3 WHERE l3.patient_id = l.patient_id) - 1 END as повторні,
-        ${ICD_BLOCK_CASE} as блок
+        ${ICD_BLOCK_CASE} as блок,
+        COUNT(*) OVER () as всього
       FROM lsmd l
       LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
       LEFT JOIN patients_best pb ON pb.patient_id = l.patient_id
       WHERE ${conds.join(' AND ')}
-      ORDER BY pb.full_name ASC NULLS LAST LIMIT 100`
+      ORDER BY pb.full_name ASC NULLS LAST LIMIT 500`
   },
   // Розподіл МКХ-блоків пацієнтів лікаря, що ПЕРЕБУВАЮТЬ на дату (лікар|рік|місяць|день)
   docIcdBlocks: (p) => {
     const [doc = '', year = '', month = '', day = ''] = String(p || '').split('|')
     const y = parseInt(year, 10), m = parseInt(month, 10), d = parseInt(day, 10)
     const validDate = /^\d{4}$/.test(String(year).trim()) && m >= 1 && m <= 12 && d >= 1 && d <= 31
-    const dateExpr = validDate ? `make_date(${y},${m},${d})` : 'CURRENT_DATE'
+    const dateExpr = validDate ? `make_date(${y},${m},${d})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     const docCond = doc ? `AND l.doc_name = '${esc(doc)}'` : ''
     return `WITH blocks AS (
         SELECT ${ICD_BLOCK_CASE} as блок
         FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code=l.icd_primary
-        WHERE l.admission_date_d <= ${dateExpr}
-          AND (l.discharge_date_d >= ${dateExpr} OR l.discharge_date_d IS NULL)
+        WHERE l.admission_day_d <= ${dateExpr}
+          AND (l.discharge_day_d > ${dateExpr} OR l.discharge_day_d IS NULL)
           AND l.icd_primary IS NOT NULL ${docCond}
       ),
       grouped AS (SELECT блок, COUNT(*) as cnt FROM blocks WHERE блок IS NOT NULL GROUP BY блок),
@@ -343,19 +345,19 @@ const PARAM_QUERIES = {
   docMonthlyCases: (p) => {
     const [doc = '', year = 'all'] = String(p || '').split('|')
     const ys = String(year).trim().toLowerCase()
-    const yearCond = /^\d{4}$/.test(ys) ? `AND EXTRACT(year FROM admission_date_d) = ${parseInt(ys, 10)}` : ''
-    return `SELECT EXTRACT(month FROM admission_date_d)::int as місяць, COUNT(*) as випадків
+    const yearCond = /^\d{4}$/.test(ys) ? `AND EXTRACT(year FROM admission_day_d) = ${parseInt(ys, 10)}` : ''
+    return `SELECT EXTRACT(month FROM admission_day_d)::int as місяць, COUNT(*) as випадків
       FROM lsmd
-      WHERE doc_name = '${esc(doc)}' AND admission_date_d IS NOT NULL ${yearCond}
+      WHERE doc_name = '${esc(doc)}' AND admission_day_d IS NOT NULL ${yearCond}
       GROUP BY місяць
       ORDER BY місяць`
   },
   // Динаміка по роках для 3 топових нозологій (блоків МКХ) лікаря. param = doc_name. Публічний (агрегати).
   // → рядки {рік, блок, випадків} лише для топ-3 блоків лікаря за весь час
   docYearlyTopBlocks: (p) => `WITH yb AS (
-      SELECT EXTRACT(year FROM l.admission_date_d)::int as рік, ${ICD_BLOCK_CASE} as блок
+      SELECT EXTRACT(year FROM l.admission_day_d)::int as рік, ${ICD_BLOCK_CASE} as блок
       FROM lsmd l LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary
-      WHERE l.doc_name = '${esc(p)}' AND l.admission_date_d IS NOT NULL AND l.icd_primary IS NOT NULL
+      WHERE l.doc_name = '${esc(p)}' AND l.admission_day_d IS NOT NULL AND l.icd_primary IS NOT NULL
     ),
     counts AS (SELECT рік, блок, COUNT(*) as cnt FROM yb WHERE блок IS NOT NULL GROUP BY рік, блок),
     top3 AS (SELECT блок FROM counts GROUP BY блок ORDER BY SUM(cnt) DESC LIMIT 3)
@@ -388,19 +390,19 @@ const PARAM_QUERIES = {
     const dept = "('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології')";
     const s = String(p || '').trim().toLowerCase();
     if (!s || s === 'all' || s === 'усі')
-      return `SELECT EXTRACT(year FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
-    return `SELECT EXTRACT(month FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
+      return `SELECT EXTRACT(year FROM admission_day_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_day_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
+    return `SELECT EXTRACT(month FROM admission_day_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_day_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
   },
   // Тренд госпіталізацій хірургічного блоку
   surgicalTrend: (p) => {
     const dept = "('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1')";
     const s = String(p || '').trim().toLowerCase();
     if (!s || s === 'all' || s === 'усі')
-      return `SELECT EXTRACT(year FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
-    return `SELECT EXTRACT(month FROM admission_date_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_date_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
+      return `SELECT EXTRACT(year FROM admission_day_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_day_d IS NOT NULL AND admission_department IN ${dept} GROUP BY x ORDER BY x`;
+    return `SELECT EXTRACT(month FROM admission_day_d)::int as x, COUNT(*) as y FROM lsmd WHERE admission_day_d IS NOT NULL AND admission_department IN ${dept} AND ${yearFilter(p)} GROUP BY x ORDER BY x`;
   },
   // --- Остання дата з даними ---
-  maxDataDate: () => `SELECT EXTRACT(year FROM MAX(admission_date_d))::int as year, EXTRACT(month FROM MAX(admission_date_d))::int as month, EXTRACT(day FROM MAX(admission_date_d))::int as day FROM lsmd WHERE admission_date_d IS NOT NULL`,
+  maxDataDate: () => `SELECT EXTRACT(year FROM MAX(admission_day_d))::int as year, EXTRACT(month FROM MAX(admission_day_d))::int as month, EXTRACT(day FROM MAX(admission_day_d))::int as day FROM lsmd WHERE admission_day_d IS NOT NULL`,
   // --- Огляд із фільтром по року (param = рік як рядок, або 'all') ---
   ovKpiYear: (p) => `SELECT COUNT(*) as total_cases, COUNT(DISTINCT patient_id) as unique_patients,
       ROUND(AVG(length_of_stay),1) as avg_bed_days,
@@ -458,14 +460,14 @@ const PARAM_QUERIES = {
       SUM((gender='Ж')::int) as жінки,
       SUM((gender='Ч')::int) as чоловіки,
       SUM((discharge_status='З поліпшенням')::int) as поліпшення,
-      (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND ${yf.replace('admission_date_d', 'l2.admission_date_d')} GROUP BY patient_id HAVING COUNT(*)>1) t) as повторні
+      (SELECT COUNT(*) FROM (SELECT patient_id FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND ${yf.replace('admission_day_d', 'l2.admission_day_d')} GROUP BY patient_id HAVING COUNT(*)>1) t) as повторні
       FROM lsmd
       WHERE admission_department='${esc(dept)}' AND ${yf}`
   },
   // Сьогоднішня активність відділення (поступили / виписані сьогодні)
   deptToday: (p) => `SELECT
-    SUM((DATE(admission_date_d) = CURRENT_DATE)::int) as admitted,
-    SUM((DATE(discharge_date_d) = CURRENT_DATE)::int) as discharged
+    SUM((DATE(admission_day_d) = (CURRENT_TIMESTAMP - interval '8 hours')::date)::int) as admitted,
+    SUM((DATE(discharge_day_d) = (CURRENT_TIMESTAMP - interval '8 hours')::date)::int) as discharged
     FROM lsmd WHERE admission_department='${esc(p)}'`,
   // Топ-5 ICD категорій для пончика (param = назва відділення)
   deptIcdPie: (p) => `SELECT i.code_level1 as код, i.category_level1 as назва,
@@ -481,7 +483,7 @@ const PARAM_QUERIES = {
     const yPart = sep >= 0 ? p.slice(sep + 1) : 'all'
     const yf = yearFilter(yPart)
     return `SELECT i.code_level1 as код, i.category_level1 as назва,
-      ROUND(100.0*COUNT(*)::numeric/NULLIF((SELECT COUNT(*) FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND l2.icd_primary IS NOT NULL AND ${yf.replace('admission_date_d','l2.admission_date_d')}),0),1) as відс,
+      ROUND(100.0*COUNT(*)::numeric/NULLIF((SELECT COUNT(*) FROM lsmd l2 WHERE l2.admission_department='${esc(dept)}' AND l2.icd_primary IS NOT NULL AND ${yf.replace('admission_day_d','l2.admission_day_d')}),0),1) as відс,
       COUNT(*) as випадків
       FROM lsmd l JOIN icd_10 i ON i.icd_code=l.icd_primary
       WHERE l.admission_department='${esc(dept)}' AND l.icd_primary IS NOT NULL AND i.code_level1 IS NOT NULL AND ${yf}
@@ -613,9 +615,9 @@ const PARAM_QUERIES = {
   // Топ-діагнози одного відділення
   deptDiag: (p) => `SELECT COALESCE(diagnosis, icd_code) as діагноз, icd_code as код, cases as випадків, deaths as померло, percent_of_dept as відс FROM department_diagnoses WHERE department = '${esc(p)}' ORDER BY cases DESC LIMIT 10`,
   // Динаміка топ-3 діагнозів за 12 місяців (помісячно)
-  deptTrend12m: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(DATE_TRUNC('month', l.admission_date_d), 'YYYY-MM') AS місяць, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND l.admission_date_d >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months' GROUP BY місяць, l.icd_primary, i.diagnosis_level3 ORDER BY місяць, COUNT(*) DESC`,
+  deptTrend12m: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(DATE_TRUNC('month', l.admission_day_d), 'YYYY-MM') AS місяць, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND l.admission_day_d >= DATE_TRUNC('month', (CURRENT_TIMESTAMP - interval '8 hours')::date) - INTERVAL '11 months' GROUP BY місяць, l.icd_primary, i.diagnosis_level3 ORDER BY місяць, COUNT(*) DESC`,
   // Динаміка топ-3 діагнозів поточного місяця (щодня)
-  deptTrendMonth: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(l.admission_date_d, 'DD') AS день, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND DATE_TRUNC('month', l.admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день, l.icd_primary, i.diagnosis_level3 ORDER BY день::int, COUNT(*) DESC`,
+  deptTrendMonth: (p) => `WITH top3 AS (SELECT icd_primary AS код FROM lsmd WHERE admission_department = '${esc(p)}' AND icd_primary IS NOT NULL GROUP BY icd_primary ORDER BY COUNT(*) DESC LIMIT 3) SELECT TO_CHAR(l.admission_day_d, 'DD') AS день, l.icd_primary AS код, COALESCE(i.diagnosis_level3, l.icd_primary) AS діагноз, COUNT(*) AS випадків FROM lsmd l JOIN top3 ON top3.код = l.icd_primary LEFT JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND DATE_TRUNC('month', l.admission_day_d) = DATE_TRUNC('month', (CURRENT_TIMESTAMP - interval '8 hours')::date) GROUP BY день, l.icd_primary, i.diagnosis_level3 ORDER BY день::int, COUNT(*) DESC`,
   // Лікарі відділення з doc_name + emp_name (для dept cabinet)
   deptDocs2: (p) => `SELECT ld.doc_name as doc_name, COALESCE(e.full_name, e.emp_name) as full_name, e.emp_name as emp_name, e.position as посада, e.specialization as спеціалізація, COALESCE(ds.total_cases, 0) as випадків FROM empl e LEFT JOIN lsmd_doctors ld ON ld.empl_name_id = e.name_id LEFT JOIN doctor_stats ds ON ds.doctor_id = ld.empl_name_id WHERE e.department = '${esc(p)}' AND (e.emp_status IS DISTINCT FROM 'звільнений') AND (e.position ILIKE '%лікар%' OR e.position ILIKE '%ординатор%' OR e.position ILIKE '%завідувач%') ORDER BY COALESCE(e.full_name, e.emp_name) ASC LIMIT 50`,
   // Ординатори (резиденти) відділення, макс 20
@@ -624,7 +626,7 @@ const PARAM_QUERIES = {
   // 1 черговий на блок, детермінована щоденна ротація. param = 'YYYY-MM-DD' (доба); дефолт — сьогодні.
   dutyDoctors: (p) => {
     const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(p || '').trim())
-    const dateExpr = m ? `make_date(${+m[1]},${+m[2]},${+m[3]})` : 'CURRENT_DATE'
+    const dateExpr = m ? `make_date(${+m[1]},${+m[2]},${+m[3]})` : "(CURRENT_TIMESTAMP - interval '8 hours')::date"
     return `WITH params AS (SELECT (${dateExpr} - DATE '2000-01-01') AS seed),
       pool AS (
         SELECT CASE
@@ -657,21 +659,21 @@ const PARAM_QUERIES = {
   // Топ-діагнози лікаря (через doctor_id, бо doc_name скорочений ≠ повне ПІБ у doctor_diagnoses)
   docDiag: (p) => `SELECT COALESCE(dd.diagnosis, dd.icd_code) as діагноз, dd.icd_code as код, dd.cases as випадків, dd.deaths as померло FROM doctor_diagnoses dd JOIN lsmd_doctors ld ON ld.empl_name_id = dd.doctor_id WHERE ld.doc_name = '${esc(p)}' ORDER BY dd.cases DESC LIMIT 10`,
   // Тренд по роках (для головної сторінки)
-  deptYearly: (p) => `SELECT EXTRACT(year FROM admission_date_d)::int as рік, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_date_d IS NOT NULL GROUP BY рік ORDER BY рік`,
+  deptYearly: (p) => `SELECT EXTRACT(year FROM admission_day_d)::int as рік, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_day_d IS NOT NULL GROUP BY рік ORDER BY рік`,
   // Місячний тренд госпіталізацій по відділенню (для головної сторінки)
-  deptMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_date_d >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '11 months' GROUP BY місяць ORDER BY місяць`,
+  deptMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_day_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND admission_day_d >= DATE_TRUNC('month', (CURRENT_TIMESTAMP - interval '8 hours')::date) - INTERVAL '11 months' GROUP BY місяць ORDER BY місяць`,
   // Щоденний тренд поточного місяця по відділенню
-  deptDaily: (p) => `SELECT TO_CHAR(admission_date_d, 'DD') as день, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND DATE_TRUNC('month', admission_date_d) = DATE_TRUNC('month', CURRENT_DATE) GROUP BY день ORDER BY день::int`,
+  deptDaily: (p) => `SELECT TO_CHAR(admission_day_d, 'DD') as день, COUNT(*) as випадків FROM lsmd WHERE admission_department = '${esc(p)}' AND DATE_TRUNC('month', admission_day_d) = DATE_TRUNC('month', (CURRENT_TIMESTAMP - interval '8 hours')::date) GROUP BY день ORDER BY день::int`,
   // Топ-5 категорій МКХ по відділенню — назви з icd_10 (chapter = перша буква)
   deptIcdCat: (p) => `SELECT i.code_level1 as код, i.category_level1 as назва, COUNT(*) as випадків FROM lsmd l JOIN icd_10 i ON i.icd_code = l.icd_primary WHERE l.admission_department = '${esc(p)}' AND l.icd_primary IS NOT NULL GROUP BY i.code_level1, i.category_level1 ORDER BY випадків DESC LIMIT 5`,
   // Пошук МКХ-10 за кодом або назвою (для форми додавання пацієнта)
   icdSearch: (p) => `SELECT icd_code as код, COALESCE(diagnosis_level3, diagnosis_level2, category_level1) as назва FROM icd_10 WHERE icd_code ILIKE '${esc(p)}%' OR diagnosis_level3 ILIKE '%${esc(p)}%' OR diagnosis_level2 ILIKE '%${esc(p)}%' ORDER BY usage_count DESC NULLS LAST LIMIT 8`,
   // Місячна динаміка поступлень по всій лікарні за конкретний рік (param = рік як рядок)
-  hospitalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} GROUP BY місяць ORDER BY місяць`,
+  hospitalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_day_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_day_d IS NOT NULL AND EXTRACT(year FROM admission_day_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} GROUP BY місяць ORDER BY місяць`,
   // Місячна динаміка терапевтичного блоку (param = рік)
-  therapeuticMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології','Відділення анестезіології з ліжками інтенсивної терапії') GROUP BY місяць ORDER BY місяць`,
+  therapeuticMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_day_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_day_d IS NOT NULL AND EXTRACT(year FROM admission_day_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Терапевтичне відділення №1','Гематологічне відділення','Терапевтичне відділення №2','Гастроентерологічне відділення','Центр невідкладної неврології','Відділення анестезіології з ліжками інтенсивної терапії') GROUP BY місяць ORDER BY місяць`,
   // Місячна динаміка хірургічного блоку (param = рік)
-  surgicalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_date_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_date_d IS NOT NULL AND EXTRACT(year FROM admission_date_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1') GROUP BY місяць ORDER BY місяць`,
+  surgicalMonthly: (p) => `SELECT TO_CHAR(DATE_TRUNC('month', admission_day_d), 'YYYY-MM') as місяць, COUNT(*) as випадків FROM lsmd WHERE admission_day_d IS NOT NULL AND EXTRACT(year FROM admission_day_d) = ${/^\d{4}$/.test(String(p).trim()) ? parseInt(p,10) : new Date().getFullYear()} AND admission_department IN ('Опікове відділення','Травматологічне відділення для дітей','Травматологічне відділення для дорослих','Нейрохірургічне відділення','Урологічне відділення','Хірургічне відділення №2','Хірургічне відділення №1') GROUP BY місяць ORDER BY місяць`,
 }
 
 // Запити лише для admin (персональні дані пацієнтів).

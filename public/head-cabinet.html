@@ -1202,7 +1202,9 @@
         // дата-рядок обраного дня для фільтрів поступило/виписано
         const selStr = (/^\d{4}$/.test(String(activeParam)) && month !== 'all')
           ? `${String(day).padStart(2,'0')}.${String(month).padStart(2,'0')}.${activeParam}` : null;
-        const stayingCount = rows.length;   // перебуває в відділенні — до фільтра поступило/виписано (це число НЕ змінюється від кліку потоку)
+        // перебуває в відділенні — до фільтра поступило/виписано (це число НЕ змінюється від кліку потоку).
+        // Без фільтра лікаря/МКХ — беремо справжню кількість (rowsAll[0].всього, не обрізану LIMIT-ом списку).
+        const stayingCount = (docFilter || lockedBlok) ? rows.length : (rowsAll[0]?.всього ?? rowsAll.length);
         if (flowMode === 'admitted' && selStr) rows = rows.filter(r => r.поступив === selStr);
         if (flowMode === 'discharged' && selStr) rows = rows.filter(r => r.виписаний === selStr);
         const f = flow[0] || {};
