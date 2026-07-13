@@ -81,8 +81,10 @@ function initStaffFields() {
     requestAnimationFrame(() => { fields.style.transform = 'translateZ(0)'; });
   });
 }
-const HOSPITAL_NAME   = 'ХОТИНСЬКА<br>БАГАТОПРОФІЛЬНА<br>ЛІКАРНЯ';
-const HOSPITAL_TAGLINE = 'ТУРБУЄМОСЬ ПРО НАЙЦІННІШЕ';
+// Назва/слоган лікарні раніше були тут захардкоджені на "Хотинська" — і
+// показувались так на всіх 4 сторінках незалежно від того, чия це лікарня.
+// Тепер тягнемо з lpz_organizations по org_edrpou, який кожна сторінка
+// задає сама через window.HOSPITAL_ORG_EDRPOU перед підключенням utils.js.
 
 // ── Підсвітка чергових лікарів ↔ відділень ──
 (function injectDutyStyles() {
@@ -145,8 +147,16 @@ document.addEventListener('DOMContentLoaded', initCrossHighlight);
 function initHospitalName() {
   const title   = document.querySelector('.name-block .title');
   const tagline = document.querySelector('.name-block .tagline');
-  if (title)   title.innerHTML  = HOSPITAL_NAME;
-  if (tagline) tagline.textContent = HOSPITAL_TAGLINE;
+  const org = window.HOSPITAL_ORG_EDRPOU;
+  if (!org || (!title && !tagline)) return;
+  fetch(`/api/hospital-info?org=${encodeURIComponent(org)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(info => {
+      if (!info) return;
+      if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
+      if (tagline) tagline.textContent = info.tagline || '';
+    })
+    .catch(() => {});
 }
 
 document.addEventListener('DOMContentLoaded', () => {
