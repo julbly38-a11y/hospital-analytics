@@ -33,10 +33,13 @@ function renderShell(root, config) {
   `).join('');
   root.appendChild(kpiRow);
 
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: config.yearsBack }, (_, i) => currentYear - i);
+
   const yearFilter = document.createElement('div');
   yearFilter.className = 'year-filter';
   yearFilter.innerHTML =
-    config.years.map(y => `<div class="ypill">${y}</div>`).join('') +
+    years.map(y => `<div class="ypill">${y}</div>`).join('') +
     `<div class="ypill ypill-all active">ВСІ РОКИ</div>`;
   root.appendChild(yearFilter);
 
