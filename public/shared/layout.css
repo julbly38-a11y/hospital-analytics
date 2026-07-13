@@ -108,3 +108,119 @@ html, body {
   white-space: nowrap;
 }
 .year-num.small { font-size: 26px; letter-spacing: 1px; }
+
+/* смуга "Для працівників" — логін/пароль. Після входу цей же простір
+   займають чергові лікарі (окремий шар, ще не підключено). */
+.work-band {
+  position: absolute;
+  left: 3px; top: 521px;
+  width: 1920px; height: 50px;
+  background: linear-gradient(90deg, rgba(178,124,139,0.28), rgba(141,151,140,0.28));
+  z-index: 2;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.10);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
+}
+.work-band span {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font-weight: 300;
+}
+.wb-title {
+  right: 1390px;
+  font-size: 26px;
+  color: var(--c-ink-3);
+  -webkit-text-stroke: 0.7px var(--c-ink-3);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.wb-login { left: 740px; }
+.wb-pass  { left: 1180px; }
+.wb-login, .wb-pass {
+  font-size: 23px;
+  color: var(--c-ink-4);
+  letter-spacing: 1px;
+  -webkit-text-stroke: 0.3px var(--c-ink-4);
+}
+
+.staff-fields {
+  position: absolute;
+  left: 0; top: 521px;
+  width: 1920px; height: 50px;
+  z-index: 3;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease;
+  will-change: opacity;
+  transform: translateZ(0);
+}
+.staff-fields.open { opacity: 1; }
+.staff-fields.open > * { pointer-events: auto; }
+.staff-fields input {
+  position: absolute;
+  top: 7px; height: 36px;
+  border: 1px solid rgba(178,124,139,0.45);
+  background: rgba(240,236,232,0.18);
+  padding: 0 16px;
+  font-size: 19px;
+  color: var(--c-ink-2);
+  outline: none;
+  border-radius: 18px;
+  transition: border-color .2s ease, background .2s ease;
+}
+.staff-fields input::placeholder { color: var(--c-taupe); }
+.staff-fields input:focus {
+  border-color: var(--c-accent-pink);
+  background: rgba(255,255,255,0.28);
+}
+.f-login { left: 838px; width: 205px; }
+.f-pass  { left: 1345px; width: 170px; }
+.f-btn, .f-forgot {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: none;
+  border: 1px solid transparent;
+  padding: 5px 16px;
+  border-radius: 16px;
+  font-weight: 300;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+  color: var(--c-ink-4);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .25s ease, color .25s ease, border-color .25s ease;
+}
+.f-btn    { left: 1545px; }
+.f-forgot { right: 54px; }
+.f-btn:hover, .f-forgot:hover {
+  background: var(--c-ink-3);
+  color: var(--c-white);
+  border-color: var(--c-ink-3);
+  box-shadow: 0 0 14px rgba(58,58,58,0.45);
+}
+.f-error {
+  position: absolute;
+  left: 838px; top: 52px;
+  font-size: 15px;
+  color: var(--c-accent-red);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* стан "залогінено": чергові лікарі замість форми (наступний шар підключить дані) */
+.duty-docs {
+  position: absolute;
+  left: 700px; right: 175px; top: 50%;
+  transform: translateY(-50%);
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.duty-docs span {
+  position: static; transform: none;
+  font-weight: 300; font-size: 18px;
+  color: var(--c-taupe-light);
+  white-space: nowrap;
+}
+.me-logout {
+  font-size: 11px;
+  color: var(--c-accent-pink);
+  cursor: pointer;
+}
+.me-logout:hover { text-decoration: underline; }

@@ -58,4 +58,21 @@ function renderShell(root, config) {
       else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); }
     });
   });
+
+  // Смуга "Для працівників": форма логіну (стан "залогінено" з черговими
+  // лікарями замість форми — наступний шар, тут лише неавторизований стан).
+  root.insertAdjacentHTML('beforeend', `
+    <div class="work-band">
+      <span class="wb-title">Для працівників:</span>
+      <span class="wb-login">LOGIN:</span>
+      <span class="wb-pass">PASSWORDS:</span>
+    </div>
+    <div class="staff-fields">
+      <input class="f-login" type="text" placeholder="введіть логін" autocomplete="off">
+      <input class="f-pass" type="password" placeholder="введіть пароль" autocomplete="off">
+      <span class="f-btn">Увійти</span>
+      <span class="f-forgot">Забув пароль?</span>
+      <span class="f-error"></span>
+    </div>
+  `);
 }
