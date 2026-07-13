@@ -1,0 +1,110 @@
+/* Спільний структурний шар (позиціонування) для слайд-дашбордів.
+   Кольори — з theme.css. Дані (підписи KPI, роки) — з js/layout-config.js. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100vw; height: 100vh;
+  background: var(--c-cream);
+  overflow: hidden;
+  font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
+}
+
+.slide-wrapper {
+  position: fixed;
+  width: 1920px; height: 1080px;
+  transform-origin: top left;
+}
+
+.slide {
+  width: 1920px; height: 1080px;
+  position: relative; overflow: hidden;
+  background: var(--c-cream);
+}
+
+.logo {
+  position: absolute;
+  left: 36px; top: 50px;
+  width: 160px; height: auto;
+}
+
+.name-block {
+  position: absolute;
+  left: 221px; top: 59px;
+  width: 315px; height: 139px;
+  display: flex; flex-direction: column; justify-content: center;
+  text-align: left;
+}
+.title {
+  font-weight: 300; font-size: 28.8px; line-height: 1.0;
+  color: var(--c-ink-3); text-transform: uppercase;
+}
+.tagline {
+  font-weight: 300; font-size: 16.2px; line-height: 1.0;
+  color: var(--c-ink-3); margin-top: 8px; white-space: nowrap;
+}
+
+.vline, .vline2 {
+  position: absolute; top: 58px; width: 3px; height: 854px;
+}
+.vline  { left: 585px; background: rgba(0,0,0,0.12); }
+.vline2 { left: 576px; background: var(--c-accent-pink); }
+
+.hline, .hline2 {
+  position: absolute; left: 221px; width: 1688px; height: 3px;
+}
+.hline  { top: 211px; background: rgba(0,0,0,0.12); }
+.hline2 { top: 202px; background: var(--c-accent-pink); }
+
+.kpi-row {
+  position: absolute;
+  left: 690px; top: 108px;
+  width: 980px; height: 83px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.kpi { flex: 1; text-align: right; }
+.kpi-num {
+  font-weight: 300; font-size: 32.5px; color: var(--c-ink-1);
+  line-height: 1.1; white-space: nowrap;
+}
+.kpi-label {
+  font-weight: 300; font-size: 16.2px; letter-spacing: 0.5px;
+  color: var(--c-taupe-light); text-transform: uppercase;
+  margin-top: 4px; white-space: nowrap;
+}
+
+.year-filter {
+  position: absolute; right: 54px; top: 37px;
+  display: flex; gap: 9px; align-items: center;
+}
+.ypill {
+  width: 60px; height: 30px;
+  border: 1px solid var(--c-ink-4); border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px; color: var(--c-ink-2);
+  cursor: pointer; user-select: none;
+  transition: background .25s ease, color .25s ease, border-color .25s ease;
+}
+.ypill-all { width: 90px; letter-spacing: 0.5px; }
+.ypill:hover {
+  background: rgba(178,124,139,0.22);
+  border-color: var(--c-accent-pink);
+}
+.ypill.active {
+  background: var(--c-ink-3); color: var(--c-white); border-color: var(--c-ink-3);
+}
+
+.year-badge {
+  position: absolute; left: 1719px; top: 100px;
+  width: 147px; height: 85px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.year-num {
+  font-weight: 300; font-size: 48px; letter-spacing: 2px; margin-top: 16px;
+  background: linear-gradient(120deg, var(--c-accent-berry), var(--c-sage));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  white-space: nowrap;
+}
+.year-num.small { font-size: 26px; letter-spacing: 1px; }
