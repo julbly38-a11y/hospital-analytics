@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Хотинська — слайд</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&subset=cyrillic&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css">
 <style>
   @font-face {
     font-family: 'ITFLight';
@@ -15,7 +16,7 @@
 
   html, body {
     width: 100vw; height: 100vh;
-    background: #f0ece8;
+    background: var(--c-cream);
     overflow: hidden;
   }
 
@@ -28,7 +29,7 @@
   .slide {
     width: 1920px; height: 1080px;
     position: relative; overflow: hidden;
-    background: #f0ece8;
+    background: var(--c-cream);
   }
 
   /* динамічний пастельний mesh-фон */
@@ -83,7 +84,7 @@
     top: 58px;
     width: 3px;
     height: 854px;
-    background: #b27c8b;
+    background: var(--c-accent-pink);
   }
 
   /* горизонтальна лінія: X=259 Y=226 довжина=1650 товщина=3 */
@@ -101,7 +102,7 @@
     top: 217px;
     width: 1688px;
     height: 3px;
-    background: #b27c8b;
+    background: var(--c-accent-pink);
   }
 
   /* KPI-блок: X=775 Y=108 W=800 H=83 */
@@ -123,7 +124,7 @@
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
     font-size: 36px;
-    color: #1a1a1a;
+    color: var(--c-ink-1);
     line-height: 1.1;
     white-space: nowrap;
   }
@@ -132,7 +133,7 @@
     font-weight: 300;
     font-size: 20px;
     letter-spacing: 0.5px;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     text-transform: uppercase;
     margin-top: 4px;
   }
@@ -154,8 +155,8 @@
     background: linear-gradient(90deg, rgba(178,124,139,0.28), rgba(141,151,140,0.28));
     z-index: 2;
     box-shadow: 0 3px 14px rgba(0,0,0,0.10);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
-    mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
   }
   .work-band span {
     position: absolute;
@@ -165,15 +166,15 @@
     font-weight: 300;
   }
   @keyframes wbtitlepulse {
-    0%, 100% { color: #3a3a3a; -webkit-text-stroke: 0.7px #3a3a3a; text-shadow: none; }
-    50%       { color: #b27c8b; -webkit-text-stroke: 0.7px #b27c8b;
+    0%, 100% { color: var(--c-ink-3); -webkit-text-stroke: 0.7px var(--c-ink-3); text-shadow: none; }
+    50%       { color: var(--c-accent-pink); -webkit-text-stroke: 0.7px var(--c-accent-pink);
                 text-shadow: 0 0 12px rgba(141,151,140,0.9), 0 0 30px rgba(141,151,140,0.65), 0 0 60px rgba(141,151,140,0.4); }
   }
   .wb-title {
     right: 1390px;
     font-size: 26px;
-    color: #3a3a3a;
-    -webkit-text-stroke: 0.7px #3a3a3a;
+    color: var(--c-ink-3);
+    -webkit-text-stroke: 0.7px var(--c-ink-3);
     cursor: pointer;
     pointer-events: auto;
     animation: wbtitlepulse 1.8s ease-in-out infinite;
@@ -186,9 +187,9 @@
   .wb-pass  { left: 1180px; }
   .wb-login, .wb-pass {
     font-size: 23px;
-    color: #4a4a4a;
+    color: var(--c-ink-4);
     letter-spacing: 1px;
-    -webkit-text-stroke: 0.3px #4a4a4a;
+    -webkit-text-stroke: 0.3px var(--c-ink-4);
   }
 
   /* поля логіна/пароля — з'являються при наведенні на смугу */
@@ -221,14 +222,14 @@
     padding: 0 16px;
     font-family: 'ITFLight', 'Palatino', serif;
     font-size: 19px;
-    color: #2a2a2a;
+    color: var(--c-ink-2);
     outline: none;
     border-radius: 18px;
     transition: border-color .2s ease, background .2s ease;
   }
-  .staff-fields input::placeholder { color: #8a857f; }
+  .staff-fields input::placeholder { color: var(--c-taupe); }
   .staff-fields input:focus {
-    border-color: #b27c8b;
+    border-color: var(--c-accent-pink);
     background: rgba(255,255,255,0.28);
   }
   .f-login { left: 838px; width: 205px; }
@@ -245,7 +246,7 @@
     font-weight: 300;
     font-size: 20px;
     letter-spacing: 0.5px;
-    color: #4a4a4a;
+    color: var(--c-ink-4);
     cursor: pointer;
     white-space: nowrap;
     transition: background .25s ease, color .25s ease, border-color .25s ease;
@@ -253,9 +254,9 @@
   .f-btn    { left: 1545px; }
   .f-forgot { right: 54px; }
   .f-btn:hover, .f-forgot:hover {
-    background: #3a3a3a;
-    color: #fff;
-    border-color: #3a3a3a;
+    background: var(--c-ink-3);
+    color: var(--c-white);
+    border-color: var(--c-ink-3);
     box-shadow: 0 0 14px rgba(58,58,58,0.45);
   }
   .f-error {
@@ -264,7 +265,7 @@
     top: 52px;
     font-family: 'ITFLight', 'Palatino', serif;
     font-size: 15px;
-    color: #c0392b;
+    color: var(--c-accent-red);
     white-space: nowrap;
     pointer-events: none;
   }
@@ -285,7 +286,7 @@
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
     font-size: 26px;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     white-space: nowrap;
   }
 
@@ -301,14 +302,14 @@
   .ypill {
     width: 60px;
     height: 30px;
-    border: 1px solid #4a4a4a;
+    border: 1px solid var(--c-ink-4);
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Helvetica Neue', Arial, sans-serif;
     font-size: 13px;
-    color: #2a2a2a;
+    color: var(--c-ink-2);
   }
   .ypill-all {
     width: 90px;
@@ -334,7 +335,7 @@
     font-size: 48px;
     letter-spacing: 2px;
     margin-top: 16px;
-    background: linear-gradient(120deg, #9c5468, #5f6e5e);
+    background: linear-gradient(120deg, var(--c-accent-berry), var(--c-sage));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -372,7 +373,7 @@
     font-weight: 300;
     font-size: 28.8px;
     line-height: 1.0;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: uppercase;
   }
 
@@ -381,7 +382,7 @@
     font-weight: 300;
     font-size: 16.2px;
     line-height: 1.0;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: none;
     margin-top: 8px;
     white-space: nowrap;
@@ -431,7 +432,7 @@
     width: 3px;
   }
   .vseg  { left: 585px; background: rgba(0,0,0,0.12); }
-  .vseg2 { left: 576px; background: #b27c8b; }
+  .vseg2 { left: 576px; background: var(--c-accent-pink); }
   .seg-top { top: 58px;  height: 463px; }
   .seg-bot { top: 571px; height: 341px; }
 
@@ -462,13 +463,13 @@
   }
   .ypill:hover {
     background: rgba(178,124,139,0.22);
-    border-color: #b27c8b;
+    border-color: var(--c-accent-pink);
     box-shadow: 0 0 12px rgba(178,124,139,0.55);
   }
   .ypill.active {
-    background: #3a3a3a;
-    color: #fff;
-    border-color: #3a3a3a;
+    background: var(--c-ink-3);
+    color: var(--c-white);
+    border-color: var(--c-ink-3);
   }
 </style>
 <script src="/js/utils.js"></script>

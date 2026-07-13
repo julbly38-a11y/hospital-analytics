@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Хотинська — слайд</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&subset=cyrillic&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css">
 <style>
   @font-face {
     font-family: 'ITFLight';
@@ -15,7 +16,7 @@
 
   html, body {
     width: 100vw; height: 100vh;
-    background: #f0ece8;
+    background: var(--c-cream);
     overflow: hidden;
   }
 
@@ -28,7 +29,7 @@
   .slide {
     width: 1920px; height: 1080px;
     position: relative; overflow: hidden;
-    background: #f0ece8;
+    background: var(--c-cream);
   }
 
   /* динамічний пастельний mesh-фон */
@@ -83,7 +84,7 @@
     top: 58px;
     width: 3px;
     height: 854px;
-    background: #b27c8b;
+    background: var(--c-accent-pink);
   }
 
   /* горизонтальна лінія: X=259 Y=226 довжина=1650 товщина=3 */
@@ -101,7 +102,7 @@
     top: 217px;
     width: 1688px;
     height: 3px;
-    background: #b27c8b;
+    background: var(--c-accent-pink);
   }
 
   /* KPI-блок (5 метрик): X=775 Y=108 */
@@ -141,8 +142,8 @@
     stroke-width: 1;
   }
   .spark-dot {
-    fill: #b27c8b;
-    stroke: #f0ece8;
+    fill: var(--c-accent-pink);
+    stroke: var(--c-cream);
     stroke-width: 1.5;
     cursor: pointer;
     transition: r .15s ease;
@@ -154,7 +155,7 @@
     text-anchor: middle;
     transition: font-size .15s ease, fill .15s ease;
   }
-  .spark-val.active { font-size: 12.61px; fill: #b27c8b; }
+  .spark-val.active { font-size: 12.61px; fill: var(--c-accent-pink); }
   .spark-xlabel {
     fill: #a89aa0;
     font-family: 'ITFLight', 'Palatino', serif;
@@ -162,12 +163,12 @@
     text-anchor: middle;
     transition: font-size .15s ease, fill .15s ease;
   }
-  .spark-xlabel.active { font-size: 10.67px; fill: #b27c8b; }
+  .spark-xlabel.active { font-size: 10.67px; fill: var(--c-accent-pink); }
   .kpi-num {
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
     font-size: 32.4px;
-    color: #1a1a1a;
+    color: var(--c-ink-1);
     line-height: 1.1;
     white-space: nowrap;
   }
@@ -176,7 +177,7 @@
     font-weight: 300;
     font-size: 18px;
     letter-spacing: 0.5px;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     text-transform: uppercase;
     margin-top: 4px;
     white-space: nowrap;
@@ -207,8 +208,8 @@
     background: linear-gradient(90deg, rgba(178,124,139,0.28), rgba(141,151,140,0.28));
     z-index: 2;
     box-shadow: 0 3px 14px rgba(0,0,0,0.10);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
-    mask-image: linear-gradient(90deg, transparent 0, #000 9%, #000 91%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
   }
   .work-band span {
     position: absolute;
@@ -220,8 +221,8 @@
   .wb-title {
     right: 1390px;
     font-size: 26px;
-    color: #3a3a3a;
-    -webkit-text-stroke: 0.7px #3a3a3a;
+    color: var(--c-ink-3);
+    -webkit-text-stroke: 0.7px var(--c-ink-3);
     cursor: pointer;
     pointer-events: auto;
   }
@@ -245,7 +246,7 @@
     transition: color .2s ease, text-shadow .2s ease;
   }
   .dept.hl, .duty-docs span.hl {
-    color: #b27c8b !important;
+    color: var(--c-accent-pink) !important;
     text-shadow:
       0 0 6px rgba(178,124,139,0.55),
       0 0 16px rgba(178,124,139,0.45),
@@ -258,15 +259,15 @@
     font-family: 'ITFLight', 'Palatino', serif;
     font-weight: 300;
     font-size: 18px;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     white-space: nowrap;
   }
 
   .wb-login, .wb-pass {
     font-size: 23px;
-    color: #4a4a4a;
+    color: var(--c-ink-4);
     letter-spacing: 1px;
-    -webkit-text-stroke: 0.3px #4a4a4a;
+    -webkit-text-stroke: 0.3px var(--c-ink-4);
   }
 
   /* поля логіна/пароля — з'являються при наведенні на смугу */
@@ -299,14 +300,14 @@
     padding: 0 16px;
     font-family: 'ITFLight', 'Palatino', serif;
     font-size: 19px;
-    color: #2a2a2a;
+    color: var(--c-ink-2);
     outline: none;
     border-radius: 18px;
     transition: border-color .2s ease, background .2s ease;
   }
-  .staff-fields input::placeholder { color: #8a857f; }
+  .staff-fields input::placeholder { color: var(--c-taupe); }
   .staff-fields input:focus {
-    border-color: #b27c8b;
+    border-color: var(--c-accent-pink);
     background: rgba(255,255,255,0.28);
   }
   .f-login { left: 838px; width: 205px; }
@@ -323,7 +324,7 @@
     font-weight: 300;
     font-size: 20px;
     letter-spacing: 0.5px;
-    color: #4a4a4a;
+    color: var(--c-ink-4);
     cursor: pointer;
     white-space: nowrap;
     transition: background .25s ease, color .25s ease, border-color .25s ease;
@@ -331,9 +332,9 @@
   .f-btn    { left: 1545px; }
   .f-forgot { right: 54px; }
   .f-btn:hover, .f-forgot:hover {
-    background: #3a3a3a;
-    color: #fff;
-    border-color: #3a3a3a;
+    background: var(--c-ink-3);
+    color: var(--c-white);
+    border-color: var(--c-ink-3);
     box-shadow: 0 0 14px rgba(58,58,58,0.45);
   }
   .f-error {
@@ -342,7 +343,7 @@
     top: 52px;
     font-family: 'ITFLight', 'Palatino', serif;
     font-size: 15px;
-    color: #c0392b;
+    color: var(--c-accent-red);
     white-space: nowrap;
     pointer-events: none;
   }
@@ -363,7 +364,7 @@
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-weight: 300;
     font-size: 26px;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     white-space: nowrap;
   }
 
@@ -379,14 +380,14 @@
   .ypill {
     width: 60px;
     height: 30px;
-    border: 1px solid #4a4a4a;
+    border: 1px solid var(--c-ink-4);
     border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-family: 'Helvetica Neue', Arial, sans-serif;
     font-size: 13px;
-    color: #2a2a2a;
+    color: var(--c-ink-2);
   }
   .ypill-all {
     width: 90px;
@@ -412,7 +413,7 @@
     font-size: 48px;
     letter-spacing: 2px;
     line-height: 1;
-    background: linear-gradient(120deg, #9c5468, #5f6e5e);
+    background: linear-gradient(120deg, var(--c-accent-berry), var(--c-sage));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -429,7 +430,7 @@
     font-weight: 300;
     font-size: 19px;
     letter-spacing: 1px;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     white-space: nowrap;
     text-transform: uppercase;
     margin-top: 4px;
@@ -461,7 +462,7 @@
     font-weight: 300;
     font-size: 28.8px;
     line-height: 1.0;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: uppercase;
   }
 
@@ -474,7 +475,7 @@
     font-weight: 300;
     font-size: 25.92px;
     line-height: 1.0;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: uppercase;
     white-space: nowrap;
     text-align: right;
@@ -486,7 +487,7 @@
     font-weight: 300;
     font-size: 16.2px;
     line-height: 1.0;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: none;
     margin-top: 8px;
     white-space: nowrap;
@@ -508,7 +509,7 @@
   .me-clock {
     font-weight: 300;
     font-size: 13px;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     letter-spacing: 0.5px;
     line-height: 1.2;
     margin-bottom: 6px;
@@ -517,14 +518,14 @@
   .me-surname {
     font-weight: 300;
     font-size: 19px;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: uppercase;
     line-height: 1.1;
   }
   .me-firstname {
     font-weight: 300;
     font-size: 11px;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     text-transform: uppercase;
     line-height: 1.1;
   }
@@ -535,7 +536,7 @@
     display: block;
     font-weight: 300;
     font-size: 12px;
-    color: #b27c8b;
+    color: var(--c-accent-pink);
   }
 
   /* ── анімація появи блоків ── */
@@ -582,7 +583,7 @@
     width: 3px;
   }
   .vseg  { left: 585px; background: rgba(0,0,0,0.12); }
-  .vseg2 { left: 576px; background: #b27c8b; }
+  .vseg2 { left: 576px; background: var(--c-accent-pink); }
   .seg-top { top: 58px;  height: 463px; }
   .seg-bot { top: 571px; height: 341px; }
 
@@ -612,11 +613,11 @@
     transition: background .25s ease, color .25s ease, border-color .25s ease;
   }
   .ypill:hover {
-    border-color: #b27c8b;
+    border-color: var(--c-accent-pink);
     box-shadow: 0 0 12px rgba(178,124,139,0.55);
   }
   .ypill.active {
-    border-color: #3a3a3a;
+    border-color: var(--c-ink-3);
     border-width: 2px;
     font-weight: 700;
   }
@@ -694,8 +695,8 @@
     overflow-y: auto;
     padding: 10px 4px;
     /* розмиті краї зверху і знизу при прокручуванні */
-    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
-    mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
@@ -704,7 +705,7 @@
   .pat-all {
     font-size: 12px;
     letter-spacing: 0.04em;
-    color: #9a958f;
+    color: var(--c-taupe-light);
     cursor: pointer;
     border-bottom: 1px dashed #b9b3ac;
     margin-left: 6px;
@@ -726,16 +727,16 @@
   .pat-month:hover { color: #c0704a; border-bottom-color: #c0704a; }
   /* пацієнт у списку лікаря (на місці ординаторської) */
   .pat-item { text-align: right; line-height: 1.15; max-width: 100%; }
-  .pat-item .pi-name { display: block; font-size: 16px; font-weight: 300; color: #3a3a3a; white-space: nowrap; }
+  .pat-item .pi-name { display: block; font-size: 16px; font-weight: 300; color: var(--c-ink-3); white-space: nowrap; }
   .pat-item .pi-meta { display: block; font-size: 11px; color: #978f88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 480px; }
   .doc-item {
     font-size: 19px;
     font-weight: 300;
-    color: #3a3a3a;
+    color: var(--c-ink-3);
     white-space: nowrap;
   }
   .doc-item.chief {
-    color: #b27c8b;
+    color: var(--c-accent-pink);
     font-weight: 600;
   }
   /* власник кабінету у списку — виділяємо (клік по ньому → лише його хворі) */
@@ -783,10 +784,10 @@
     text-align: left;
   }
   .admissions-box.open { opacity: 1; pointer-events: auto; }
-  .ab-blok { color: #b27c8b; font-weight: 600; }
+  .ab-blok { color: var(--c-accent-pink); font-weight: 600; }
   .ab-title {
     font-size: 17px;
-    color: #b27c8b;
+    color: var(--c-accent-pink);
     text-align: left;
     margin-bottom: 2px;
     text-transform: uppercase;
@@ -805,8 +806,8 @@
     overflow-y: auto;
     padding: 10px 4px;
     /* розмиті краї: вміст згасає зверху і знизу при прокручуванні */
-    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
-    mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
@@ -820,17 +821,17 @@
     padding-bottom: 7px;
   }
   .ab-info { display: flex; flex-direction: row; align-items: baseline; gap: 10px; min-width: 0; white-space: nowrap; }
-  .ab-name { font-size: 15px; color: #1a1a1a; }
+  .ab-name { font-size: 15px; color: var(--c-ink-1); }
   .ab-meta { font-size: 13px; color: #978f88; }
   .ab-repeat { color: #c0704a; }
   /* смужка перебування: число діб + кожен сегмент = 1 доба */
   .ab-stay { display: flex; gap: 5px; flex-shrink: 0; align-items: center; }
-  .ab-days { font-size: 13px; color: #b27c8b; text-align: left; }
+  .ab-days { font-size: 13px; color: var(--c-accent-pink); text-align: left; }
   .ab-bar { display: flex; gap: 2px; }
   .ab-bar i {
     width: 6px;
     height: 12px;
-    background: #b27c8b;
+    background: var(--c-accent-pink);
     border-radius: 1px;
   }
   .ab-bar i.today {
@@ -844,7 +845,7 @@
   .me-logout {
     font-family: 'ITFLight', 'Palatino', 'Palatino Linotype', serif;
     font-size: 11px;
-    color: #b27c8b;
+    color: var(--c-accent-pink);
     cursor: pointer;
   }
   .me-logout:hover { text-decoration: underline; }
@@ -862,7 +863,7 @@
     left: 0; bottom: 0; width: 100%;
     max-height: 44vh;
     background: #f3eee8;
-    border-top: 2px solid #b27c8b;
+    border-top: 2px solid var(--c-accent-pink);
     box-shadow: 0 -12px 30px rgba(0,0,0,0.18);
     transform: translateY(100%);
     transition: transform .28s ease;
@@ -874,20 +875,20 @@
   .dept-drawer.open { transform: translateY(0); pointer-events: auto; }
   .dd-inner { padding: 22px 48px 28px; }
   .dd-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 14px; }
-  .dd-name { font-size: 24px; color: #1a1a1a; }
-  .dd-chief { font-size: 14px; color: #b27c8b; }
+  .dd-name { font-size: 24px; color: var(--c-ink-1); }
+  .dd-chief { font-size: 14px; color: var(--c-accent-pink); }
   .dd-kpi { display: flex; gap: 0; flex-wrap: wrap; border-bottom: 1px solid rgba(0,0,0,0.08); padding-bottom: 16px; margin-bottom: 16px; }
   .dd-kpi .s { flex: 1 1 110px; padding: 0 18px; border-left: 1px solid rgba(0,0,0,0.08); }
   .dd-kpi .s:first-child { border-left: none; padding-left: 0; }
-  .dd-kpi .s .v { font-size: 26px; color: #1a1a1a; line-height: 1; }
+  .dd-kpi .s .v { font-size: 26px; color: var(--c-ink-1); line-height: 1; }
   .dd-kpi .s .l { font-size: 11px; color: #978f88; text-transform: uppercase; letter-spacing: .07em; margin-top: 5px; }
   .dd-cols { display: flex; gap: 40px; }
   .dd-col { flex: 1; }
   .dd-col-title { font-size: 11px; color: #978f88; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
   .dd-staff-row { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; font-size: 14px; color: #333; }
   .dd-staff-row .av { width: 24px; height: 24px; border-radius: 50%; background: rgba(141,151,140,0.25); color: #5b6359; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
-  .dd-staff-row.chief .av { background: #b27c8b; color: #fff; }
-  .dd-staff-row.chief b { color: #b27c8b; font-weight: normal; }
+  .dd-staff-row.chief .av { background: var(--c-accent-pink); color: var(--c-white); }
+  .dd-staff-row.chief b { color: var(--c-accent-pink); font-weight: normal; }
   .dd-icd-row { margin-bottom: 9px; }
   .dd-icd-row .top { display: flex; justify-content: space-between; font-size: 13px; color: #333; margin-bottom: 3px; }
   .dd-icd-row .pct { color: #8d978c; }
