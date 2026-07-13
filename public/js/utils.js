@@ -147,14 +147,16 @@ document.addEventListener('DOMContentLoaded', initCrossHighlight);
 function initHospitalName() {
   const title   = document.querySelector('.name-block .title');
   const tagline = document.querySelector('.name-block .tagline');
+  const logo    = document.querySelector('.logo');
   const org = window.HOSPITAL_ORG_EDRPOU;
-  if (!org || (!title && !tagline)) return;
+  if (!org || (!title && !tagline && !logo)) return;
   fetch(`/api/hospital-info?org=${encodeURIComponent(org)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => {
       if (!info) return;
       if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
       if (tagline) tagline.textContent = info.tagline || '';
+      if (logo && info.logo_url) logo.src = info.logo_url;
     })
     .catch(() => {});
 }

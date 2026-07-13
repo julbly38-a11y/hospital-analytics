@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     const { data, error } = await sb()
       .schema('lpz')
       .from('lpz_organizations')
-      .select('edrpou, display_name, tagline, short_name, address, phones')
+      .select('edrpou, display_name, tagline, logo_url, short_name, address, phones')
       .eq('edrpou', org)
       .single()
 

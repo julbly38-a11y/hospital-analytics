@@ -6,9 +6,9 @@ function renderShell(root, config) {
   config = config || window.LAYOUT_CONFIG;
   if (!root || !config) return;
 
+  // src заповнює initHospitalName() з /api/hospital-info (логотип — per-лікарня)
   const logo = document.createElement('img');
   logo.className = 'logo';
-  logo.src = config.logo;
   logo.alt = 'Логотип';
   root.appendChild(logo);
 
