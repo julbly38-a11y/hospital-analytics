@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
     const { data: appUser } = await supabase
       .from('app_users')
-      .select('role, empl_name_id')
+      .select('role, empl_name_id, is_owner')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -48,6 +48,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       role: appUser?.role || 'viewer',
+      // is_owner — окремо від role: role='admin' видають і директорам/заступникам
+      // окремих лікарень (з lpz_empl.role), а сторінки, що бачать усі ЛПУ одразу
+      // (admin-hospitals, admin-status), мають бути доступні лише власнику сайту.
+      is_owner: appUser?.is_owner || false,
       email: user.email,
       full_name, emp_name, position, specialization, department, doc_name,
     })

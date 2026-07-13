@@ -14,7 +14,7 @@ export default function AdminHospitals() {
 
   useEffect(() => {
     fetch('/api/me').then(r => r.json()).then(me => {
-      if (me.role !== 'admin') { router.replace('/'); return }
+      if (!me.is_owner) { router.replace('/'); return }
       setAllowed(true)
     })
   }, [router])

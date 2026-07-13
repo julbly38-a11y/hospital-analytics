@@ -6,7 +6,7 @@ const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SB_SERVICE = process.env.SUPABASE_SERVICE_KEY
 const GH_TOKEN = process.env.GITHUB_TOKEN
 
-async function getRole(req) {
+async function isOwner(req) {
   try {
     const supabase = createServerClient(SB_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
       cookies: {
@@ -15,10 +15,10 @@ async function getRole(req) {
       },
     })
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return null
-    const { data } = await supabase.from('app_users').select('role').eq('auth_user_id', user.id).single()
-    return data?.role || null
-  } catch { return null }
+    if (!user) return false
+    const { data } = await supabase.from('app_users').select('is_owner').eq('auth_user_id', user.id).single()
+    return data?.is_owner || false
+  } catch { return false }
 }
 
 async function checkSupabase() {
@@ -68,8 +68,8 @@ function checkVercel() {
 }
 
 export default async function handler(req, res) {
-  const role = await getRole(req)
-  if (role !== 'admin') return res.status(403).json({ error: 'Доступ заборонено' })
+  const owner = await isOwner(req)
+  if (!owner) return res.status(403).json({ error: 'Доступ заборонено' })
 
   const [supabase, github] = await Promise.all([checkSupabase(), checkGithub()])
   const vercel = checkVercel()
