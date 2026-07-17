@@ -17,6 +17,18 @@
 <script src="/js/staff-login.js"></script>
 </head>
 <body>
+<!-- dev-перемикач лікарень: тимчасовий, поки немає зручного адмін-доступу під час налаштування -->
+<select id="devOrgSwitch" style="position:fixed; top:8px; left:8px; z-index:9999; font-family:sans-serif; font-size:13px; padding:3px 6px;">
+  <option value="02005875">Хотинська</option>
+  <option value="43342788">ЛШМД</option>
+</select>
+<script>
+  (function () {
+    const sel = document.getElementById('devOrgSwitch');
+    sel.value = window.HOSPITAL_ORG_EDRPOU;
+    sel.addEventListener('change', () => { location.href = '/layout.html?org=' + sel.value; });
+  })();
+</script>
 <div class="slide-wrapper">
   <div class="slide" id="slideRoot"></div>
 </div>
@@ -33,7 +45,7 @@
   // initHospitalName() і initStaffFields() вже викликає utils.js на
   // DOMContentLoaded — до цього моменту DOM з renderShell() вже готовий,
   // тож повторний виклик тут лише подвоїв би обробники (баг з подвійним toggle).
-  initStaffLogin('/kabinet.html');
+  initStaffLogin('/entry.html');
 </script>
 </body>
 </html>

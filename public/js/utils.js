@@ -5,6 +5,9 @@
  * countUp(el, target, dur, delay) — animated count-up with easeOutCubic
  * stat(key, param)                — POST /api/stats and return rows[]
  * inertialScrollToCenter(c, el)   — smooth-scroll container so el is centred
+ * updateFadeMask(el, axis)        — fade edges of a scrollable list ('x'/'y'), reacts to scroll position
+ * enableDragScroll(el, axis)      — drag-to-scroll with inertia (momentum on release)
+ * fitHeightTo(el, bottomPx, gap)  — sets el's max-height from its real offsetTop to a given boundary
  */
 
 function fmt(n) {
@@ -75,6 +78,7 @@ function initStaffFields() {
   if (!title || !fields) return;
   title.addEventListener('click', (e) => {
     e.stopPropagation();
+    title.classList.add('no-pulse');
     fields.classList.toggle('open');
     void fields.offsetHeight;
     fields.style.transform = 'translateZ(0)';
@@ -144,6 +148,15 @@ function initCrossHighlight() {
 
 document.addEventListener('DOMContentLoaded', initCrossHighlight);
 
+// Кольорова схема per-лікарня (lib/hospital-themes.js, отримана через
+// /api/hospital-info) — накладає CSS-змінні на :root. theme=null (немає
+// власної схеми) — нічого не робить, лишається дефолт Хотина з theme.css.
+function applyHospitalTheme(theme) {
+  if (!theme) return;
+  const root = document.documentElement.style;
+  Object.entries(theme).forEach(([k, v]) => root.setProperty(k, v));
+}
+
 function initHospitalName() {
   const title   = document.querySelector('.name-block .title');
   const tagline = document.querySelector('.name-block .tagline');
@@ -157,6 +170,7 @@ function initHospitalName() {
       if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
       if (tagline) tagline.textContent = info.tagline || '';
       if (logo && info.logo_url) logo.src = info.logo_url;
+      applyHospitalTheme(info.theme);
     })
     .catch(() => {});
 }
@@ -199,6 +213,101 @@ function initYearFilter(onchange) {
   }));
 
   return { getParam: () => activeParam };
+}
+
+// ── Прокручувані списки: спільна поведінка для БУДЬ-ЯКОГО списку на будь-якій
+// сторінці (горизонтального чи вертикального) — інерційне перетягування
+// мишею + fade-маска, що реагує на реальну позицію скролу. Нічого тут не
+// хардкодиться під конкретну сторінку/список — розміри рахує сама сторінка
+// (fitHeightTo) з реальних offsetTop елементів, а не ці утиліти. ──
+
+const SCROLL_FADE_SIZE = 32; // px, ширина розмиття країв
+
+// Fade-маска на краях реагує на позицію скролу: біля самого початку/кінця
+// зникає з того боку, щоб не затуляти перший/останній пункт, коли
+// прокручувати далі вже нікуди.
+function updateFadeMask(el, axis) {
+  if (!el) return;
+  const pos = axis === 'x' ? el.scrollLeft : el.scrollTop;
+  const extent = axis === 'x' ? el.scrollWidth - el.clientWidth : el.scrollHeight - el.clientHeight;
+  const atStart = pos <= 2;
+  const atEnd = pos >= extent - 2;
+  const dir = axis === 'x' ? '90deg' : '180deg';
+  let mask;
+  if (atStart && atEnd) mask = 'none';
+  else if (atStart) mask = `linear-gradient(${dir}, var(--c-black) 0, var(--c-black) calc(100% - ${SCROLL_FADE_SIZE}px), transparent 100%)`;
+  else if (atEnd) mask = `linear-gradient(${dir}, transparent 0, var(--c-black) ${SCROLL_FADE_SIZE}px, var(--c-black) 100%)`;
+  else mask = `linear-gradient(${dir}, transparent 0, var(--c-black) ${SCROLL_FADE_SIZE}px, var(--c-black) calc(100% - ${SCROLL_FADE_SIZE}px), transparent 100%)`;
+  el.style.webkitMaskImage = mask;
+  el.style.maskImage = mask;
+}
+
+// Прокрутка перетягуванням мишею (затиснути ліву кнопку й тягнути) — з
+// інерційним гальмуванням після відпускання за швидкістю руху перед ним
+// (як типовий touch/трекпад скрол), а не миттєва зупинка.
+function enableDragScroll(el, axis) {
+  if (!el) return;
+  axis = axis || 'x';
+  const isX = axis === 'x';
+  let dragging = false, startPos = 0, startScroll = 0;
+  let lastPos = 0, lastT = 0, velocity = 0;
+  let momentumId = null;
+
+  const pointerPos = (e) => isX ? e.pageX : e.pageY;
+  const getScroll = () => isX ? el.scrollLeft : el.scrollTop;
+  const setScroll = (v) => { if (isX) el.scrollLeft = v; else el.scrollTop = v; };
+
+  const stopMomentum = () => { if (momentumId) { cancelAnimationFrame(momentumId); momentumId = null; } };
+
+  function runMomentum() {
+    let v = velocity;
+    const friction = 0.94;
+    function step() {
+      if (Math.abs(v) < 0.5) { momentumId = null; return; }
+      setScroll(getScroll() - v);
+      v *= friction;
+      momentumId = requestAnimationFrame(step);
+    }
+    momentumId = requestAnimationFrame(step);
+  }
+
+  el.style.cursor = 'grab';
+  el.addEventListener('mousedown', (e) => {
+    stopMomentum();
+    dragging = true;
+    el.style.cursor = 'grabbing';
+    startPos = lastPos = pointerPos(e);
+    startScroll = getScroll();
+    lastT = performance.now();
+    velocity = 0;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    setScroll(startScroll - (pointerPos(e) - startPos));
+    const now = performance.now();
+    const dt = now - lastT;
+    if (dt > 8) {
+      velocity = (pointerPos(e) - lastPos) / dt * 16; // px за кадр (~16мс)
+      lastPos = pointerPos(e);
+      lastT = now;
+    }
+  });
+  window.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.cursor = 'grab';
+    if (Math.abs(velocity) > 1) runMomentum();
+  });
+}
+
+// Максимальна висота елемента від його реального offsetTop до заданої
+// нижньої межі (px у тій самій системі координат, зазвичай offsetTop іншого
+// елемента чи root.clientHeight) — сторінка сама вирішує, що є межею,
+// ця функція лише рахує різницю, без жодних захардкоджених px.
+function fitHeightTo(el, bottomPx, gap = 12) {
+  if (!el) return;
+  el.style.maxHeight = Math.max(bottomPx - el.offsetTop - gap, 0) + 'px';
 }
 
 function inertialScrollToCenter(container, el, dur = 600) {

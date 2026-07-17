@@ -56,7 +56,7 @@ export default function AdminHospitals() {
           ))}
           {active && (
             <a
-              href={`/khotyn_slide.html?org=${encodeURIComponent(active)}`}
+              href={`/layout.html?org=${encodeURIComponent(active)}`}
               target="_blank" rel="noreferrer"
               style={{ display: 'block', marginTop: 20, fontSize: 12, color: '#4a9870', ...MONO }}
             >
@@ -68,7 +68,7 @@ export default function AdminHospitals() {
           {active ? (
             <iframe
               key={active}
-              src={`/khotyn_slide.html?org=${encodeURIComponent(active)}`}
+              src={`/layout.html?org=${encodeURIComponent(active)}`}
               style={{ width: '100%', height: '100%', minHeight: 600, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, background: '#fff' }}
             />
           ) : (

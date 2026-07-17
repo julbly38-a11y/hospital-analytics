@@ -22,10 +22,18 @@ html, body {
   background: var(--c-cream);
 }
 
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes logopulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
 .logo {
   position: absolute;
   left: 36px; top: 50px;
   width: 160px; height: auto;
+  opacity: 0;
+  animation: fadein 0.9s ease forwards,
+             logopulse 5s ease-in-out 1.5s infinite;
 }
 
 .name-block {
@@ -125,6 +133,11 @@ html, body {
   position: absolute; top: 50%; transform: translateY(-50%);
   font-weight: 300;
 }
+@keyframes wbtitlepulse {
+  0%, 100% { color: var(--c-ink-3); -webkit-text-stroke: 0.7px var(--c-ink-3); text-shadow: none; }
+  50%       { color: var(--c-accent-pink); -webkit-text-stroke: 0.7px var(--c-accent-pink);
+              text-shadow: 0 0 12px rgba(141,151,140,0.9), 0 0 30px rgba(141,151,140,0.65), 0 0 60px rgba(141,151,140,0.4); }
+}
 .wb-title {
   right: 1390px;
   font-size: 26px;
@@ -132,6 +145,11 @@ html, body {
   -webkit-text-stroke: 0.7px var(--c-ink-3);
   cursor: pointer;
   pointer-events: auto;
+  animation: wbtitlepulse 1.8s ease-in-out infinite;
+}
+.wb-title.no-pulse {
+  animation: none;
+  text-shadow: none;
 }
 .wb-login { left: 740px; }
 .wb-pass  { left: 1180px; }
@@ -206,21 +224,93 @@ html, body {
 }
 
 /* стан "залогінено": чергові лікарі замість форми (наступний шар підключить дані) */
+/* Горизонтальна прокрутка замість space-between: кількість чергових лікарів
+   росте з кількістю відділень (13 у ЛШМД) і не завжди вміщається в ширину —
+   тепер список просто скролиться, а не обрізається/вилазить за екран. */
 .duty-docs {
   position: absolute;
-  left: 700px; right: 175px; top: 50%;
+  left: 620px; right: 60px; top: 50%;
   transform: translateY(-50%);
-  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  display: flex; justify-content: flex-start; align-items: center; gap: 22px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 32px, var(--c-black) calc(100% - 32px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 32px, var(--c-black) calc(100% - 32px), transparent 100%);
 }
+.duty-docs::-webkit-scrollbar { display: none; }
 .duty-docs span {
   position: static; transform: none;
   font-weight: 300; font-size: 18px;
   color: var(--c-taupe-light);
   white-space: nowrap;
+  flex-shrink: 0;
+  cursor: default;
 }
+
+/* Спливаюча підказка при наведенні на чергового лікаря — посада + повне ПІБ */
+.duty-tip {
+  position: fixed;
+  z-index: 20;
+  background: var(--c-ink-3);
+  color: var(--c-white);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, calc(-100% - 12px));
+  transition: opacity .15s ease;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
+.duty-tip.open { opacity: 1; }
+.duty-tip .dt-name { font-weight: 500; }
+.duty-tip .dt-role { color: var(--c-taupe); font-size: 11px; margin-top: 2px; }
 .me-logout {
-  font-size: 11px;
-  color: var(--c-accent-pink);
+  font-weight: 300;
+  font-size: 20px;
+  letter-spacing: 0.5px;
+  color: var(--c-ink-4);
   cursor: pointer;
+  white-space: nowrap;
+  transition: background .25s ease, color .25s ease, border-color .25s ease;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  padding: 5px 16px;
 }
-.me-logout:hover { text-decoration: underline; }
+.me-logout:hover {
+  background: var(--c-ink-3);
+  color: var(--c-white);
+  border-color: var(--c-ink-3);
+  box-shadow: 0 0 14px rgba(58,58,58,0.45);
+}
+/* "Вийти" на смузі "Чергові лікарі" — ліворуч, перед написом */
+.work-band .me-logout { left: 134px; }
+
+/* Ліва колонка кабінету: назви клінічних відділень, без підписів блоку —
+   зверху терапевтичний напрямок, знизу хірургічний. Список тепер вертикально
+   скролиться (overflow-y:auto) — а це за специфікацією CSS автоматично робить
+   і overflow-x активним (не можна лишити його "visible", коли інша вісь не
+   visible), тому текст більше не може "вибігати" за межі блоку зліва, як
+   раніше — блок ширший і дозволяє перенос рядка для найдовших назв. */
+.dept-list, .dept-list2 {
+  position: absolute;
+  left: 20px;
+  width: 545px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.dept-list::-webkit-scrollbar, .dept-list2::-webkit-scrollbar { display: none; }
+.dept-list  { top: 236px; }
+.dept-list2 { top: 581px; }
+.dept {
+  padding: 7px 0;
+  text-align: right;
+  font-weight: 300;
+  font-size: 24.7px;
+  line-height: 1.2;
+  color: var(--c-ink-3);
+  white-space: normal;
+}

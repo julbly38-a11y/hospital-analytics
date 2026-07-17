@@ -25,7 +25,7 @@ function initStaffLogin(redirectTo) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      if (r.ok) { window.location.href = redirectTo || '/kabinet.html'; return; }
+      if (r.ok) { window.location.href = redirectTo || '/entry.html'; return; }
       const d = await r.json().catch(() => ({}));
       flash(d.error || 'Невірний логін або пароль');
     } catch {
