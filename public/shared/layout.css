@@ -22,6 +22,88 @@ html, body {
   background: var(--c-cream);
 }
 
+/* Mesh-фон — спільний для всіх сторінок ПІСЛЯ логіну (entry.html,
+   head-cabinet.html, doctor-cabinet.html): кожна сторінка сама додає
+   <div class="bg"></div><div class="bg2"></div> у свій root. Кольори плям
+   (--mesh-1..5) — CSS-змінні з дефолтом Хотина (теплий рожевий/шавліїв/
+   лавандовий/бірюзовий/персиковий). Якщо для лікарні є своя схема
+   (lib/hospital-themes.js), JS підставляє інші значення на :root
+   (utils.js:applyHospitalTheme) — сам градієнт-малюнок/анімація не змінюється. */
+.bg {
+  position: absolute;
+  inset: -10%;
+  z-index: 0;
+  background:
+    radial-gradient(40% 45% at 30% 80%, var(--mesh-1, rgba(214,150,150,0.45)), transparent 70%),
+    radial-gradient(38% 42% at 70% 75%, var(--mesh-2, rgba(150,190,180,0.40)), transparent 70%),
+    radial-gradient(45% 50% at 80% 25%, var(--mesh-3, rgba(200,180,210,0.35)), transparent 70%),
+    radial-gradient(40% 45% at 15% 30%, var(--mesh-4, rgba(180,200,205,0.35)), transparent 70%),
+    radial-gradient(50% 55% at 50% 55%, var(--mesh-5, rgba(230,200,185,0.40)), transparent 75%);
+  filter: blur(40px);
+  animation: meshmove 18s ease-in-out infinite alternate;
+  will-change: transform;
+}
+.bg2 {
+  background:
+    radial-gradient(42% 48% at 60% 30%, var(--mesh-1, rgba(214,150,150,0.38)), transparent 70%),
+    radial-gradient(40% 45% at 25% 65%, var(--mesh-2, rgba(150,190,180,0.36)), transparent 70%),
+    radial-gradient(46% 52% at 85% 70%, var(--mesh-3, rgba(200,180,210,0.32)), transparent 72%),
+    radial-gradient(44% 50% at 40% 85%, var(--mesh-5, rgba(230,200,185,0.36)), transparent 75%);
+  animation: meshmove2 26s ease-in-out infinite alternate;
+  mix-blend-mode: soft-light;
+  opacity: 0.9;
+}
+@keyframes meshmove {
+  0%   { transform: translate(-4%, -3%) scale(1.05) rotate(0deg); }
+  50%  { transform: translate(4%, 3%)   scale(1.12) rotate(4deg); }
+  100% { transform: translate(-2%, 4%)  scale(1.06) rotate(-3deg); }
+}
+@keyframes meshmove2 {
+  0%   { transform: translate(3%, 4%)   scale(1.08) rotate(0deg); }
+  50%  { transform: translate(-4%, -3%) scale(1.0)  rotate(-5deg); }
+  100% { transform: translate(4%, -4%)  scale(1.1)  rotate(3deg); }
+}
+.slide > *:not(.bg) { z-index: 1; }
+
+/* Базові стилі спарклайна (spark-chart.js) — спільні; кожна сторінка додає
+   лише свій instance-клас з top/left-позицією (.chart-therap, .dept-trend...). */
+.spark { position: absolute; left: 690px; display: block; overflow: visible; }
+.spark-line {
+  fill: none;
+  stroke: var(--c-sage);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.spark-base {
+  stroke: var(--c-accent-pink);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+.spark-dot {
+  fill: var(--c-accent-pink);
+  stroke: var(--c-cream);
+  stroke-width: 1.5;
+  cursor: pointer;
+  transition: r .15s ease;
+}
+.spark-val {
+  fill: var(--c-ink-2);
+  font-weight: 300;
+  font-size: 12px;
+  text-anchor: middle;
+  transition: font-size .15s ease, fill .15s ease;
+}
+.spark-val.active { font-size: 17px; fill: var(--c-accent-pink); }
+.spark-xlabel {
+  fill: var(--c-taupe);
+  font-weight: 300;
+  font-size: 11px;
+  text-anchor: middle;
+  transition: font-size .15s ease, fill .15s ease;
+}
+.spark-xlabel.active { font-size: 15px; fill: var(--c-accent-pink); }
+
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 @keyframes logopulse {
   0%, 100% { transform: scale(1); }
@@ -287,6 +369,45 @@ html, body {
 }
 /* "Вийти" на смузі "Чергові лікарі" — ліворуч, перед написом */
 .work-band .me-logout { left: 134px; }
+
+/* Профіль залогінованого працівника — спільний для entry.html і кабінетів
+   (head-cabinet.html/doctor-cabinet.html), не лише entry. Позиція за
+   замовчуванням — правий нижній кут (координати зі старого kabinet.html,
+   під right-колонкою КПІ-блоків entry.html); сторінка може перевизначити
+   top/right своїм CSS, якщо власна компоновка того вимагає. Текст заповнює
+   utils.js:applyMeProfile() з /api/me — своєї rise-анімації не потребує,
+   з'являється разом із даними. */
+.me-bar {
+  position: absolute;
+  right: 54px;
+  top: 850px;
+  width: 630px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+.me-surname {
+  font-weight: 300;
+  font-size: 19px;
+  color: var(--c-ink-3);
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.me-firstname {
+  font-weight: 300;
+  font-size: 11px;
+  color: var(--c-ink-3);
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.me-info { text-align: right; }
+.me-greet {
+  display: block;
+  font-weight: 300;
+  font-size: 12px;
+  color: var(--c-accent-pink);
+}
 
 /* Ліва колонка кабінету: назви клінічних відділень, без підписів блоку —
    зверху терапевтичний напрямок, знизу хірургічний. Список тепер вертикально

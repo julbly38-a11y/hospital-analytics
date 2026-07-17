@@ -8,6 +8,10 @@
  * updateFadeMask(el, axis)        — fade edges of a scrollable list ('x'/'y'), reacts to scroll position
  * enableDragScroll(el, axis)      — drag-to-scroll with inertia (momentum on release)
  * fitHeightTo(el, bottomPx, gap)  — sets el's max-height from its real offsetTop to a given boundary
+ * renderMeBar(root)               — insert .me-bar markup (logged-in user profile chip)
+ * applyMeProfile(me)              — fill .me-bar with data from /api/me
+ * renderDutyBand(root, org, cb)   — insert .work-band (duty doctors + "Вийти"), cb(dutyEl) after load
+ * initDutyTooltip(dutyEl)         — hover tooltip (position + full name) for duty-docs spans
  */
 
 function fmt(n) {
@@ -72,6 +76,217 @@ async function statBatch(queries, ttl = 0) {
   return results;
 }
 
+// ── Спільний "перший шар" (логотип, лінії, KPI-рядок, фільтр років) —
+// однакова розмітка й логіка для БУДЬ-ЯКОЇ сторінки, підключеної до цього
+// файлу (зараз: layout.html через page-shell.js, entry.html через entry.js;
+// раніше кожна тримала свою копію). org береться з window.HOSPITAL_ORG_EDRPOU
+// (сторінка виставляє його сама, до виклику), як і initHospitalName(). ──
+
+// bed/age — середні, з десятковою частиною; let — відсоток. Решта (hosp, pat,
+// і будь-які майбутні лічильники) — цілі числа, countUp + роздільник тисяч.
+const KPI_DECIMAL_KEYS = new Set(['bed', 'age']);
+const KPI_PERCENT_KEYS = new Set(['let']);
+
+function fetchLpzKpi(org, year) {
+  if (!org) return Promise.resolve(null);
+  return fetch(`/api/lpz-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}`)
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+}
+
+function applyLpzKpi(info) {
+  if (!info) return;
+  // [data-k] — обов'язково, інакше зачіпає й .kpi-num блоків напрямку на
+  // entry.html (ті мають data-dk, не data-k, саме щоб уникнути цієї колізії) —
+  // без фільтра info[undefined] даю "—" і затирає вже застосовані значення.
+  document.querySelectorAll('.kpi-num[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    const v = info[k];
+    if (v == null) { el.textContent = '—'; return; }
+    if (KPI_PERCENT_KEYS.has(k)) { el.textContent = Number(v).toFixed(2) + '%'; return; }
+    if (KPI_DECIMAL_KEYS.has(k)) { el.textContent = Number(v).toFixed(1); return; }
+    countUp(el, v, 900, 0);
+  });
+}
+
+// kpiConfig: [{ key, label }, ...] — які показники й підписи; yearsBack:
+// скільки років показувати в фільтрі (рахуючи поточний). onYearChange(param) —
+// опційно, викликається з тим самим param щоразу, коли міняється активний рік
+// (клік на пігулку або дефолт при завантаженні) — щоб сторінка могла
+// синхронно перезавантажити СВОЇ додаткові блоки (той самий рік, без
+// дублювання логіки визначення дефолтного року).
+function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange) {
+  const org = window.HOSPITAL_ORG_EDRPOU;
+
+  // src заповнює initHospitalName() з /api/hospital-info (логотип — per-лікарня)
+  const logo = document.createElement('img');
+  logo.className = 'logo';
+  logo.alt = 'Логотип';
+  root.appendChild(logo);
+
+  root.insertAdjacentHTML('beforeend', `
+    <div class="name-block">
+      <div class="title"></div>
+      <div class="tagline"></div>
+    </div>
+    <div class="vline"></div>
+    <div class="vline2"></div>
+    <div class="hline"></div>
+    <div class="hline2"></div>
+  `);
+
+  const kpiRow = document.createElement('div');
+  kpiRow.className = 'kpi-row';
+  kpiRow.innerHTML = kpiConfig.map(k => `
+    <div class="kpi">
+      <div class="kpi-num" data-k="${k.key}">—</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>
+  `).join('');
+  root.appendChild(kpiRow);
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: yearsBack }, (_, i) => currentYear - i);
+
+  const yearFilter = document.createElement('div');
+  yearFilter.className = 'year-filter';
+  yearFilter.innerHTML =
+    years.map(y => `<div class="ypill">${y}</div>`).join('') +
+    `<div class="ypill ypill-all active">ВСІ РОКИ</div>`;
+  root.appendChild(yearFilter);
+
+  const yearBadge = document.createElement('div');
+  yearBadge.className = 'year-badge';
+  yearBadge.innerHTML = `<span class="year-num small">ВСІ РОКИ</span>`;
+  root.appendChild(yearBadge);
+
+  yearFilter.querySelectorAll('.ypill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const yearNum = yearBadge.querySelector('.year-num');
+      const t = pill.textContent.trim();
+      if (/^\d{4}$/.test(t)) { yearNum.textContent = t; yearNum.classList.remove('small'); fetchLpzKpi(org, t).then(applyLpzKpi); if (onYearChange) onYearChange(t); }
+      else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); fetchLpzKpi(org, 'all').then(applyLpzKpi); if (onYearChange) onYearChange('all'); }
+    });
+  });
+
+  // За замовчуванням — не "всі роки", а рік ОСТАННЬОЇ госпіталізації в даних
+  // (найактуальніший період), якщо для нього є пігулка в видимому діапазоні років.
+  //
+  // TODO (наступний шар, коли зʼявляться фільтри по місяцях/тижнях/добах):
+  // той самий принцип "дефолт = останній наявний період" має працювати на
+  // КОЖНОМУ рівні деталізації, що буде додано — не лише рік. Тобто коли є
+  // вибір місяця в межах року, за замовчуванням підставляти місяць останньої
+  // госпіталізації (а не 01 чи "весь рік"); якщо дійде до діб — так само
+  // останню добу з даними. max_admission_date з RPC вже містить повну дату
+  // (рік-місяць-день), просто зараз береться лише .slice(0,4) — решту частини
+  // дати вже можна брати звідти ж, коли зʼявиться відповідний UI-рівень.
+  fetchLpzKpi(org, 'all').then(info => {
+    const lastYear = info?.max_admission_date ? info.max_admission_date.slice(0, 4) : null;
+    const pill = lastYear && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === lastYear);
+    if (pill) {
+      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      const yearNum = yearBadge.querySelector('.year-num');
+      yearNum.textContent = lastYear;
+      yearNum.classList.remove('small');
+      fetchLpzKpi(org, lastYear).then(applyLpzKpi);
+      if (onYearChange) onYearChange(lastYear);
+    } else {
+      applyLpzKpi(info);
+      if (onYearChange) onYearChange('all');
+    }
+  });
+}
+
+// Смуга "Чергові лікарі" + "Вийти" (.work-band) — спільна для всіх сторінок
+// після логіну (entry.html, head-cabinet.html, doctor-cabinet.html). Логаут
+// живе тут-таки (не окремою кнопкою) — той самий .work-band .me-logout
+// { left:134px } з layout.css. onLoaded(dutyEl) — опційний колбек після
+// підвантаження рядків (entry.html чіпляє туди крос-підсвітку з dept-list;
+// кабінетам без списку відділень він не потрібен).
+function renderDutyBand(root, org, onLoaded) {
+  root.insertAdjacentHTML('beforeend', `
+    <div class="work-band">
+      <span class="me-logout" id="meLogout">Вийти</span>
+      <span class="wb-title">Чергові лікарі:</span>
+      <div class="duty-docs" id="dutyDocs"></div>
+    </div>
+  `);
+  document.getElementById('meLogout').addEventListener('click', () => {
+    fetch('/api/slide-logout', { method: 'POST' }).then(() => { window.location.href = '/layout.html'; });
+  });
+  const dutyEl0 = document.getElementById('dutyDocs');
+  enableDragScroll(dutyEl0, 'x');
+  dutyEl0.addEventListener('scroll', () => updateFadeMask(dutyEl0, 'x'));
+  fetch(`/api/lpz-duty-doctors?org=${encodeURIComponent(org)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const dutyEl = document.getElementById('dutyDocs');
+      if (!data || !dutyEl) return;
+      dutyEl.innerHTML = data.rows.map(r => `
+        <span data-full="${r.doctorFull}" data-position="${r.position}" data-home="${r.department}">${r.doctor}</span>
+      `).join('');
+      initDutyTooltip(dutyEl);
+      updateFadeMask(dutyEl, 'x');
+      if (onLoaded) onLoaded(dutyEl);
+    })
+    .catch(() => {});
+}
+
+// Спливаюча підказка при наведенні на чергового лікаря: посада + повне ПІБ.
+function initDutyTooltip(dutyEl) {
+  let tip = document.querySelector('.duty-tip');
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'duty-tip';
+    tip.innerHTML = '<div class="dt-name"></div><div class="dt-role"></div>';
+    document.body.appendChild(tip);
+  }
+  const nameEl = tip.querySelector('.dt-name');
+  const roleEl = tip.querySelector('.dt-role');
+
+  dutyEl.querySelectorAll('span[data-full]').forEach(span => {
+    if (span._tipBound) return;
+    span._tipBound = true;
+    span.addEventListener('mouseenter', () => {
+      nameEl.textContent = span.dataset.full;
+      roleEl.textContent = span.dataset.position || '';
+      const rect = span.getBoundingClientRect();
+      tip.style.left = (rect.left + rect.width / 2) + 'px';
+      tip.style.top = rect.top + 'px';
+      tip.classList.add('open');
+    });
+    span.addEventListener('mouseleave', () => tip.classList.remove('open'));
+  });
+}
+
+// Профіль залогінованого працівника (.me-bar) — спільний для entry.html і
+// кабінетів (head-cabinet.html/doctor-cabinet.html). renderMeBar() вставляє
+// розмітку (id'и порожні), applyMeProfile(me) заповнює її даними з /api/me
+// (ПІБ одним рядком шрифтом прізвища, "посада · відділення" дрібним).
+function renderMeBar(root) {
+  root.insertAdjacentHTML('beforeend', `
+    <div class="me-bar">
+      <div class="me-name">
+        <div class="me-surname" id="meSurname"></div>
+        <div class="me-firstname" id="meFirstname"></div>
+      </div>
+      <div class="me-info">
+        <span class="me-greet" id="meGreet"></span>
+      </div>
+    </div>
+  `);
+}
+
+function applyMeProfile(me) {
+  const surEl = document.getElementById('meSurname');
+  if (surEl) surEl.textContent = me.full_name || me.emp_name || me.email || '';
+  const greetEl = document.getElementById('meGreet');
+  if (greetEl) greetEl.textContent = [me.position, me.department].filter(Boolean).join(' · ');
+}
+
 function initStaffFields() {
   const title  = document.querySelector('.wb-title');
   const fields = document.querySelector('.staff-fields');
@@ -106,7 +321,7 @@ function initStaffFields() {
       transition: color .2s ease, text-shadow .2s ease;
     }
     .dept, .duty-docs span { cursor: pointer; transition: text-shadow .2s ease; }
-    .dept.hl, .duty-docs span.hl {
+    .dept.hl, .dept.own, .duty-docs span.hl {
       text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30); }
   `;
   document.head.appendChild(s);

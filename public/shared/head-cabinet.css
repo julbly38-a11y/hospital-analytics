@@ -1,0 +1,24 @@
+/* Візуальні доповнення лише для head-cabinet.html (не чіпає layout.css,
+   спільний з entry.html) — назва відділення, КПІ-блок і спарклайн ОДНОГО
+   відділення (Етап 2 staged-плану), координати зі старого head-cabinet.html. */
+
+/* назва відділення — між лінією (hline, top:211px) і КПІ-блоком відділення,
+   по правому краю (той самий right:54px, що й .me-bar/.year-filter) */
+.dept-title {
+  position: absolute;
+  right: 54px;
+  top: 262px;
+  font-weight: 300;
+  font-size: 25.92px;
+  line-height: 1.0;
+  color: var(--c-ink-3);
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.kpi-row.dept-block {
+  top: 281px;
+  width: 1176px;
+}
+.dept-trend { top: 342px; }

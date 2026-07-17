@@ -8,6 +8,92 @@
    форма логіну не потрібна, натомість "Вийти" + чергові лікарі.
    Дані КПІ/відділень — org-scoped, org_edrpou береться з сесії (/api/me). */
 
+// ── КПІ по напрямках (терапевтичний/хірургічний) + графіки динаміки —
+// перенесено зі старого проекту (kabinet.html block-row/block-row2/
+// chart-therap/chart-surg), позиції ті самі, дані — нові lpz-ендпоінти
+// (/api/lpz-kpi-direction, /api/lpz-trend-direction). data-dk (не data-k!),
+// бо data-k уже зайнятий загальнолікарняним КПІ-рядком (utils.js:applyLpzKpi
+// шукає .kpi-num глобально по всій сторінці) — інший атрибут, щоб не
+// перезаписувати один одного. ──
+const DIRECTION_KPI = [
+  { key: 'hosp', label: 'ГОСПІТАЛІЗАЦІЙ' },
+  { key: 'pat',  label: 'ПАЦІЄНТІВ' },
+  { key: 'bed',  label: 'ЛІЖКО-ДЕНЬ' },
+  { key: 'age',  label: 'СЕРЕДНІЙ ВІК' },
+  { key: 'imp',  label: 'З ПОКРАЩЕННЯМ' },
+  { key: 'let',  label: 'ЛЕТАЛЬНІСТЬ' },
+];
+const DIRECTION_DECIMAL_KEYS = new Set(['bed', 'age']);
+const DIRECTION_PERCENT_KEYS = new Set(['imp', 'let']);
+
+function directionKpiRowHtml() {
+  return DIRECTION_KPI.map(k => `
+    <div class="kpi">
+      <div class="kpi-num" data-dk="${k.key}">—</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>
+  `).join('');
+}
+
+function renderDirectionBlocks(root) {
+  root.insertAdjacentHTML('beforeend', `
+    <div class="direction-label for-therap">Терапевтичний напрямок</div>
+    <div class="kpi-row block-row" id="blockTherap">${directionKpiRowHtml()}</div>
+    <svg class="spark chart-therap" viewBox="0 0 1176 130" width="1176" height="130">
+      <line class="spark-base" x1="0" x2="1176" y1="80" y2="80"></line>
+      <path class="spark-line"></path>
+    </svg>
+    <div class="direction-label for-surg">Хірургічний напрямок</div>
+    <div class="kpi-row block-row block-row2" id="blockSurg">${directionKpiRowHtml()}</div>
+    <svg class="spark chart-surg" viewBox="0 0 1176 140" width="1176" height="140">
+      <line class="spark-base" x1="0" x2="1176" y1="90" y2="90"></line>
+      <path class="spark-line"></path>
+    </svg>
+  `);
+}
+
+function applyDirectionKpi(rowEl, info) {
+  if (!rowEl || !info) return;
+  rowEl.querySelectorAll('.kpi-num[data-dk]').forEach(el => {
+    const k = el.dataset.dk;
+    const v = info[k];
+    if (v == null) { el.textContent = '—'; return; }
+    if (DIRECTION_PERCENT_KEYS.has(k)) { el.textContent = Number(v).toFixed(2) + '%'; return; }
+    if (DIRECTION_DECIMAL_KEYS.has(k)) { el.textContent = Number(v).toFixed(1); return; }
+    countUp(el, v, 900, 0);
+  });
+}
+
+function loadDirectionBlocks(org, year) {
+  const blockTherap = document.getElementById('blockTherap');
+  const blockSurg = document.getElementById('blockSurg');
+
+  ['терапевтичний', 'хірургічний'].forEach(direction => {
+    fetch(`/api/lpz-kpi-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(info => applyDirectionKpi(direction === 'терапевтичний' ? blockTherap : blockSurg, info))
+      .catch(() => {});
+  });
+
+  // Спільна шкала Y для обох графіків (як у старому проекті) — рахуємо, коли
+  // обидва тренди готові, а не окремо (інакше шкали "стрибають" одна проти одної).
+  Promise.all(['терапевтичний', 'хірургічний'].map(direction =>
+    fetch(`/api/lpz-trend-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}`)
+      .then(r => r.ok ? r.json() : null)
+  )).then(([tData, sData]) => {
+    const tRows = tData?.rows || [];
+    const sRows = sData?.rows || [];
+    if (!tRows.length && !sRows.length) return;
+    const step = year === 'all' ? 10000 : 1000;
+    const allVals = [...tRows, ...sRows].map(r => Number(r.y));
+    const niceMin = Math.floor(Math.min(...allVals, 0) / step) * step;
+    const niceMax = Math.max(Math.ceil(Math.max(...allVals, 1) / step) * step, niceMin + step);
+    const bounds = { niceMin, niceMax };
+    if (tRows.length) renderSpark(document.querySelector('.chart-therap'), tRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+    if (sRows.length) renderSpark(document.querySelector('.chart-surg'), sRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+  }).catch(() => {});
+}
+
 const ENTRY_KPI = [
   { key: 'hosp', label: 'ГОСПІТАЛІЗАЦІЙ' },
   { key: 'pat',  label: 'ПАЦІЄНТІВ' },
@@ -16,26 +102,6 @@ const ENTRY_KPI = [
   { key: 'let',  label: 'ЛЕТАЛЬНІСТЬ' },
 ];
 const ENTRY_YEARS_BACK = 7;
-const KPI_DECIMAL_KEYS = new Set(['bed', 'age']);
-const KPI_PERCENT_KEYS = new Set(['let']);
-
-function fetchEntryKpi(org, year) {
-  return fetch(`/api/lpz-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}`)
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => null);
-}
-
-function applyEntryKpi(info) {
-  if (!info) return;
-  document.querySelectorAll('.kpi-num').forEach(el => {
-    const k = el.dataset.k;
-    const v = info[k];
-    if (v == null) { el.textContent = '—'; return; }
-    if (KPI_PERCENT_KEYS.has(k)) { el.textContent = v.toFixed(2) + '%'; return; }
-    if (KPI_DECIMAL_KEYS.has(k)) { el.textContent = v.toFixed(1); return; }
-    countUp(el, v, 900, 0);
-  });
-}
 
 // ── Шар "клінічний блок": два списки зліва (терапевтичний/хірургічний
 // напрямок), без підписів блоку. Дані — /api/lpz-departments, org-scoped. ──
@@ -92,7 +158,7 @@ function fitDeptListHeights(root) {
   fitHeightTo(bottomList, root.clientHeight);
 }
 
-function renderClinicalBlock(root, org) {
+function renderClinicalBlock(root, org, own) {
   root.insertAdjacentHTML('beforeend', `
     <div class="dept-list"></div>
     <div class="dept-list2"></div>
@@ -116,146 +182,58 @@ function renderClinicalBlock(root, org) {
       updateFadeMask(topList, 'y');
       updateFadeMask(bottomList, 'y');
       wireDeptHover(root);
+      markOwnDepartment(root, own);
     })
     .catch(() => {});
+}
+
+// Власне відділення завідувача/лікаря — постійна підсвітка (клас .own, той
+// самий glow, що й .hl при hover — див. utils.js:injectDutyStyles) + клік на
+// весь рядок веде у відповідний кабінет (поки порожній, чекає на перебудову
+// під lpz-схему). own = { department, href } або null (немає клінічного
+// відділення чи роль не head_dept/doctor) — див. buildOwnDeptLink().
+function markOwnDepartment(root, own) {
+  if (!own) return;
+  const el = [...root.querySelectorAll('.dept[data-dept]')].find(d => d.dataset.dept === own.department);
+  if (!el) return;
+  el.classList.add('own');
+  el.addEventListener('click', () => { window.location.href = own.href; });
+}
+
+// Джерело — lpz_empl через сесію (me.lpz_role/me.lpz_department з /api/me),
+// НЕ стара empl/app_users.role: та мала прогалини (напр. Семенюк не мав
+// head_dept, хоча в lpz-каноні тепер коректно head). Без ?dept=/?doc= у href —
+// head-cabinet.html/doctor-cabinet.html самі визначать себе з сесії (той
+// самий принцип, що й тут: сторінка не бере ідентичність з URL).
+function buildOwnDeptLink(me) {
+  if (!me.lpz_department) return null;
+  if (me.lpz_role === 'head') {
+    return { department: me.lpz_department, href: '/head-cabinet.html' };
+  }
+  if (me.lpz_role === 'doctor') {
+    return { department: me.lpz_department, href: '/doctor-cabinet.html' };
+  }
+  return null;
 }
 
 // ── Шар "перший шар": логотип, назва, лінії, КПІ-рядок лікарні, роки,
-// смуга "Чергові лікарі" + "Вийти". Спільний структурний вигляд —
-// з /shared/layout.css. ──
+// смуга "Чергові лікарі" + "Вийти". Спільна частина (логотип/лінії/KPI-рядок/
+// фільтр років) — utils.js:renderHeaderBlock(), як і на layout.html; тут
+// лишається лише mesh-фон і специфічний для entry.html підвал. ──
 function renderGeneralLayer(root, org) {
   root.insertAdjacentHTML('beforeend', '<div class="bg"></div><div class="bg2"></div>');
 
-  const logo = document.createElement('img');
-  logo.className = 'logo';
-  logo.alt = 'Логотип';
-  root.appendChild(logo);
+  renderDirectionBlocks(root);
+  renderHeaderBlock(root, ENTRY_KPI, ENTRY_YEARS_BACK, (year) => loadDirectionBlocks(org, year));
 
-  root.insertAdjacentHTML('beforeend', `
-    <div class="name-block">
-      <div class="title"></div>
-      <div class="tagline"></div>
-    </div>
-    <div class="vline"></div>
-    <div class="vline2"></div>
-    <div class="hline"></div>
-    <div class="hline2"></div>
-  `);
-
-  const kpiRow = document.createElement('div');
-  kpiRow.className = 'kpi-row';
-  kpiRow.innerHTML = ENTRY_KPI.map(k => `
-    <div class="kpi">
-      <div class="kpi-num" data-k="${k.key}">—</div>
-      <div class="kpi-label">${k.label}</div>
-    </div>
-  `).join('');
-  root.appendChild(kpiRow);
-
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: ENTRY_YEARS_BACK }, (_, i) => currentYear - i);
-
-  const yearFilter = document.createElement('div');
-  yearFilter.className = 'year-filter';
-  yearFilter.innerHTML =
-    years.map(y => `<div class="ypill">${y}</div>`).join('') +
-    `<div class="ypill ypill-all active">ВСІ РОКИ</div>`;
-  root.appendChild(yearFilter);
-
-  const yearBadge = document.createElement('div');
-  yearBadge.className = 'year-badge';
-  yearBadge.innerHTML = `<span class="year-num small">ВСІ РОКИ</span>`;
-  root.appendChild(yearBadge);
-
-  yearFilter.querySelectorAll('.ypill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      const yearNum = yearBadge.querySelector('.year-num');
-      const t = pill.textContent.trim();
-      const param = /^\d{4}$/.test(t) ? t : 'all';
-      if (param !== 'all') { yearNum.textContent = t; yearNum.classList.remove('small'); }
-      else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); }
-      fetchEntryKpi(org, param).then(applyEntryKpi);
-    });
-  });
-
-  // Дефолт — рік останньої госпіталізації в даних (як на layout.html),
-  // не "всі роки". Див. TODO в page-shell.js: той самий принцип має
-  // поширитись на майбутні рівні деталізації (місяць/доба).
-  fetchEntryKpi(org, 'all').then(info => {
-    const lastYear = info?.max_admission_date ? info.max_admission_date.slice(0, 4) : null;
-    const pill = lastYear && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === lastYear);
-    if (pill) {
-      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      const yearNum = yearBadge.querySelector('.year-num');
-      yearNum.textContent = lastYear;
-      yearNum.classList.remove('small');
-      fetchEntryKpi(org, lastYear).then(applyEntryKpi);
-    } else {
-      applyEntryKpi(info);
-    }
-  });
-
-  // Смуга "Чергові лікарі" — як у старому кабінеті: "Вийти" зліва перед
-  // написом, чергові лікарі розподілені по ширині. Дані — ТЕСТОВИЙ РЕЖИМ
-  // (див. коментар у /api/lpz-duty-doctors): реального графіка чергувань
-  // ще немає, тимчасово по одному лікарю на відділення.
-  root.insertAdjacentHTML('beforeend', `
-    <div class="work-band">
-      <span class="me-logout" id="meLogout">Вийти</span>
-      <span class="wb-title">Чергові лікарі:</span>
-      <div class="duty-docs" id="dutyDocs"></div>
-    </div>
-  `);
-  document.getElementById('meLogout').addEventListener('click', () => {
-    fetch('/api/slide-logout', { method: 'POST' }).then(() => { window.location.href = '/layout.html'; });
-  });
-  const dutyEl0 = document.getElementById('dutyDocs');
-  enableDragScroll(dutyEl0, 'x');
-  dutyEl0.addEventListener('scroll', () => updateFadeMask(dutyEl0, 'x'));
-  fetch(`/api/lpz-duty-doctors?org=${encodeURIComponent(org)}`)
-    .then(r => r.ok ? r.json() : null)
-    .then(data => {
-      const dutyEl = document.getElementById('dutyDocs');
-      if (!data || !dutyEl) return;
-      dutyEl.innerHTML = data.rows.map(r => `
-        <span data-full="${r.doctorFull}" data-position="${r.position}" data-home="${r.department}">${r.doctor}</span>
-      `).join('');
-      initDutyTooltip(dutyEl);
-      wireDutyHover(root);
-      updateFadeMask(dutyEl, 'x');
-    })
-    .catch(() => {});
-}
-
-// Спливаюча підказка при наведенні на чергового лікаря: посада + повне ПІБ
-// (відділення тепер показується підсвіткою в dept-list, не текстом тут).
-function initDutyTooltip(dutyEl) {
-  let tip = document.querySelector('.duty-tip');
-  if (!tip) {
-    tip = document.createElement('div');
-    tip.className = 'duty-tip';
-    tip.innerHTML = '<div class="dt-name"></div><div class="dt-role"></div>';
-    document.body.appendChild(tip);
-  }
-  const nameEl = tip.querySelector('.dt-name');
-  const roleEl = tip.querySelector('.dt-role');
-
-  dutyEl.querySelectorAll('span[data-full]').forEach(span => {
-    if (span._tipBound) return;
-    span._tipBound = true;
-    span.addEventListener('mouseenter', () => {
-      nameEl.textContent = span.dataset.full;
-      roleEl.textContent = span.dataset.position || '';
-      const rect = span.getBoundingClientRect();
-      tip.style.left = (rect.left + rect.width / 2) + 'px';
-      tip.style.top = rect.top + 'px';
-      tip.classList.add('open');
-    });
-    span.addEventListener('mouseleave', () => tip.classList.remove('open'));
-  });
+  // Смуга "Чергові лікарі" — utils.js:renderDutyBand (спільна з
+  // head-cabinet.html/doctor-cabinet.html). Дані — ТЕСТОВИЙ РЕЖИМ (див.
+  // коментар у /api/lpz-duty-doctors): реального графіка чергувань ще
+  // немає, тимчасово по одному лікарю на відділення. onLoaded — тут-таки
+  // чіпляємо крос-підсвітку з dept-list (лише entry.html, бо тільки тут є
+  // список відділень поруч).
+  renderMeBar(root);
+  renderDutyBand(root, org, () => wireDutyHover(root));
 }
 
 function initEntry() {
@@ -266,7 +244,8 @@ function initEntry() {
     window.HOSPITAL_ORG_EDRPOU = org;
     const root = document.getElementById('slideRoot');
     renderGeneralLayer(root, org);
-    renderClinicalBlock(root, org);
+    renderClinicalBlock(root, org, buildOwnDeptLink(me));
+    applyMeProfile(me);
     initHospitalName();
   });
 }
