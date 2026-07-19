@@ -1,24 +1,48 @@
 /* Візуальні доповнення лише для head-cabinet.html (не чіпає layout.css,
-   спільний з entry.html) — назва відділення, КПІ-блок і спарклайн ОДНОГО
-   відділення (Етап 2 staged-плану), координати зі старого head-cabinet.html. */
+   спільний з entry.html) — КПІ ОДНОГО відділення (Етап 2 staged-плану)
+   рендериться через .field-kpi-1 (layout.css, спільний з entry.html/
+   doctor-cabinet.html), тут лишається решта: ординаторська. "Перебуває у
+   відділенні" (.census-*) перенесено в layout.css — спільне з
+   doctor-cabinet.html. */
 
-/* назва відділення — між лінією (hline, top:211px) і КПІ-блоком відділення,
-   по правому краю (той самий right:54px, що й .me-bar/.year-filter) */
-.dept-title {
+/* Ординаторська — ліва колонка (x=20..565), повністю вільна на цій сторінці
+   (тут немає dept-list, як на entry.html). Висота списку — динамічна, до
+   верху смуги "Чергові лікарі" (fitHeightTo, як dept-list на entry.html). */
+.docs-title {
   position: absolute;
-  right: 54px;
-  top: 262px;
   font-weight: 300;
-  font-size: 25.92px;
-  line-height: 1.0;
-  color: var(--c-ink-3);
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--c-taupe-light);
   text-transform: uppercase;
-  white-space: nowrap;
+  left: var(--field-pad); top: var(--field-pad);
+}
+.docs-list {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: calc(var(--field-pad) + 30px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.docs-list::-webkit-scrollbar { display: none; }
+.doc-item {
+  padding: 7px 0;
   text-align: right;
+  font-weight: 300;
+  font-size: 20px;
+  color: var(--c-ink-3);
+  cursor: pointer;
+  transition: text-shadow .2s ease, color .2s ease;
 }
-
-.kpi-row.dept-block {
-  top: 281px;
-  width: 1176px;
+.doc-item .doc-position {
+  display: block;
+  font-size: 12px;
+  color: var(--c-taupe-light);
+  text-transform: uppercase;
 }
-.dept-trend { top: 342px; }
+.doc-item:hover, .doc-item.doc-active {
+  text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
+}
+.doc-item.doc-active { color: var(--c-accent-pink); }

@@ -5,14 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Кабінет лікаря</title>
 <link rel="stylesheet" href="/shared/theme.css">
-<!-- TODO: org_edrpou для цієї сторінки має братись з сесії (/api/me), не статично -->
+<link rel="stylesheet" href="/shared/layout.css">
 <script src="/js/utils.js"></script>
+<script src="/js/spark-chart.js"></script>
+<script src="/js/doctor-cabinet.js"></script>
 </head>
 <body>
-<!-- очищено для перебудови на lpz-схему; підключено: theme.css + utils.js (initHospitalName) -->
-<div class="name-block">
-  <div class="title"></div>
-  <div class="tagline"></div>
+<!-- .name-block/лого/КПІ-рядок/рік-пігулки — рендерить utils.js:renderHeaderBlock
+     (той самий шар, що на entry.html/head-cabinet.html), не статична розмітка. -->
+<div class="slide-wrapper">
+  <div class="slide" id="slideRoot"></div>
 </div>
+<script>
+  function scaleSlide() {
+    const w = document.querySelector('.slide-wrapper');
+    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    w.style.transform = `scale(${s})`;
+  }
+  window.addEventListener('load', scaleSlide);
+  window.addEventListener('resize', scaleSlide);
+</script>
 </body>
 </html>

@@ -12,6 +12,11 @@
  * applyMeProfile(me)              — fill .me-bar with data from /api/me
  * renderDutyBand(root, org, cb)   — insert .work-band (duty doctors + "Вийти"), cb(dutyEl) after load
  * initDutyTooltip(dutyEl)         — hover tooltip (position + full name) for duty-docs spans
+ * renderLayoutFields(root, fields) — insert .layout-field markup placeholders (auto-run on any #slideRoot page)
+ * renderBgLayers(root)            — insert .bg/.bg2 background divs (entry/head-cabinet/doctor-cabinet)
+ * HOSPITAL_KPI, HOSPITAL_YEARS_BACK — shared kpiConfig/yearsBack for renderHeaderBlock() on all 3 cabinet pages
+ * renderKpiChartBlock(root, rowId, chartId) — insert .field-kpi-1 6-показникового ряду + .field-chart-1 svg
+ * loadKpiChartBlock(kind, org, entityId, year, opts) — fetch КПІ+тренд для kind='department'|'doctor', click-графіка → census
  */
 
 function fmt(n) {
@@ -114,8 +119,15 @@ function applyLpzKpi(info) {
 // опційно, викликається з тим самим param щоразу, коли міняється активний рік
 // (клік на пігулку або дефолт при завантаженні) — щоб сторінка могла
 // синхронно перезавантажити СВОЇ додаткові блоки (той самий рік, без
-// дублювання логіки визначення дефолтного року).
-function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange) {
+// дублювання логіки визначення дефолтного року). authorized=true — додає
+// пігулки місяців під роками, повнорозмірні (той самий .ypill стиль) і з
+// повними назвами — з'являються при НАВЕДЕННІ на будь-яку пігулку року (не
+// на клік), ховаються при виході курсора з обох рядків АБО одразу по кліку
+// на місяць (клік на місяць одночасно активує сам рік, під яким навели, і
+// ховає рядок місяців). НЕ просто приховані CSS на неавторизованих сторінках
+// (page-shell.js/layout.html не передає authorized) — їх узагалі нема в DOM,
+// якщо не авторизовано. onMonthChange(year, month) — опційно, як onYearChange.
+function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized = false, onMonthChange) {
   const org = window.HOSPITAL_ORG_EDRPOU;
 
   // src заповнює initHospitalName() з /api/hospital-info (логотип — per-лікарня)
@@ -155,21 +167,69 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange) {
     `<div class="ypill ypill-all active">ВСІ РОКИ</div>`;
   root.appendChild(yearFilter);
 
+  let monthFilter = null;
+  if (authorized) {
+    monthFilter = document.createElement('div');
+    monthFilter.className = 'month-filter';
+    monthFilter.innerHTML = MONTH_PILL_NAMES.map((m, i) => `<div class="ypill ypill-month" data-month="${i + 1}">${m}</div>`).join('');
+    root.appendChild(monthFilter);
+  }
+
   const yearBadge = document.createElement('div');
   yearBadge.className = 'year-badge';
   yearBadge.innerHTML = `<span class="year-num small">ВСІ РОКИ</span>`;
   root.appendChild(yearBadge);
 
-  yearFilter.querySelectorAll('.ypill').forEach(pill => {
-    pill.addEventListener('click', () => {
-      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      const yearNum = yearBadge.querySelector('.year-num');
-      const t = pill.textContent.trim();
-      if (/^\d{4}$/.test(t)) { yearNum.textContent = t; yearNum.classList.remove('small'); fetchLpzKpi(org, t).then(applyLpzKpi); if (onYearChange) onYearChange(t); }
-      else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); fetchLpzKpi(org, 'all').then(applyLpzKpi); if (onYearChange) onYearChange('all'); }
+  // Активує рік (пігулка, бейдж, fetch, onYearChange) — спільна логіка для
+  // кліку на пігулку року І для кліку на пігулку місяця (той теж активує
+  // свій рік, а не лише повідомляє onMonthChange).
+  function selectYear(pill) {
+    yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    const yearNum = yearBadge.querySelector('.year-num');
+    const t = pill.textContent.trim();
+    if (/^\d{4}$/.test(t)) { yearNum.textContent = t; yearNum.classList.remove('small'); fetchLpzKpi(org, t).then(applyLpzKpi); if (onYearChange) onYearChange(t); }
+    else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); fetchLpzKpi(org, 'all').then(applyLpzKpi); if (onYearChange) onYearChange('all'); }
+  }
+
+  yearFilter.querySelectorAll('.ypill').forEach(pill => pill.addEventListener('click', () => selectYear(pill)));
+
+  // Пігулки місяців — з'являються на НАВЕДЕННЯ (не клік) на будь-яку пігулку
+  // року (крім "ВСІ РОКИ" — місяць без конкретного року не має сенсу),
+  // ховаються з невеликою затримкою (щоб встигнути довести курсор від
+  // пігулки року вниз до рядка місяців, не втративши hover), або одразу по
+  // кліку на сам місяць.
+  if (monthFilter) {
+    let hideTimer = null;
+    const showMonths = (yearText) => {
+      clearTimeout(hideTimer);
+      monthFilter.dataset.targetYear = yearText;
+      monthFilter.classList.add('visible');
+    };
+    const scheduleHide = () => {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => monthFilter.classList.remove('visible'), 200);
+    };
+    yearFilter.querySelectorAll('.ypill:not(.ypill-all)').forEach(pill => {
+      pill.addEventListener('mouseenter', () => showMonths(pill.textContent.trim()));
     });
-  });
+    yearFilter.addEventListener('mouseleave', scheduleHide);
+    monthFilter.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    monthFilter.addEventListener('mouseleave', scheduleHide);
+
+    monthFilter.querySelectorAll('.ypill-month').forEach(pill => {
+      pill.addEventListener('click', () => {
+        monthFilter.querySelectorAll('.ypill-month').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        const year = monthFilter.dataset.targetYear;
+        const yearPill = year && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === year);
+        if (yearPill) selectYear(yearPill);
+        if (onMonthChange && year) onMonthChange(year, Number(pill.dataset.month));
+        clearTimeout(hideTimer);
+        monthFilter.classList.remove('visible');
+      });
+    });
+  }
 
   // За замовчуванням — не "всі роки", а рік ОСТАННЬОЇ госпіталізації в даних
   // (найактуальніший період), якщо для нього є пігулка в видимому діапазоні років.
@@ -185,18 +245,8 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange) {
   fetchLpzKpi(org, 'all').then(info => {
     const lastYear = info?.max_admission_date ? info.max_admission_date.slice(0, 4) : null;
     const pill = lastYear && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === lastYear);
-    if (pill) {
-      yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
-      pill.classList.add('active');
-      const yearNum = yearBadge.querySelector('.year-num');
-      yearNum.textContent = lastYear;
-      yearNum.classList.remove('small');
-      fetchLpzKpi(org, lastYear).then(applyLpzKpi);
-      if (onYearChange) onYearChange(lastYear);
-    } else {
-      applyLpzKpi(info);
-      if (onYearChange) onYearChange('all');
-    }
+    if (pill) selectYear(pill);
+    else { applyLpzKpi(info); if (onYearChange) onYearChange('all'); }
   });
 }
 
@@ -285,6 +335,261 @@ function applyMeProfile(me) {
   if (surEl) surEl.textContent = me.full_name || me.emp_name || me.email || '';
   const greetEl = document.getElementById('meGreet');
   if (greetEl) greetEl.textContent = [me.position, me.department].filter(Boolean).join(' · ');
+}
+
+// Дні тижня / місяці (родовий відмінок) — спільні для живого годинника
+// (.field-me-clock) і префікса дати в census-when, перенесено зі старого
+// doctor-cabinet.html (tickClock/monthGen/clockWeekdays).
+const WEEKDAY_NAMES = ['Неділя', 'Понеділок', 'Вівторок', 'Середа', 'Четвер', 'Пʼятниця', 'Субота'];
+const MONTH_GEN_NAMES = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня', 'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
+// Повні назви місяців (пігулки .month-filter, renderHeaderBlock) — окремо
+// від MONTH_GEN_NAMES (той — родовий відмінок для годинника/дати, тут —
+// називний, ПОВНІ назви без скорочень, як напис "ВСІ РОКИ" на .ypill-all).
+const MONTH_PILL_NAMES = ['СІЧЕНЬ', 'ЛЮТИЙ', 'БЕРЕЗЕНЬ', 'КВІТЕНЬ', 'ТРАВЕНЬ', 'ЧЕРВЕНЬ', 'ЛИПЕНЬ', 'СЕРПЕНЬ', 'ВЕРЕСЕНЬ', 'ЖОВТЕНЬ', 'ЛИСТОПАД', 'ГРУДЕНЬ'];
+
+// Міні-табличка ПІБ + посада авторизованого — нижній правий кут поля
+// розмітки lf-right-bottom (layout.css:.field-me). Ті самі поля /api/me, що
+// й .me-bar/applyMeProfile вище, але окремий компактний елемент — сторінка
+// сама вирішує, який з двох показувати (entry.js/head-cabinet.js). Живий
+// годинник (.field-me-clock) над ПІБ — перенесено зі старого .me-clock/
+// tickClock (день тижня, дата словами, час, оновлюється щосекунди).
+function renderFieldMe(root, me) {
+  const parent = root.querySelector('.lf-right-bottom') || root;
+  parent.insertAdjacentHTML('beforeend', `
+    <div class="field-me">
+      <div class="field-me-clock" id="fieldMeClock"></div>
+      <div class="field-me-name"></div>
+      <div class="field-me-role"></div>
+    </div>
+  `);
+  const field = parent.querySelector('.field-me');
+  field.querySelector('.field-me-name').textContent = me.full_name || me.emp_name || me.email || '';
+  field.querySelector('.field-me-role').textContent = [me.position, me.department].filter(Boolean).join(' · ');
+
+  const clockEl = field.querySelector('#fieldMeClock');
+  const tick = () => {
+    const n = new Date();
+    const pad = v => String(v).padStart(2, '0');
+    clockEl.textContent = `${WEEKDAY_NAMES[n.getDay()]}, ${n.getDate()} ${MONTH_GEN_NAMES[n.getMonth()]} ${n.getFullYear()} · ${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+  };
+  tick();
+  setInterval(tick, 1000);
+}
+
+// КПІ-ряд на 6 показників — спільний для entry.html (напрямки), head-
+// cabinet.html (відділення) і doctor-cabinet.html (лікар): та сама позиція
+// (layout.css:.field-kpi-1/.field-kpi-2), той самий формат чисел, різні лише
+// дані (передає сторінка через свій ендпоінт/id рядка). data-dk (не data-k!)
+// — бо data-k уже зайнятий загальнолікарняним КПІ-рядком (applyLpzKpi нижче
+// шукає .kpi-num глобально по всій сторінці).
+const KPI_6 = [
+  { key: 'hosp', label: 'ГОСПІТАЛІЗАЦІЙ' },
+  { key: 'pat',  label: 'ПАЦІЄНТІВ' },
+  { key: 'bed',  label: 'ЛІЖКО-ДЕНЬ' },
+  { key: 'age',  label: 'СЕРЕДНІЙ ВІК' },
+  { key: 'imp',  label: 'З ПОКРАЩЕННЯМ' },
+  { key: 'let',  label: 'ЛЕТАЛЬНІСТЬ' },
+];
+const KPI_6_DECIMAL_KEYS = new Set(['bed', 'age']);
+const KPI_6_PERCENT_KEYS = new Set(['imp', 'let']);
+
+function kpi6RowHtml() {
+  return KPI_6.map(k => `
+    <div class="kpi">
+      <div class="kpi-num" data-dk="${k.key}">—</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>
+  `).join('');
+}
+
+function applyKpi6(rowEl, info) {
+  if (!rowEl || !info) return;
+  rowEl.querySelectorAll('.kpi-num[data-dk]').forEach(el => {
+    const k = el.dataset.dk;
+    const v = info[k];
+    if (v == null) { el.textContent = '—'; return; }
+    if (KPI_6_PERCENT_KEYS.has(k)) { el.textContent = Number(v).toFixed(2) + '%'; return; }
+    if (KPI_6_DECIMAL_KEYS.has(k)) { el.textContent = Number(v).toFixed(1); return; }
+    countUp(el, v, 900, 0);
+  });
+}
+
+// Фон .bg/.bg2 — спільний для entry.html/head-cabinet.html/doctor-cabinet.html.
+function renderBgLayers(root) {
+  root.insertAdjacentHTML('beforeend', '<div class="bg"></div><div class="bg2"></div>');
+}
+
+// Загальнолікарняний КПІ-рядок (шапка сторінки, renderHeaderBlock) — та сама
+// пʼятірка показників і той самий "7 років назад" на entry.html/head-
+// cabinet.html/doctor-cabinet.html, раніше копіювалась в кожен файл окремо
+// (ENTRY_KPI/HOSPITAL_KPI).
+const HOSPITAL_KPI = [
+  { key: 'hosp', label: 'ГОСПІТАЛІЗАЦІЙ' },
+  { key: 'pat',  label: 'ПАЦІЄНТІВ' },
+  { key: 'bed',  label: 'ЛІЖКО-ДЕНЬ' },
+  { key: 'age',  label: 'СЕРЕДНІЙ ВІК' },
+  { key: 'let',  label: 'ЛЕТАЛЬНІСТЬ' },
+];
+const HOSPITAL_YEARS_BACK = 7;
+
+// Блок "КПІ-ряд (6 показників) + графік динаміки" — той самий патерн на
+// head-cabinet.html (по відділенню) і doctor-cabinet.html (по лікарю):
+// .field-kpi-1 (kpi6RowHtml) + .field-chart-1 (12-місячний спарклайн). level —
+// 'department'|'doctor', додає .kpi-lvl-<level> для ієрархії шрифтів
+// (layout.css: напрямок→відділення→лікар, кожен -5% від попереднього).
+function renderKpiChartBlock(root, rowId, chartId, level) {
+  const field = root.querySelector('.lf-right-top');
+  (field || root).insertAdjacentHTML('beforeend', `
+    <div class="kpi-row field-kpi-1 kpi-lvl-${level}" id="${rowId}">${kpi6RowHtml()}</div>
+    <svg class="spark field-chart-1" id="${chartId}" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
+      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
+      <path class="spark-line"></path>
+    </svg>
+  `);
+}
+
+// Дані для renderKpiChartBlock: fetch КПІ (/api/lpz-kpi-<kind>) → applyKpi6,
+// fetch тренду (/api/lpz-trend-<kind>) → renderSpark; клік на точку графіка —
+// census "станом на цю дату" (censusDateFromChartPoint). kind='department'|
+// 'doctor' — визначає одразу і назву обох ендпоінтів, і назву query-
+// параметра сутності (вони завжди збігаються: department=.../doctor=...).
+// getCensusDoctorId — опційний колбек (не значення!), бо на head-cabinet.html
+// його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
+// лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
+// не передається — census і так лише свій (сервер підставляє doctor сам).
+function loadKpiChartBlock(kind, org, entityId, year, { rowId, chartId, emptyMessage, getCensusDoctorId } = {}) {
+  fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&${kind}=${encodeURIComponent(entityId)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(info => applyKpi6(document.getElementById(rowId), info))
+    .catch(() => {});
+  fetch(`/api/lpz-trend-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&${kind}=${encodeURIComponent(entityId)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const rows = data?.rows || [];
+      if (!rows.length) return;
+      renderSpark(document.getElementById(chartId), rows, year, null, (r) => {
+        loadCensus(getCensusDoctorId ? getCensusDoctorId() : null, {
+          date: censusDateFromChartPoint(year, r.x),
+          ...(emptyMessage ? { emptyMessage } : {}),
+        });
+      });
+    })
+    .catch(() => {});
+}
+
+// "Перебуває у відділенні" — спільний список для head-cabinet.html (усе
+// відділення, з можливістю клік-фільтра по лікарю — showReset:true) і
+// doctor-cabinet.html (лише свої пацієнти, /api/lpz-department-census сам
+// підставляє doctor=resource_id на сервері — тут просто loadCensus(null)).
+// Дизайн — смужка перебування (сегмент = 1 доба, максимум 60) + день тижня і
+// дата перед заголовком (census-when, WEEKDAY_NAMES вище), перенесено зі
+// старого doctor-cabinet.html (.admissions-box/.ab-stay/.ab-bar, dateLabel).
+
+function renderCensusSection(root, { showReset = false } = {}) {
+  const parent = root.querySelector('.lf-right-bottom') || root;
+  parent.insertAdjacentHTML('beforeend', `
+    <div class="census-title">
+      <span class="census-when" id="censusWhen"></span>
+      <span class="census-active">Перебуває у відділенні</span>
+      <span class="census-count" id="censusCount"></span>
+      <span class="census-flow" id="censusFlow"></span>
+      ${showReset ? '<span class="census-reset" id="censusReset" style="display:none">✕ скинути лікаря</span>' : ''}
+    </div>
+    <div class="census-list" id="censusList"></div>
+  `);
+  const censusList = parent.querySelector('#censusList');
+  // Динамічну висоту (fitHeightTo) НЕ рахуємо тут — .field-me ще може бути
+  // не відрендерений на цей момент (doctor-cabinet.js кличе renderCensusSection
+  // ДО renderFieldMe). Рахується в loadCensus() нижче, де обидва точно є.
+  // CSS max-height (layout.css) — лише fallback на перший рендер до фетчу.
+  enableDragScroll(censusList, 'y');
+  censusList.addEventListener('scroll', () => updateFadeMask(censusList, 'y'));
+}
+
+function loadCensus(doctorId, options = {}) {
+  const { date } = options;
+  const emptyMessage = options.emptyMessage || (doctorId
+    ? 'Немає даних про пацієнтів цього лікаря (покриття lpz_episodes на живих випадках неповне)'
+    : 'Наразі нікого немає');
+  const params = new URLSearchParams();
+  if (doctorId) params.set('doctor', doctorId);
+  if (date) params.set('date', date);
+  const qs = params.toString();
+  const url = `/api/lpz-department-census${qs ? '?' + qs : ''}`;
+  fetch(url)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const censusList = document.getElementById('censusList');
+      if (!data || !censusList) return;
+
+      // Межа знизу — реальна позиція .field-me (ПІБ авторизованого, правий
+      // нижній кут), не фіксоване число: довжина ПІБ і зміст живого годинника
+      // (.field-me-clock) різні на кожній сторінці/у кожного користувача, тож
+      // лише реальний offsetTop гарантує, що список ніколи не налізе на неї.
+      const fieldMe = document.querySelector('.field-me');
+      if (fieldMe) fitHeightTo(censusList, offsetInSlide(fieldMe), 20);
+
+      const countEl = document.getElementById('censusCount');
+      if (countEl) countEl.textContent = `· ${data.rows.length}`;
+      const whenEl = document.getElementById('censusWhen');
+      if (whenEl) {
+        // data.date — дата, яку РЕАЛЬНО використав сервер (явно передана або,
+        // якщо не передавали, дата останнього наявного запису — не "сьогодні",
+        // бо на реальне сьогодні даних може й не бути). "✕ ..." — лише коли
+        // caller сам явно обрав дату (клік на графік), щоб повернутись до
+        // дефолту (знову останній наявний запис, а не жорстко "сьогодні").
+        const d = data.date ? new Date(data.date + 'T00:00:00') : new Date();
+        const dayName = WEEKDAY_NAMES[d.getDay()];
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const label = `${dayName} ${dd}.${mm}.${d.getFullYear()}`;
+        whenEl.innerHTML = date ? `${label} · <span class="census-reset-date">✕ скинути дату</span>` : label;
+        if (date) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage }));
+      }
+      const flowEl = document.getElementById('censusFlow');
+      if (flowEl) flowEl.textContent = `· поступило: ${data.admitted ?? 0} · виписано: ${data.discharged ?? 0}`;
+
+      if (!data.rows.length) {
+        censusList.innerHTML = `<div class="census-empty">${emptyMessage}</div>`;
+        return;
+      }
+      censusList.innerHTML = data.rows.map(r => {
+        const repeatStr = (r.re_admission && r.re_admission !== 'Ні')
+          ? ` · <span class="census-repeat">${r.re_admission.toLowerCase()}</span>` : '';
+        const days = Math.max(0, Number(r.days) || 0);
+        const segs = Array.from({ length: Math.min(days, 60) }, () => '<i></i>').join('');
+        return `
+        <div class="census-row">
+          <div class="census-info">
+            <span class="census-name">${r.pib || '—'}</span>
+            <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · ${r.diagnosis || '—'}${repeatStr}</span>
+          </div>
+          <div class="census-stay" title="${days} діб">
+            <span class="census-bar">${segs}</span>
+            <span class="census-days">${days}</span>
+          </div>
+        </div>`;
+      }).join('');
+      updateFadeMask(censusList, 'y');
+    })
+    .catch(() => {});
+}
+
+// Дата для census за точкою графіка динаміки (utils.js:loadChart-style
+// onDotClick у head-cabinet.js/doctor-cabinet.js) — рік='all' → x це рік
+// (31 грудня), інакше x це місяць (1-12) обраного року (останній день
+// місяця). Не пізніше сьогодні (майбутнього не буває).
+function censusDateFromChartPoint(year, x) {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const target = (year === 'all')
+    ? new Date(Number(x), 11, 31)
+    : new Date(Number(year), Number(x), 0); // day 0 наступного місяця = останній день x-го
+  const y = target.getFullYear();
+  const m = String(target.getMonth() + 1).padStart(2, '0');
+  const d = String(target.getDate()).padStart(2, '0');
+  const targetStr = `${y}-${m}-${d}`;
+  return targetStr > todayStr ? todayStr : targetStr;
 }
 
 function initStaffFields() {
@@ -390,9 +695,31 @@ function initHospitalName() {
     .catch(() => {});
 }
 
+// Поля розмітки (.layout-field) — постійні орієнтовні зони канви 1920x1080,
+// утворені vline (ліва/права) і work-band (над смугою/під смугою). Єдине
+// джерело координат — тут; сторінка нічого не викликає сама, досить мати
+// #slideRoot (canvas), і поля з'являються автоматично при DOMContentLoaded.
+// Щоб додати ще менші поля розмітки поверх/усередині базових — викликати
+// renderLayoutFields(root, [...BASE_LAYOUT_FIELDS, {top, left, width, height, label}])
+// або передати свій список окремо.
+const BASE_LAYOUT_FIELDS = [
+  { className: 'lf-left-top',     top: 231, left: 20,  width: 545,  height: 270 },
+  { className: 'lf-left-bottom',  top: 591, left: 20,  width: 545,  height: 469 },
+  { className: 'lf-right-top',    top: 231, left: 605, width: 1295, height: 270 },
+  { className: 'lf-right-bottom', top: 591, left: 605, width: 1295, height: 469 },
+];
+
+function renderLayoutFields(root, fields = BASE_LAYOUT_FIELDS) {
+  root.insertAdjacentHTML('beforeend', fields.map(f => `
+    <div class="layout-field ${f.className || ''}" style="top:${f.top}px; left:${f.left}px; width:${f.width}px; height:${f.height}px;"></div>
+  `).join(''));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initStaffFields();
   initHospitalName();
+  const slideRoot = document.getElementById('slideRoot');
+  if (slideRoot) renderLayoutFields(slideRoot);
 });
 
 // Ініціалізує фільтр років (.year-filter .ypill + .year-num).
@@ -516,13 +843,26 @@ function enableDragScroll(el, axis) {
   });
 }
 
-// Максимальна висота елемента від його реального offsetTop до заданої
-// нижньої межі (px у тій самій системі координат, зазвичай offsetTop іншого
-// елемента чи root.clientHeight) — сторінка сама вирішує, що є межею,
-// ця функція лише рахує різницю, без жодних захардкоджених px.
+// Позиція елемента "в канві" — сума offsetTop по всьому ланцюжку
+// offsetParent (не лише прямого predка). Потрібно, бо елементи тепер можуть
+// бути вкладені в .layout-field (свій offsetParent) і водночас звірятись з
+// елементами поза полем (work-band, #slideRoot) — голий el.offsetTop тоді
+// зчитує лише зсув відносно НАЙБЛИЖЧОГО предка, не спільної системи
+// координат. Перенесено з entry.js (was: offsetInSlide, локальна там).
+function offsetInSlide(node) {
+  let top = 0;
+  while (node) { top += node.offsetTop || 0; node = node.offsetParent; }
+  return top;
+}
+
+// Максимальна висота елемента від його реальної позиції (offsetInSlide, не
+// голий offsetTop — див. коментар вище) до заданої нижньої межі (px у тій
+// самій системі координат — теж через offsetInSlide(boundaryEl), не
+// .offsetTop напряму) — сторінка сама вирішує, що є межею, ця функція лише
+// рахує різницю, без жодних захардкоджених px.
 function fitHeightTo(el, bottomPx, gap = 12) {
   if (!el) return;
-  el.style.maxHeight = Math.max(bottomPx - el.offsetTop - gap, 0) + 'px';
+  el.style.maxHeight = Math.max(bottomPx - offsetInSlide(el) - gap, 0) + 'px';
 }
 
 function inertialScrollToCenter(container, el, dur = 600) {

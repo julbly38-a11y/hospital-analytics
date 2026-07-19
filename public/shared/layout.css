@@ -136,12 +136,14 @@ html, body {
 
 .vline, .vline2 {
   position: absolute; top: 58px; width: 3px; height: 854px;
+  display: none;
 }
 .vline  { left: 585px; background: rgba(0,0,0,0.12); }
 .vline2 { left: 576px; background: var(--c-accent-pink); }
 
 .hline, .hline2 {
   position: absolute; left: 221px; width: 1688px; height: 3px;
+  display: none;
 }
 .hline  { top: 211px; background: rgba(0,0,0,0.12); }
 .hline2 { top: 202px; background: var(--c-accent-pink); }
@@ -185,6 +187,22 @@ html, body {
   background: var(--c-ink-3); color: var(--c-white); border-color: var(--c-ink-3);
 }
 
+/* Пігулки місяців — під роками, повнорозмірні (той самий .ypill стиль +
+   .ypill-month лише розширює ширину під довші повні назви — "ЛИСТОПАД"/
+   "ВЕРЕСЕНЬ" не влізуть у фіксовані 60px, як у .ypill з роком). З'являються
+   на НАВЕДЕННЯ на пігулку року (не клік — utils.js:renderHeaderBlock),
+   ховаються з затримкою при виході курсора або одразу по кліку на місяць.
+   Лише на авторизованих сторінках — renderHeaderBlock не додає їх у DOM
+   узагалі, якщо authorized не передано, не просто ховає CSS-ом. */
+.month-filter {
+  display: none;
+  position: absolute; right: 54px; top: 75px;
+  gap: 6px; align-items: center;
+  flex-wrap: wrap; justify-content: flex-end;
+}
+.month-filter.visible { display: flex; }
+.ypill-month { width: auto; padding: 0 14px; white-space: nowrap; }
+
 .year-badge {
   position: absolute; left: 1719px; top: 100px;
   width: 147px; height: 85px;
@@ -204,8 +222,8 @@ html, body {
 .work-band {
   position: absolute;
   left: 3px; top: 521px;
-  width: 1920px; height: 50px;
-  background: linear-gradient(90deg, rgba(178,124,139,0.28), rgba(141,151,140,0.28));
+  width: 1920px; height: 47.5px;
+  background: linear-gradient(90deg, rgba(178,124,139,0.266), rgba(141,151,140,0.266));
   z-index: 2;
   box-shadow: 0 3px 14px rgba(0,0,0,0.10);
   -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--c-black) 9%, var(--c-black) 91%, transparent 100%);
@@ -417,15 +435,15 @@ html, body {
    раніше — блок ширший і дозволяє перенос рядка для найдовших назв. */
 .dept-list, .dept-list2 {
   position: absolute;
-  left: 20px;
-  width: 545px;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: var(--field-pad);
+  width: auto;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 .dept-list::-webkit-scrollbar, .dept-list2::-webkit-scrollbar { display: none; }
-.dept-list  { top: 236px; }
-.dept-list2 { top: 581px; }
 .dept {
   padding: 7px 0;
   text-align: right;
@@ -434,4 +452,245 @@ html, body {
   line-height: 1.2;
   color: var(--c-ink-3);
   white-space: normal;
+  cursor: pointer;
 }
+.dept.dept-active { color: var(--c-accent-pink); }
+
+/* Поля розмітки — орієнтовні зони канви (1920x1080), суто візуальний
+   орієнтир (розмита пляма, radial-gradient, без чіткої рамки), куди в
+   майбутньому класти нові стовпці/списки/діаграми, не готовий UI-елемент.
+   pointer-events:none і низький z-index — ніколи не заважає реальному
+   контенту (лежить під ним).
+
+   Позиція/розмір кожного поля — inline style, згенерований з JS
+   (utils.js:renderLayoutFields/BASE_LAYOUT_FIELDS — єдине джерело координат).
+   Автопідключення: будь-яка сторінка з #slideRoot, що вантажить utils.js,
+   отримує базові 4 поля на DOMContentLoaded без власного виклику. Щоб додати
+   ще менші поля розмітки — новий запис у BASE_LAYOUT_FIELDS або окремий
+   виклик renderLayoutFields(root, [...]) з власним списком. */
+:root {
+  /* Єдиний відступ для БУДЬ-ЯКОГО об'єкта всередині поля розмітки (нижче) —
+     міняти лише тут. ПОМІТКА: CSS padding на position:absolute-батьку НЕ
+     обмежує абсолютно позиційованих дітей (їхній containing block — це
+     padding-box, тобто ЗОВНІШНЯ межа padding, а не внутрішня) — тому кожен
+     об'єкт всередині поля явно читає цю саму змінну (top/left/right:
+     var(--field-pad)), а не покладається на успадкування від батьківського
+     padding. */
+  --field-pad: 22px;
+}
+.layout-field {
+  position: absolute;
+  z-index: 0;
+  background: rgba(255,255,255,0.55);
+  /* filter: blur(24px); — тимчасово прибрано (2026-07-19): блюр на батьку
+     розмивав би й вкладені діти, а праві поля (lf-right-top/lf-right-bottom)
+     тепер справжні DOM-контейнери для свого вмісту. М'який фон повернути
+     пізніше іншим способом (напр. ::before без blur на дітях). */
+  padding: var(--field-pad);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.layout-field > * { pointer-events: auto; }
+
+/* Вміст усередині правих полів розмітки (КПІ-ряди на 6 показників + графік +
+   census + міні-табличка авторизованого) — СПРАВЖНІ DOM-нащадки
+   .lf-right-top/.lf-right-bottom (utils.js вставляє через
+   root.querySelector('.lf-right-top') тощо, не в root напряму). Кожен читає
+   --field-pad напряму (див. коментар вище чому не просто успадковує padding). */
+.field-kpi-1, .field-kpi-2 {
+  position: absolute;
+  top: var(--field-pad); left: var(--field-pad); right: var(--field-pad);
+  width: auto; height: auto; /* .kpi-row (базовий) задає свої width/height — скасовуємо, інакше right ігнорується */
+}
+/* Ієрархія шрифтів КПІ: кожен рівень на 5% менший за попередній.
+   Рівень 1 — загальнолікарняний .kpi-row (верх сторінки, поза полями):
+   32.5px/16.2px (як є). Рівні 2-4 — напрямок → відділення → лікар (той самий
+   .kpi-num/.kpi-label клас у .field-kpi-1/.field-kpi-2 на трьох різних
+   сторінках, тому розрізняються окремим класом .kpi-lvl-* на самому рядку —
+   renderKpiChartBlock/renderDirectionBlocks додають його явно). */
+.kpi-lvl-direction .kpi-num  { font-size: 30.875px; } /* 32.50 × 0.95 — entry.html (напрямок) */
+.kpi-lvl-direction .kpi-label { font-size: 15.39px; }
+.kpi-lvl-department .kpi-num  { font-size: 29.33px; } /* 30.875 × 0.95 — head-cabinet.html (відділення) */
+.kpi-lvl-department .kpi-label { font-size: 14.62px; }
+.kpi-lvl-doctor .kpi-num  { font-size: 27.86px; } /* 29.33 × 0.95 — doctor-cabinet.html (лікар) */
+.kpi-lvl-doctor .kpi-label { font-size: 13.89px; }
+
+/* Та сама ієрархія — тепер і для відступу від краю поля (не лише шрифту).
+   .kpi-lvl-direction лишається на базовому var(--field-pad)=22px (нема
+   потреби в окремому правилі). Далі кожен рівень ×0.95 від попереднього,
+   ЛИШЕ для самого КПІ-рядка (.field-chart-1 під ним і решта вмісту поля —
+   і далі на var(--field-pad), це навмисно різні речі). */
+.kpi-lvl-department { top: 20.9px; left: 20.9px; right: 20.9px; } /* 22 × 0.95 */
+.kpi-lvl-doctor { top: 19.855px; left: 19.855px; right: 19.855px; } /* 20.9 × 0.95 */
+
+/* Графік динаміки (12 місяців обраного року) — під КПІ-рядком (.field-kpi-1),
+   у тому самому полі lf-right-top. Клік на точку — census "станом на цю
+   дату" (utils.js:loadCensus(..., {date})), перенесено зі старого
+   doctor-cabinet.html/head-cabinet.html (.chart-therap + клік). */
+.field-chart-1 {
+  position: absolute;
+  top: calc(var(--field-pad) + 95px); left: var(--field-pad); right: var(--field-pad);
+}
+
+.field-me {
+  position: absolute;
+  right: var(--field-pad); bottom: var(--field-pad);
+  text-align: right;
+}
+.field-me-clock {
+  font-weight: 300; font-size: 13px;
+  color: var(--c-taupe-light); letter-spacing: 0.5px;
+  line-height: 1.2; margin-bottom: 6px;
+}
+.field-me-name {
+  font-weight: 300; font-size: 17px;
+  color: var(--c-ink-3); text-transform: uppercase; line-height: 1.2;
+}
+.field-me-role {
+  font-weight: 300; font-size: 11px;
+  color: var(--c-taupe); text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* "Перебуває у відділенні" — спільний список для head-cabinet.html (усе
+   відділення) і doctor-cabinet.html (лише пацієнти цього лікаря,
+   /api/lpz-department-census примусово підставляє doctor=свій resource_id).
+   Дизайн/утиліти — перенесено зі старого doctor-cabinet.html (.admissions-box/
+   .ab-row/.ab-stay/.ab-bar): смужка перебування (сегмент = 1 доба, максимум
+   60 сегментів) замість простого тексту "X дн." Позиція — права частина під
+   смугою "Чергові лікарі" (та сама, що вже була для head-cabinet). */
+.census-title {
+  position: absolute;
+  left: var(--field-pad); right: var(--field-pad); top: var(--field-pad);
+  font-weight: 300;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  color: var(--c-accent-pink);
+  text-transform: uppercase;
+}
+/* when/count/flow/reset успадковують стиль .census-title (17px, рожевий,
+   uppercase) — те саме, що в старому .ab-title (dateLabel/stayingCount/
+   flowStr там теж без власного класу, просто текст усередині .ab-title). */
+.census-title .census-when,
+.census-title .census-count,
+.census-title .census-flow,
+.census-title .census-reset {
+  margin-left: 10px;
+}
+.census-title .census-when { margin-left: 0; }
+/* "Перебуває у відділенні" — активний стан за замовчуванням (синій, жирний,
+   світіння), як старий .ab-reset.active — бо в нашій спрощеній версії немає
+   інших перемикних вкладок (flowMode/lockedBlok), тож це завжди "активний" вигляд. */
+.census-active {
+  color: #6d93d8;
+  font-weight: 600;
+  text-shadow: 0 0 5px rgba(109,147,216,0.35);
+}
+.census-title .census-reset,
+.census-title .census-reset-date {
+  cursor: pointer;
+  transition: color .2s ease;
+}
+.census-title .census-reset:hover,
+.census-title .census-reset-date:hover {
+  color: #6d93d8;
+}
+.census-repeat { color: #c0704a; }
+.census-list {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: calc(var(--field-pad) + 30px);
+  max-height: 250px; /* fallback до першого loadCensus() — далі fitHeightTo(.field-me) в utils.js */
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, var(--c-black) 28px, var(--c-black) calc(100% - 28px), transparent 100%);
+}
+.census-list::-webkit-scrollbar { display: none; }
+.census-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  font-weight: 300;
+}
+.census-row:first-child { border-top: none; }
+.census-info { display: flex; flex-direction: row; align-items: baseline; gap: 10px; min-width: 0; }
+.census-name { font-size: 15px; color: var(--c-ink-3); white-space: nowrap; flex-shrink: 0; }
+.census-meta {
+  font-size: 13px; color: var(--c-taupe-light);
+  flex: 1; min-width: 0;
+}
+.census-stay { display: flex; gap: 5px; flex-shrink: 0; align-items: center; }
+.census-bar { display: flex; gap: 2px; }
+.census-bar i {
+  display: inline-block;
+  width: 6px; height: 12px;
+  background: var(--c-accent-pink);
+  border-radius: 1px;
+}
+.census-days { font-size: 13px; color: var(--c-accent-pink); }
+.census-empty {
+  position: absolute;
+  left: var(--field-pad);
+  top: calc(var(--field-pad) + 30px);
+  font-size: 14px;
+  color: var(--c-taupe-light);
+}
+
+/* Інлайн-розгортка відділення (клік на .dept) — завідувач + 4 показники.
+   Перенесено зі старого kabinet.html (.dept-expand), там же й push-механізм:
+   зсуваємо work-band/staff-fields (і dept-list2, якщо розгортка йде вгору)
+   через CSS-змінну --push на висоту самої картки. */
+.dept-expand {
+  padding: 4px 0;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+.de-head {
+  font-size: 15px;
+  color: var(--c-ink-4);
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
+.de-label { color: var(--c-taupe); font-size: 13px; }
+.de-chief { color: var(--c-ink-3); }
+.de-stats { display: flex; justify-content: flex-end; }
+.de-s {
+  text-align: right;
+  padding: 0 10px;
+  border-left: 1px solid rgba(0,0,0,0.08);
+}
+.de-s:first-child { border-left: none; }
+.de-s:last-child { padding-right: 0; }
+.de-v {
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--c-ink-3);
+  line-height: 1;
+}
+.de-l {
+  font-size: 9px;
+  color: var(--c-taupe);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 4px;
+}
+
+.work-band, .staff-fields, .dept-list2 {
+  transition: transform .28s ease;
+}
+/* Динамічний зазор: entry.js:repositionMiddleBand() рахує реальне
+   перекриття (dept-list виріс і заліз би на смугу) і виставляє ці змінні —
+   не фіксовані класи на 2 сценарії, а завжди актуальне значення, що враховує
+   й те, що зсунута смуга сама не повинна наїхати на dept-list2. */
+.work-band { transform: translateY(var(--band-shift, 0px)); }
+.staff-fields { transform: translateY(var(--band-shift, 0px)) translateZ(0); }
+.dept-list2 { transform: translateY(var(--list2-shift, 0px)); }
