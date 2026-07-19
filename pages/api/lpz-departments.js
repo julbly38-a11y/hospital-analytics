@@ -19,15 +19,16 @@ export default async function handler(req, res) {
     const { data, error } = await sb()
       .schema('lpz')
       .from('lpz_departments')
-      .select('name, direction')
+      .select('name, direction, structure_id')
       .eq('org_edrpou', org)
       .not('direction', 'is', null)
       .order('name')
 
     if (error) return res.status(500).json({ error: error.message })
 
-    const therapeutic = data.filter(d => d.direction === 'терапевтичний').map(d => displayDeptName(d.name))
-    const surgical = data.filter(d => d.direction === 'хірургічний').map(d => displayDeptName(d.name))
+    const toEntry = d => ({ name: displayDeptName(d.name), structure_id: d.structure_id })
+    const therapeutic = data.filter(d => d.direction === 'терапевтичний').map(toEntry)
+    const surgical = data.filter(d => d.direction === 'хірургічний').map(toEntry)
     res.status(200).json({ therapeutic, surgical })
   } catch (e) {
     res.status(500).json({ error: e.message })
