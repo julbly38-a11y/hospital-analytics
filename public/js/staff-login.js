@@ -38,5 +38,5 @@ function initStaffLogin(redirectTo) {
   [loginEl, passEl].forEach(el => el && el.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   }));
-  if (forgotEl) forgotEl.addEventListener('click', (e) => { e.stopPropagation(); window.location.href = '/login'; });
+  if (forgotEl) forgotEl.addEventListener('click', (e) => { e.stopPropagation(); window.location.href = '/login?mode=reset'; });
 }
