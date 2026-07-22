@@ -750,41 +750,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (slideRoot) renderLayoutFields(slideRoot);
 });
 
-// Ініціалізує фільтр років (.year-filter .ypill + .year-num).
-// Повертає { getParam } — функцію що дає поточно обраний параметр ('all' або '2025' тощо).
-// onchange(param) — викликається при кліку на пігулку.
-function initYearFilter(onchange) {
-  const pills   = [...document.querySelectorAll('.year-filter .ypill')];
-  const yearNum = document.querySelector('.year-num');
-  if (!pills.length || !yearNum) return { getParam: () => 'all' };
-
-  let activeParam = 'all';
-
-  function setActive(pill) {
-    pills.forEach(x => x.classList.remove('active'));
-    pill.classList.add('active');
-    const t = pill.textContent.trim();
-    if (/^\d{4}$/.test(t)) {
-      yearNum.textContent = t; yearNum.classList.remove('small'); activeParam = t;
-    } else {
-      yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); activeParam = 'all';
-    }
-  }
-
-  const defaultYear = String(new Date().getFullYear() - 1);
-  const defaultPill = pills.find(p => p.textContent.trim() === defaultYear)
-    || pills.find(p => p.textContent.trim().toUpperCase().includes('ВСІ'))
-    || pills[pills.length - 1];
-  setActive(defaultPill);
-
-  pills.forEach(p => p.addEventListener('click', () => {
-    setActive(p);
-    if (onchange) onchange(activeParam);
-  }));
-
-  return { getParam: () => activeParam };
-}
-
 // ── Прокручувані списки: спільна поведінка для БУДЬ-ЯКОГО списку на будь-якій
 // сторінці (горизонтального чи вертикального) — інерційне перетягування
 // мишею + fade-маска, що реагує на реальну позицію скролу. Нічого тут не

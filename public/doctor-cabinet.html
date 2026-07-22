@@ -9,6 +9,7 @@
 <script src="/js/utils.js"></script>
 <script src="/js/spark-chart.js"></script>
 <script src="/js/doctor-cabinet.js"></script>
+<script src="/js/scale-slide.js"></script>
 </head>
 <body>
 <!-- .name-block/лого/КПІ-рядок/рік-пігулки — рендерить utils.js:renderHeaderBlock
@@ -16,14 +17,5 @@
 <div class="slide-wrapper">
   <div class="slide" id="slideRoot"></div>
 </div>
-<script>
-  function scaleSlide() {
-    const w = document.querySelector('.slide-wrapper');
-    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-    w.style.transform = `scale(${s})`;
-  }
-  window.addEventListener('load', scaleSlide);
-  window.addEventListener('resize', scaleSlide);
-</script>
 </body>
 </html>

@@ -11,10 +11,10 @@
   // за замовчуванням Хотин; ?org=<едрпоу> перемикає на іншу лікарню (для тестування/адмін-перемикача)
   window.HOSPITAL_ORG_EDRPOU = new URLSearchParams(location.search).get('org') || '02005875';
 </script>
-<script src="/js/layout-config.js"></script>
 <script src="/js/utils.js"></script>
 <script src="/js/page-shell.js"></script>
 <script src="/js/staff-login.js"></script>
+<script src="/js/scale-slide.js"></script>
 </head>
 <body>
 <!-- dev-перемикач лікарень: тимчасовий, поки немає зручного адмін-доступу під час налаштування -->
@@ -33,14 +33,6 @@
   <div class="slide" id="slideRoot"></div>
 </div>
 <script>
-  function scaleSlide() {
-    const w = document.querySelector('.slide-wrapper');
-    const s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
-    w.style.transform = `scale(${s})`;
-  }
-  window.addEventListener('load', scaleSlide);
-  window.addEventListener('resize', scaleSlide);
-
   renderShell(document.getElementById('slideRoot'));
   // initHospitalName() і initStaffFields() вже викликає utils.js на
   // DOMContentLoaded — до цього моменту DOM з renderShell() вже готовий,

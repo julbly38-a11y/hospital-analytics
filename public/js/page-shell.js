@@ -1,13 +1,14 @@
-/* Рендерить структурний "перший шар" (логотип, лінії, KPI-блок, роки) з
-   LAYOUT_CONFIG у контейнер .slide. Спільна частина (логотип/лінії/KPI-рядок/
-   фільтр років) винесена в utils.js:renderHeaderBlock() — використовується і
-   тут, і в entry.js; тут лишається лише специфічний для layout.html підвал. */
+/* Рендерить структурний "перший шар" (логотип, лінії, KPI-блок, роки) у
+   контейнер .slide. Спільна частина (логотип/лінії/KPI-рядок/фільтр років)
+   винесена в utils.js:renderHeaderBlock() — використовується і тут, і в
+   entry.js/head-cabinet.js/doctor-cabinet.js (HOSPITAL_KPI/HOSPITAL_YEARS_BACK
+   звідти ж, раніше тут була окрема копія — window.LAYOUT_CONFIG); тут лишається
+   лише специфічний для layout.html підвал. */
 
-function renderShell(root, config) {
-  config = config || window.LAYOUT_CONFIG;
-  if (!root || !config) return;
+function renderShell(root) {
+  if (!root) return;
 
-  renderHeaderBlock(root, config.kpi, config.yearsBack);
+  renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK);
 
   // Смуга "Для працівників": форма логіну (стан "залогінено" з черговими
   // лікарями замість форми — наступний шар, тут лише неавторизований стан).
