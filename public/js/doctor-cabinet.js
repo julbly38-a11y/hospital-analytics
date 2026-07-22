@@ -17,8 +17,8 @@
 // (спільні з head-cabinet.js). census не фільтрується (getCensusDoctorId не
 // передаємо) — /api/lpz-department-census сам підставляє doctor=свій
 // resource_id на сервері, лікар завжди бачить лише своїх пацієнтів.
-function loadDoctorKpi(org, doctorId, year) {
-  loadKpiChartBlock('doctor', org, doctorId, year, {
+function loadDoctorKpi(org, doctorId, year, month = 'all') {
+  loadKpiChartBlock('doctor', org, doctorId, year, month, {
     rowId: 'doctorKpiRow', chartId: 'doctorChart',
     emptyMessage: 'Наразі немає ваших пацієнтів у відділенні',
   });
@@ -37,7 +37,9 @@ function initDoctorCabinet() {
     renderKpiChartBlock(root, 'doctorKpiRow', 'doctorChart', 'doctor');
     renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
       if (me.lpz_resource_id) loadDoctorKpi(org, me.lpz_resource_id, year);
-    }, true);
+    }, true, (year, month) => {
+      if (me.lpz_resource_id) loadDoctorKpi(org, me.lpz_resource_id, year, month);
+    });
     renderCensusSection(root);
     renderFieldMe(root, me);
     initHospitalName();

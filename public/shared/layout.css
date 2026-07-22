@@ -1,5 +1,6 @@
 /* Спільний структурний шар (позиціонування) для слайд-дашбордів.
-   Кольори — з theme.css. Дані (підписи KPI, роки) — з js/layout-config.js. */
+   Кольори — з theme.css. Дані (підписи KPI, роки) — HOSPITAL_KPI/
+   HOSPITAL_YEARS_BACK з js/utils.js. */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -216,6 +217,11 @@ html, body {
   white-space: nowrap;
 }
 .year-num.small { font-size: 26px; letter-spacing: 1px; }
+.year-badge-month {
+  font-weight: 300; font-size: 15px; letter-spacing: 1.5px;
+  color: var(--c-accent-berry); text-transform: uppercase;
+  white-space: nowrap; min-height: 18px;
+}
 
 /* смуга "Для працівників" — логін/пароль. Після входу цей же простір
    займають чергові лікарі (окремий шар, ще не підключено). */
@@ -527,7 +533,7 @@ html, body {
    у тому самому полі lf-right-top. Клік на точку — census "станом на цю
    дату" (utils.js:loadCensus(..., {date})), перенесено зі старого
    doctor-cabinet.html/head-cabinet.html (.chart-therap + клік). */
-.field-chart-1 {
+.field-chart-1, .field-chart-2 {
   position: absolute;
   top: calc(var(--field-pad) + 95px); left: var(--field-pad); right: var(--field-pad);
 }

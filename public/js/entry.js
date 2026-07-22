@@ -3,32 +3,66 @@
    1. renderGeneralLayer   — логотип, назва, лінії, КПІ-рядок лікарні, роки, "Вийти"
    2. renderClinicalBlock  — зліва два списки клінічних відділень (терапевтичний
       зверху, хірургічний знизу, без підписів блоку)
-   Навмисно НЕ використовує page-shell.js/layout-config.js (ті — лише для
-   неавторизованого шару layout.html): тут інший стан — вже після входу,
+   Навмисно НЕ використовує page-shell.js (той — лише для неавторизованого
+   шару layout.html): тут інший стан — вже після входу,
    форма логіну не потрібна, натомість "Вийти" + чергові лікарі.
    Дані КПІ/відділень — org-scoped, org_edrpou береться з сесії (/api/me). */
 
 // ── КПІ по напрямках (терапевтичний/хірургічний), 6 показників —
 // utils.js:kpi6RowHtml/applyKpi6 (спільні з head-cabinet.js/doctor-cabinet.js),
 // позиція — layout.css:.field-kpi-1/.field-kpi-2 (та сама, що й на тих
-// сторінках). Дані — /api/lpz-kpi-direction. ──
+// сторінках). Дані — /api/lpz-kpi-direction. Графік динаміки під кожним
+// рядком (.field-chart-1/.field-chart-2, той самий .spark-патерн, що на
+// head-cabinet.html/doctor-cabinet.html) — без click-фільтра (немає census
+// на entry.html) і зі спільною Y-шкалою між обома напрямками (loadDirectionBlocks),
+// щоб масштаби порівнювались візуально. ──
 function renderDirectionBlocks(root) {
-  (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend',
-    `<div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>`);
-  (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend',
-    `<div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>`);
+  (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend', `
+    <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>
+    <svg class="spark field-chart-1" id="chartTherap" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
+      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
+      <path class="spark-line"></path>
+    </svg>
+  `);
+  (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend', `
+    <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>
+    <svg class="spark field-chart-2" id="chartSurg" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
+      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
+      <path class="spark-line"></path>
+    </svg>
+  `);
 }
 
-function loadDirectionBlocks(org, year) {
+function loadDirectionBlocks(org, year, month = 'all') {
   const blockTherap = document.getElementById('blockTherap');
   const blockSurg = document.getElementById('blockSurg');
 
   ['терапевтичний', 'хірургічний'].forEach(direction => {
-    fetch(`/api/lpz-kpi-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}`)
+    fetch(`/api/lpz-kpi-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&direction=${encodeURIComponent(direction)}`)
       .then(r => r.ok ? r.json() : null)
       .then(info => applyKpi6(direction === 'терапевтичний' ? blockTherap : blockSurg, info))
       .catch(() => {});
   });
+
+  // Спільна шкала Y для обох графіків (як у старому проекті) — рахуємо, коли
+  // обидва тренди готові, а не окремо (інакше шкали "стрибають" одна проти
+  // одної). Графік — завжди по РОКУ (12 місяців), місяць його не звужує (та
+  // сама логіка, що й у loadKpiChartBlock: місяць впливає лише на КПІ-числа).
+  Promise.all(['терапевтичний', 'хірургічний'].map(direction =>
+    fetch(`/api/lpz-trend-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}`)
+      .then(r => r.ok ? r.json() : null)
+  )).then(([tData, sData]) => {
+    const tRows = tData?.rows || [];
+    const sRows = sData?.rows || [];
+    if (!tRows.length && !sRows.length) return;
+    const step = year === 'all' ? 10000 : 1000;
+    const allVals = [...tRows, ...sRows].map(r => Number(r.y));
+    const niceMin = Math.floor(Math.min(...allVals, 0) / step) * step;
+    const niceMax = Math.max(Math.ceil(Math.max(...allVals, 1) / step) * step, niceMin + step);
+    const bounds = { niceMin, niceMax };
+    if (tRows.length) renderSpark(document.getElementById('chartTherap'), tRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+    if (sRows.length) renderSpark(document.getElementById('chartSurg'), sRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+  }).catch(() => {});
 }
 
 // HOSPITAL_KPI/HOSPITAL_YEARS_BACK — utils.js (спільні з head-cabinet.js/
@@ -245,7 +279,10 @@ function renderGeneralLayer(root, org) {
   renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
     activeYear = year;
     loadDirectionBlocks(org, year);
-  }, true);
+  }, true, (year, month) => {
+    activeYear = year;
+    loadDirectionBlocks(org, year, month);
+  });
 
   // Смуга "Чергові лікарі" — utils.js:renderDutyBand (спільна з
   // head-cabinet.html/doctor-cabinet.html). Дані — ТЕСТОВИЙ РЕЖИМ (див.

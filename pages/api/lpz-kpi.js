@@ -13,12 +13,13 @@ const sb = () => createClient(
 export default async function handler(req, res) {
   const org = String(req.query.org || '').trim()
   const year = String(req.query.year || 'all').trim().toLowerCase()
+  const month = String(req.query.month || 'all').trim().toLowerCase()
   if (!org) return res.status(400).json({ error: 'org (ЄДРПОУ) обовʼязковий' })
 
   try {
     const { data, error } = await sb()
       .schema('lpz')
-      .rpc('lpz_kpi_summary', { p_org: org, p_year: year })
+      .rpc('lpz_kpi_summary', { p_org: org, p_year: year, p_month: month })
       .single()
 
     if (error) return res.status(500).json({ error: error.message })

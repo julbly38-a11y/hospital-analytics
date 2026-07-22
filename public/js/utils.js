@@ -16,7 +16,7 @@
  * renderBgLayers(root)            — insert .bg/.bg2 background divs (entry/head-cabinet/doctor-cabinet)
  * HOSPITAL_KPI, HOSPITAL_YEARS_BACK — shared kpiConfig/yearsBack for renderHeaderBlock() on all 3 cabinet pages
  * renderKpiChartBlock(root, rowId, chartId) — insert .field-kpi-1 6-показникового ряду + .field-chart-1 svg
- * loadKpiChartBlock(kind, org, entityId, year, opts) — fetch КПІ+тренд для kind='department'|'doctor', click-графіка → census
+ * loadKpiChartBlock(kind, org, entityId, year, month, opts) — fetch КПІ+тренд для kind='department'|'doctor', click-графіка → census
  */
 
 function fmt(n) {
@@ -92,9 +92,9 @@ async function statBatch(queries, ttl = 0) {
 const KPI_DECIMAL_KEYS = new Set(['bed', 'age']);
 const KPI_PERCENT_KEYS = new Set(['let']);
 
-function fetchLpzKpi(org, year) {
+function fetchLpzKpi(org, year, month = 'all') {
   if (!org) return Promise.resolve(null);
-  return fetch(`/api/lpz-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}`)
+  return fetch(`/api/lpz-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`)
     .then(r => r.ok ? r.json() : null)
     .catch(() => null);
 }
@@ -177,22 +177,39 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized 
 
   const yearBadge = document.createElement('div');
   yearBadge.className = 'year-badge';
-  yearBadge.innerHTML = `<span class="year-num small">ВСІ РОКИ</span>`;
+  yearBadge.innerHTML = `<span class="year-num small">ВСІ РОКИ</span><span class="year-badge-month"></span>`;
   root.appendChild(yearBadge);
 
   // Активує рік (пігулка, бейдж, fetch, onYearChange) — спільна логіка для
   // кліку на пігулку року І для кліку на пігулку місяця (той теж активує
-  // свій рік, а не лише повідомляє onMonthChange).
-  function selectYear(pill) {
+  // свій рік, а не лише повідомляє onMonthChange). month — опційно звужує
+  // fetchLpzKpi (шапка 5 показників лікарні) до конкретного місяця обраного
+  // року; silent=true (клік на місяць) — не викликає onYearChange повторно,
+  // бо для цього кліку вже є окремий onMonthChange нижче (інакше пішло б
+  // 2 запити одночасно: спершу весь рік, потім місяць, і результат міг би
+  // прийти в неправильному порядку — гонитва запитів). Повна назва місяця
+  // (MONTH_PILL_NAMES) виводиться під числом року в .year-badge-month, поки
+  // місяць обраний — порожній рядок повертає бейдж до звичайного "лише рік".
+  function selectYear(pill, month = 'all', silent = false) {
     yearFilter.querySelectorAll('.ypill').forEach(p => p.classList.remove('active'));
     pill.classList.add('active');
     const yearNum = yearBadge.querySelector('.year-num');
+    const monthBadge = yearBadge.querySelector('.year-badge-month');
     const t = pill.textContent.trim();
-    if (/^\d{4}$/.test(t)) { yearNum.textContent = t; yearNum.classList.remove('small'); fetchLpzKpi(org, t).then(applyLpzKpi); if (onYearChange) onYearChange(t); }
-    else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); fetchLpzKpi(org, 'all').then(applyLpzKpi); if (onYearChange) onYearChange('all'); }
+    const yearParam = /^\d{4}$/.test(t) ? t : 'all';
+    if (yearParam !== 'all') { yearNum.textContent = t; yearNum.classList.remove('small'); }
+    else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); }
+    monthBadge.textContent = (month !== 'all') ? MONTH_PILL_NAMES[Number(month) - 1] : '';
+    fetchLpzKpi(org, yearParam, month).then(applyLpzKpi);
+    if (!silent && onYearChange) onYearChange(yearParam);
   }
 
-  yearFilter.querySelectorAll('.ypill').forEach(pill => pill.addEventListener('click', () => selectYear(pill)));
+  yearFilter.querySelectorAll('.ypill').forEach(pill => pill.addEventListener('click', () => {
+    selectYear(pill);
+    // Клік на "голий" рік — скидає раніше обраний місяць (той належав іншому
+    // стану "рік+місяць", тепер знову дивимось на весь рік).
+    if (monthFilter) monthFilter.querySelectorAll('.ypill-month').forEach(p => p.classList.remove('active'));
+  }));
 
   // Пігулки місяців — з'являються на НАВЕДЕННЯ (не клік) на будь-яку пігулку
   // року (крім "ВСІ РОКИ" — місяць без конкретного року не має сенсу),
@@ -201,9 +218,16 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized 
   // кліку на сам місяць.
   if (monthFilter) {
     let hideTimer = null;
+    let activeMonthYear = null; // рік, для якого зараз реально обрано місяць
     const showMonths = (yearText) => {
       clearTimeout(hideTimer);
       monthFilter.dataset.targetYear = yearText;
+      // Наведення на ІНШИЙ рік, ніж той, для якого активний місяць, — активний
+      // стан пігулки місяця стосувався іншого року, тут його показувати нема
+      // сенсу (кожен рік має свій незалежний вибір місяця, не персистентний).
+      if (yearText !== activeMonthYear) {
+        monthFilter.querySelectorAll('.ypill-month').forEach(p => p.classList.remove('active'));
+      }
       monthFilter.classList.add('visible');
     };
     const scheduleHide = () => {
@@ -222,8 +246,9 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized 
         monthFilter.querySelectorAll('.ypill-month').forEach(p => p.classList.remove('active'));
         pill.classList.add('active');
         const year = monthFilter.dataset.targetYear;
+        activeMonthYear = year;
         const yearPill = year && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === year);
-        if (yearPill) selectYear(yearPill);
+        if (yearPill) selectYear(yearPill, Number(pill.dataset.month), true);
         if (onMonthChange && year) onMonthChange(year, Number(pill.dataset.month));
         clearTimeout(hideTimer);
         monthFilter.classList.remove('visible');
@@ -453,12 +478,15 @@ function renderKpiChartBlock(root, rowId, chartId, level) {
 // census "станом на цю дату" (censusDateFromChartPoint). kind='department'|
 // 'doctor' — визначає одразу і назву обох ендпоінтів, і назву query-
 // параметра сутності (вони завжди збігаються: department=.../doctor=...).
+// month='all'|1-12 — звужує лише КПІ-ряд (6 показників) до конкретного
+// місяця обраного року; графік динаміки лишається річним (він і так
+// показує всі 12 місяців — саме там видно місячну деталізацію візуально).
 // getCensusDoctorId — опційний колбек (не значення!), бо на head-cabinet.html
 // його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
 // лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
 // не передається — census і так лише свій (сервер підставляє doctor сам).
-function loadKpiChartBlock(kind, org, entityId, year, { rowId, chartId, emptyMessage, getCensusDoctorId } = {}) {
-  fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&${kind}=${encodeURIComponent(entityId)}`)
+function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId } = {}) {
+  fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&${kind}=${encodeURIComponent(entityId)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => applyKpi6(document.getElementById(rowId), info))
     .catch(() => {});

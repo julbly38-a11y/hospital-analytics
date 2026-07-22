@@ -8,8 +8,8 @@
 // (спільні з doctor-cabinet.js), позиція — layout.css:.field-kpi-1/
 // .field-chart-1. getCensusDoctorId — читає activeDoctorId В МОМЕНТ КЛІКА на
 // графік (не зараз), бо клік на лікаря в "Ординаторській" міняє його пізніше.
-function loadDeptBlock(org, deptId, year) {
-  loadKpiChartBlock('department', org, deptId, year, {
+function loadDeptBlock(org, deptId, year, month = 'all') {
+  loadKpiChartBlock('department', org, deptId, year, month, {
     rowId: 'deptKpiRow', chartId: 'deptChart',
     getCensusDoctorId: () => activeDoctorId,
   });
@@ -83,7 +83,9 @@ function initHeadCabinet() {
     renderBgLayers(root);
     renderKpiChartBlock(root, 'deptKpiRow', 'deptChart', 'department');
     renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK,
-      (year) => loadDeptBlock(org, me.lpz_department_structure_id, year), true);
+      (year) => loadDeptBlock(org, me.lpz_department_structure_id, year),
+      true,
+      (year, month) => loadDeptBlock(org, me.lpz_department_structure_id, year, month));
     renderFieldMe(root, me);
     renderDutyBand(root, org);
     renderStaffAndCensus(root);
