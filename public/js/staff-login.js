@@ -34,9 +34,32 @@ function initStaffLogin(redirectTo) {
     busy = false; btnEl.textContent = 'Увійти';
   }
 
+  // "Забув пароль?" — якщо email уже вписаний у поле LOGIN, шле лист
+  // одразу звідси (без переходу на /login: не змушувати вводити той самий
+  // email вдруге). Порожнє поле — нема що слати, тоді ведемо на /login?mode=reset,
+  // де можна ввести email з нуля.
+  async function doForgot() {
+    if (busy) return;
+    const email = (loginEl?.value || '').trim();
+    if (!email) { window.location.href = '/login?mode=reset'; return; }
+    busy = true; flash('Надсилаємо…');
+    try {
+      const r = await fetch('/api/slide-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const d = await r.json().catch(() => ({}));
+      flash(r.ok ? `Лист надіслано на ${email}` : (d.error || 'Не вдалося надіслати лист'));
+    } catch {
+      flash('Помилка зʼєднання');
+    }
+    busy = false;
+  }
+
   btnEl.addEventListener('click', (e) => { e.stopPropagation(); doLogin(); });
   [loginEl, passEl].forEach(el => el && el.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
   }));
-  if (forgotEl) forgotEl.addEventListener('click', (e) => { e.stopPropagation(); window.location.href = '/login?mode=reset'; });
+  if (forgotEl) forgotEl.addEventListener('click', (e) => { e.stopPropagation(); doForgot(); });
 }
