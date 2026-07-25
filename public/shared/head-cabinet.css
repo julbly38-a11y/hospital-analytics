@@ -11,11 +11,12 @@
 .docs-title {
   position: absolute;
   font-weight: 300;
-  font-size: 15px;
+  font-size: 16.2px; /* як .tagline (layout.css) — "турбуємось про найцінніше" під назвою лікарні */
   letter-spacing: 0.5px;
   color: var(--c-taupe-light);
   text-transform: uppercase;
-  left: var(--field-pad); top: var(--field-pad);
+  text-align: right;
+  left: var(--field-pad); right: var(--field-pad); top: var(--field-pad);
 }
 .docs-list {
   position: absolute;

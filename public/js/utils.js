@@ -459,22 +459,21 @@ const HOSPITAL_YEARS_BACK = 7;
 
 // Блок "КПІ-ряд (6 показників) + графік динаміки" — той самий патерн на
 // head-cabinet.html (по відділенню) і doctor-cabinet.html (по лікарю):
-// .field-kpi-1 (kpi6RowHtml) + .field-chart-1 (12-місячний спарклайн). level —
+// .field-kpi-1 (kpi6RowHtml) + .field-chart-1 (12-місячна гістограма). level —
 // 'department'|'doctor', додає .kpi-lvl-<level> для ієрархії шрифтів
 // (layout.css: напрямок→відділення→лікар, кожен -5% від попереднього).
 function renderKpiChartBlock(root, rowId, chartId, level) {
   const field = root.querySelector('.lf-right-top');
   (field || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-1 kpi-lvl-${level}" id="${rowId}">${kpi6RowHtml()}</div>
-    <svg class="spark field-chart-1" id="${chartId}" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
-      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
-      <path class="spark-line"></path>
+    <svg class="bar-chart field-chart-1" id="${chartId}" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
+      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
     </svg>
   `);
 }
 
 // Дані для renderKpiChartBlock: fetch КПІ (/api/lpz-kpi-<kind>) → applyKpi6,
-// fetch тренду (/api/lpz-trend-<kind>) → renderSpark; клік на точку графіка —
+// fetch тренду (/api/lpz-trend-<kind>) → renderBarChart; клік на стовпець —
 // census "станом на цю дату" (censusDateFromChartPoint). kind='department'|
 // 'doctor' — визначає одразу і назву обох ендпоінтів, і назву query-
 // параметра сутності (вони завжди збігаються: department=.../doctor=...).
@@ -495,7 +494,7 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
     .then(data => {
       const rows = data?.rows || [];
       if (!rows.length) return;
-      renderSpark(document.getElementById(chartId), rows, year, null, (r) => {
+      renderBarChart(document.getElementById(chartId), rows, year, null, (r) => {
         loadCensus(getCensusDoctorId ? getCensusDoctorId() : null, {
           date: censusDateFromChartPoint(year, r.x),
           ...(emptyMessage ? { emptyMessage } : {}),
@@ -518,7 +517,7 @@ function renderCensusSection(root, { showReset = false } = {}) {
   parent.insertAdjacentHTML('beforeend', `
     <div class="census-title">
       <span class="census-when" id="censusWhen"></span>
-      <span class="census-active">Перебуває у відділенні</span>
+      <span class="census-active" id="censusActive">Перебуває у відділенні</span>
       <span class="census-count" id="censusCount"></span>
       <span class="census-flow" id="censusFlow"></span>
       ${showReset ? '<span class="census-reset" id="censusReset" style="display:none">✕ скинути лікаря</span>' : ''}
@@ -535,7 +534,7 @@ function renderCensusSection(root, { showReset = false } = {}) {
 }
 
 function loadCensus(doctorId, options = {}) {
-  const { date } = options;
+  const { date, flowMode = null } = options;
   const emptyMessage = options.emptyMessage || (doctorId
     ? 'Немає даних про пацієнтів цього лікаря (покриття lpz_episodes на живих випадках неповне)'
     : 'Наразі нікого немає');
@@ -557,6 +556,9 @@ function loadCensus(doctorId, options = {}) {
       const fieldMe = document.querySelector('.field-me');
       if (fieldMe) fitHeightTo(censusList, offsetInSlide(fieldMe), 20);
 
+      // "Перебуває" — завжди повна кількість (data.rows.length), НЕ залежить
+      // від flowMode-фільтра нижче. Той самий принцип, що в старому
+      // .admissions-box: stayingCount рахується один раз, до фільтра потоку.
       const countEl = document.getElementById('censusCount');
       if (countEl) countEl.textContent = `· ${data.rows.length}`;
       const whenEl = document.getElementById('censusWhen');
@@ -574,18 +576,62 @@ function loadCensus(doctorId, options = {}) {
         whenEl.innerHTML = date ? `${label} · <span class="census-reset-date">✕ скинути дату</span>` : label;
         if (date) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage }));
       }
+
+      // "Перебуває у відділенні" — клік скидає flowMode (повний список),
+      // як старий .ab-reset. Активний вигляд (синій/жирний/світіння) — лише
+      // коли flowMode вимкнено (те саме, що .ab-reset.active за замовчуванням).
+      const activeEl = document.getElementById('censusActive');
+      if (activeEl) {
+        activeEl.classList.toggle('active', !flowMode);
+        activeEl.onclick = () => loadCensus(doctorId, { date, emptyMessage, flowMode: null });
+      }
+
+      // "поступило: N" / "виписано: N" — клікабельні фільтри списку (як
+      // старий .ab-flow): клік перемикає flowMode (повторний клік — вимикає
+      // назад у null). Самі числа завжди від повного flow за цю дату,
+      // незалежно від того, який фільтр зараз активний.
       const flowEl = document.getElementById('censusFlow');
-      if (flowEl) flowEl.textContent = `· поступило: ${data.admitted ?? 0} · виписано: ${data.discharged ?? 0}`;
+      if (flowEl) {
+        const aCls = flowMode === 'admitted' ? ' active' : '';
+        const dCls = flowMode === 'discharged' ? ' active' : '';
+        flowEl.innerHTML = `· <span class="census-flow-item${aCls}" data-flow="admitted">поступило: ${data.admitted ?? 0}</span> · <span class="census-flow-item${dCls}" data-flow="discharged">виписано: ${data.discharged ?? 0}</span>`;
+        flowEl.querySelectorAll('.census-flow-item').forEach(el => {
+          el.onclick = () => {
+            const mode = el.getAttribute('data-flow');
+            loadCensus(doctorId, { date, emptyMessage, flowMode: flowMode === mode ? null : mode });
+          };
+        });
+      }
 
       if (!data.rows.length) {
         censusList.innerHTML = `<div class="census-empty">${emptyMessage}</div>`;
         return;
       }
-      censusList.innerHTML = data.rows.map(r => {
+      // flowMode фільтрує ТІЛЬКИ список нижче (не рахунки вище) — поступив/
+      // виписаний саме в обрану дату (data.date). lpz_department_census уже
+      // повертає рядки з admission_date<=date<=discharge_date(або null), тож
+      // "виписано сьогодні" теж є серед data.rows (discharge_date=data.date).
+      let rows = data.rows;
+      if (flowMode === 'admitted') rows = rows.filter(r => r.admission_date === data.date);
+      else if (flowMode === 'discharged') rows = rows.filter(r => r.discharge_date === data.date);
+
+      if (!rows.length) {
+        censusList.innerHTML = `<div class="census-empty">пацієнти відсутні</div>`;
+        return;
+      }
+      censusList.innerHTML = rows.map(r => {
         const repeatStr = (r.re_admission && r.re_admission !== 'Ні')
           ? ` · <span class="census-repeat">${r.re_admission.toLowerCase()}</span>` : '';
         const days = Math.max(0, Number(r.days) || 0);
-        const segs = Array.from({ length: Math.min(days, 60) }, () => '<i></i>').join('');
+        const segCount = Math.min(days, 60);
+        // Останній сегмент = дата, станом на яку показано список (census-when
+        // угорі, напр. "П'ЯТНИЦЯ 17.07.2026") — той самий .today зі старого
+        // doctor-cabinet.html/head-cabinet.html (.ab-bar i.today), тільки там
+        // позицію рахували вручну (selDate−admission), а тут days уже
+        // порахований сервером саме як (p_date−admission_date), тож це просто
+        // останній елемент масиву — чорний, решта — звичайний рожевий.
+        const segs = Array.from({ length: segCount }, (_, i) =>
+          i === segCount - 1 ? '<i class="census-today"></i>' : '<i></i>').join('');
         return `
         <div class="census-row">
           <div class="census-info">

@@ -12,23 +12,21 @@
 // utils.js:kpi6RowHtml/applyKpi6 (спільні з head-cabinet.js/doctor-cabinet.js),
 // позиція — layout.css:.field-kpi-1/.field-kpi-2 (та сама, що й на тих
 // сторінках). Дані — /api/lpz-kpi-direction. Графік динаміки під кожним
-// рядком (.field-chart-1/.field-chart-2, той самий .spark-патерн, що на
+// рядком (.field-chart-1/.field-chart-2, той самий .bar-chart-патерн, що на
 // head-cabinet.html/doctor-cabinet.html) — без click-фільтра (немає census
 // на entry.html) і зі спільною Y-шкалою між обома напрямками (loadDirectionBlocks),
 // щоб масштаби порівнювались візуально. ──
 function renderDirectionBlocks(root) {
   (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>
-    <svg class="spark field-chart-1" id="chartTherap" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
-      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
-      <path class="spark-line"></path>
+    <svg class="bar-chart field-chart-1" id="chartTherap" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
+      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
     </svg>
   `);
   (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>
-    <svg class="spark field-chart-2" id="chartSurg" viewBox="0 0 1247 130" width="1247" height="130" preserveAspectRatio="none">
-      <line class="spark-base" x1="0" x2="1247" y1="80" y2="80"></line>
-      <path class="spark-line"></path>
+    <svg class="bar-chart field-chart-2" id="chartSurg" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
+      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
     </svg>
   `);
 }
@@ -55,13 +53,14 @@ function loadDirectionBlocks(org, year, month = 'all') {
     const tRows = tData?.rows || [];
     const sRows = sData?.rows || [];
     if (!tRows.length && !sRows.length) return;
-    const step = year === 'all' ? 10000 : 1000;
+    // 15% запасу над найвищим значенням з ОБОХ напрямків — той самий підхід,
+    // що й у bar-chart.js для окремого графіка без sharedBounds (нема
+    // підписаних рисок осі, тож не потрібне "кругле" округлення до тисяч).
     const allVals = [...tRows, ...sRows].map(r => Number(r.y));
-    const niceMin = Math.floor(Math.min(...allVals, 0) / step) * step;
-    const niceMax = Math.max(Math.ceil(Math.max(...allVals, 1) / step) * step, niceMin + step);
-    const bounds = { niceMin, niceMax };
-    if (tRows.length) renderSpark(document.getElementById('chartTherap'), tRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
-    if (sRows.length) renderSpark(document.getElementById('chartSurg'), sRows, year, bounds, null, { dotRadius: 6, dotRadiusHover: 9 });
+    const niceMax = Math.max(Math.max(...allVals, 1) * 1.15, 1);
+    const bounds = { niceMax };
+    if (tRows.length) renderBarChart(document.getElementById('chartTherap'), tRows, year, bounds);
+    if (sRows.length) renderBarChart(document.getElementById('chartSurg'), sRows, year, bounds);
   }).catch(() => {});
 }
 

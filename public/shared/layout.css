@@ -66,44 +66,40 @@ html, body {
 }
 .slide > *:not(.bg) { z-index: 1; }
 
-/* Базові стилі спарклайна (spark-chart.js) — спільні; кожна сторінка додає
+/* Базові стилі гістограми (bar-chart.js) — спільні; кожна сторінка додає
    лише свій instance-клас з top/left-позицією (.chart-therap, .dept-trend...). */
-.spark { position: absolute; left: 690px; display: block; overflow: visible; }
-.spark-line {
-  fill: none;
-  stroke: var(--c-sage);
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.spark-base {
+.bar-chart { position: absolute; left: 690px; display: block; overflow: visible; }
+.bar-base {
   stroke: var(--c-accent-pink);
   stroke-width: 1;
   opacity: 0.55;
 }
-.spark-dot {
-  fill: var(--c-accent-pink);
-  stroke: var(--c-cream);
-  stroke-width: 1.5;
+.bar-col {
+  fill: var(--c-sage);
+  opacity: 0.85;
   cursor: pointer;
-  transition: r .15s ease;
+  transition: fill .15s ease, opacity .15s ease;
 }
-.spark-val {
+.bar-col.active {
+  fill: var(--c-accent-pink);
+  opacity: 1;
+}
+.bar-val {
   fill: var(--c-ink-2);
   font-weight: 300;
   font-size: 12px;
   text-anchor: middle;
   transition: font-size .15s ease, fill .15s ease;
 }
-.spark-val.active { font-size: 17px; fill: var(--c-accent-pink); }
-.spark-xlabel {
+.bar-val.active { font-size: 17px; fill: var(--c-accent-pink); }
+.bar-xlabel {
   fill: var(--c-taupe);
   font-weight: 300;
   font-size: 11px;
   text-anchor: middle;
   transition: font-size .15s ease, fill .15s ease;
 }
-.spark-xlabel.active { font-size: 15px; fill: var(--c-accent-pink); }
+.bar-xlabel.active { font-size: 15px; fill: var(--c-accent-pink); }
 
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 @keyframes logopulse {
@@ -498,15 +494,19 @@ html, body {
 }
 .layout-field > * { pointer-events: auto; }
 
-/* Вміст усередині правих полів розмітки (КПІ-ряди на 6 показників + графік +
-   census + міні-табличка авторизованого) — СПРАВЖНІ DOM-нащадки
-   .lf-right-top/.lf-right-bottom (utils.js вставляє через
-   root.querySelector('.lf-right-top') тощо, не в root напряму). Кожен читає
-   --field-pad напряму (див. коментар вище чому не просто успадковує padding). */
+/* Вміст усередині правих полів розмітки (КПІ-ряд на 6 показників + графік) —
+   СПРАВЖНІ DOM-нащадки .lf-right-top/.lf-right-bottom (utils.js вставляє
+   через root.querySelector('.lf-right-top') тощо, не в root напряму).
+   Звичайний document flow (НЕ position:absolute) — .layout-field вже дає
+   22px відступ від усіх країв через власний padding (padding: var(--field-pad)
+   на .layout-field), а для normal-flow дітей цей padding реально працює
+   (на відміну від absolute — той ігнорує padding батька, бо containing
+   block для absolute-дитини це ЗОВНІШНЯ межа padding, не внутрішня).
+   Тому кожен новий елемент просто йде в поле — top/left/right/22px
+   рахувати вручну більше не треба ніде. */
 .field-kpi-1, .field-kpi-2 {
-  position: absolute;
-  top: var(--field-pad); left: var(--field-pad); right: var(--field-pad);
-  width: auto; height: auto; /* .kpi-row (базовий) задає свої width/height — скасовуємо, інакше right ігнорується */
+  position: static;
+  width: auto; height: auto; /* .kpi-row (базовий) задає свої absolute-і width/height — скасовуємо */
 }
 /* Ієрархія шрифтів КПІ: кожен рівень на 5% менший за попередній.
    Рівень 1 — загальнолікарняний .kpi-row (верх сторінки, поза полями):
@@ -521,21 +521,17 @@ html, body {
 .kpi-lvl-doctor .kpi-num  { font-size: 27.86px; } /* 29.33 × 0.95 — doctor-cabinet.html (лікар) */
 .kpi-lvl-doctor .kpi-label { font-size: 13.89px; }
 
-/* Та сама ієрархія — тепер і для відступу від краю поля (не лише шрифту).
-   .kpi-lvl-direction лишається на базовому var(--field-pad)=22px (нема
-   потреби в окремому правилі). Далі кожен рівень ×0.95 від попереднього,
-   ЛИШЕ для самого КПІ-рядка (.field-chart-1 під ним і решта вмісту поля —
-   і далі на var(--field-pad), це навмисно різні речі). */
-.kpi-lvl-department { top: 20.9px; left: 20.9px; right: 20.9px; } /* 22 × 0.95 */
-.kpi-lvl-doctor { top: 19.855px; left: 19.855px; right: 19.855px; } /* 20.9 × 0.95 */
-
-/* Графік динаміки (12 місяців обраного року) — під КПІ-рядком (.field-kpi-1),
-   у тому самому полі lf-right-top. Клік на точку — census "станом на цю
-   дату" (utils.js:loadCensus(..., {date})), перенесено зі старого
-   doctor-cabinet.html/head-cabinet.html (.chart-therap + клік). */
+/* Графік динаміки (12 місяців обраного року) — наступний normal-flow
+   елемент одразу під КПІ-рядком, у тому самому полі lf-right-top. Клік на
+   стовпець — census "станом на цю дату" (utils.js:loadCensus(..., {date})),
+   перенесено зі старого doctor-cabinet.html/head-cabinet.html
+   (.chart-therap + клік). margin-top — той самий field-pad, тепер це
+   справжній flow-відступ від реальної нижньої межі КПІ-рядка (яка б вона
+   не була по факту), а не порахований наперед піксель. */
 .field-chart-1, .field-chart-2 {
-  position: absolute;
-  top: calc(var(--field-pad) + 95px); left: var(--field-pad); right: var(--field-pad);
+  position: static; left: auto; /* скасовує .bar-chart{position:absolute;left:690px} — той призначений для окремого standalone-використання поза полями, тут потрібен normal flow */
+  display: block;
+  margin-top: var(--field-pad);
 }
 
 .field-me {
@@ -584,10 +580,21 @@ html, body {
   margin-left: 10px;
 }
 .census-title .census-when { margin-left: 0; }
-/* "Перебуває у відділенні" — активний стан за замовчуванням (синій, жирний,
-   світіння), як старий .ab-reset.active — бо в нашій спрощеній версії немає
-   інших перемикних вкладок (flowMode/lockedBlok), тож це завжди "активний" вигляд. */
-.census-active {
+/* "Перебуває у відділенні" + "поступило"/"виписано" — клікабельні фільтри
+   списку (як старий .ab-reset/.ab-flow): активний стан (синій, жирний,
+   світіння) лише на тому, що зараз обрано — .active додається/знімається в
+   loadCensus() (utils.js) залежно від flowMode. */
+.census-active,
+.census-flow-item {
+  cursor: pointer;
+  transition: color .2s ease, text-shadow .2s ease;
+}
+.census-active:hover,
+.census-flow-item:hover {
+  color: #6d93d8;
+}
+.census-active.active,
+.census-flow-item.active {
   color: #6d93d8;
   font-weight: 600;
   text-shadow: 0 0 5px rgba(109,147,216,0.35);
@@ -625,11 +632,19 @@ html, body {
   font-weight: 300;
 }
 .census-row:first-child { border-top: none; }
+/* Наведення на пацієнта — синім (той самий .ab-row:hover зі старого
+   doctor-cabinet.html/head-cabinet.html), у qwerty цього ефекту не було. */
+.census-row:hover .census-name { color: #6d93d8; }
+.census-row:hover .census-meta { color: #8aa8e0; }
 .census-info { display: flex; flex-direction: row; align-items: baseline; gap: 10px; min-width: 0; }
-.census-name { font-size: 15px; color: var(--c-ink-3); white-space: nowrap; flex-shrink: 0; }
+.census-name {
+  font-size: 15px; color: var(--c-ink-3); white-space: nowrap; flex-shrink: 0;
+  transition: color .2s ease;
+}
 .census-meta {
   font-size: 13px; color: var(--c-taupe-light);
   flex: 1; min-width: 0;
+  transition: color .2s ease;
 }
 .census-stay { display: flex; gap: 5px; flex-shrink: 0; align-items: center; }
 .census-bar { display: flex; gap: 2px; }
@@ -638,6 +653,12 @@ html, body {
   width: 6px; height: 12px;
   background: var(--c-accent-pink);
   border-radius: 1px;
+}
+/* Останній сегмент смужки = дата, станом на яку показано список (census-when
+   угорі) — чорний, решта — звичайний рожевий. Той самий .today зі старого
+   doctor-cabinet.html/head-cabinet.html (.ab-bar i.today). */
+.census-bar i.census-today {
+  background: var(--c-black);
 }
 .census-days { font-size: 13px; color: var(--c-accent-pink); }
 .census-empty {
