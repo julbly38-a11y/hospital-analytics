@@ -1,8 +1,12 @@
 # Схема lpz — довідник таблиць
 
-> Supabase project `ubjnztanehqlsrqphdqy`. Заміна старої схеми `lsmd`/`public`
-> (project `wnyfrckxhwujsjcfxqou`, див. [DATABASE.md](./DATABASE.md)): замість
-> зіставлення відділень/лікарів по назві (ризик синонімів), `lpz` матчить по
+> Supabase project `ubjnztanehqlsrqphdqy`. Заміна старої схеми `lsmd`
+> (те саме, що описано в [DATABASE.md](./DATABASE.md) — **уточнення**: `lsmd`
+> насправді живе в схемі `public` цього ж проєкту `ubjnztanehqlsrqphdqy`, а не
+> в окремому проєкті `wnyfrckxhwujsjcfxqou`, як зазначено в DATABASE.md;
+> перевірено напряму через `information_schema.schemata` — окремого проєкту
+> `wnyfrckxhwujsjcfxqou` серед доступних немає). Замість зіставлення
+> відділень/лікарів по назві (ризик синонімів), `lpz` матчить по
 > `structureId`/`resourceId` з helsi.pro.
 >
 > 39 таблиць, org_edrpou-мультитенантні — дві лікарні:
@@ -391,6 +395,107 @@ $function$;
 ```
 
 ---
+
+## View, перенесені зі старої схеми `public` (lsmd)
+
+Стара схема `public` (та сама база, `ubjnztanehqlsrqphdqy`) має 47 view.
+Більшість дублює те, що вже рахують 17 RPC-функцій `lpz` (KPI/тренди/пікові
+години тощо) — їх переносити не було сенсу. Ще частина спирається на таблиці,
+яких у `lpz` немає (`operations`, `dept_transfers_matrix`, `doctor_shifts`,
+геокодовані `localities`) — їх перенести неможливо без нових таблиць, це поза
+рамками цієї задачі.
+
+Нижче — 13 view (+ 1 допоміжна функція), яких **не було в жодному вигляді в
+`lpz`** і які повністю будуються на вже наявних таблицях `lpz_hospitalizations`
+/ `lpz_icd_diagnoses` / `lpz_dict_icd_blocks` / функції `lpz_is_urgent_icd`.
+Усі — `org_edrpou`-scoped (на відміну від старих, однолікарняних версій), з
+`security_invoker = true` (view виконується з правами того, хто її викликає,
+а не власника — щоб RLS базових таблиць застосовувався коректно).
+
+### lpz_icd_block_name(p_icd text) — функція
+Допоміжна: код МКХ → назва блоку з `lpz_dict_icd_blocks` (перший діапазон, що
+підійшов, за `priority`; якщо жоден — `'Інші'`). До цього `lpz_dict_icd_blocks`
+існувала в схемі, але жодного коду її не читало.
+
+### lpz_readmissions
+Повторні госпіталізації пацієнта — вікно `LEAD()` по `admission_date` в межах
+`(org_edrpou, patient_id)`: наступна госпіталізація, дні до неї, чи вклався в
+30/90 днів, чи той самий діагноз. Раніше в `lpz` цього не було ЗОВСІМ (лише
+статичні підсумки `readmissions_30d`/`90d` у замороженому знімку
+`lpz_analytics_dept_summary`) — найцінніше з перенесеного.
+
+### lpz_readmission_metrics
+Зведення `lpz_readmissions` по лікарні: % повторних за 30/90 днів, скільки з
+них — той самий діагноз.
+
+### lpz_night_vs_day_admissions
+Ніч (22:00–06:00) vs день по `admission_time`: кейси, унікальні пацієнти,
+середній ліжко-день, ургентні (`admission_type='Екстренна' OR lpz_is_urgent_icd`),
+летальність.
+
+### lpz_night_admissions_detail
+Те саме, у розрізі кожної години доби (0–23).
+
+### lpz_night_admissions_by_department
+Ніч vs день у розрізі відділення (`department_name`).
+
+### lpz_weekend_vs_weekday
+Вихідні vs робочі дні по `admission_date` (`EXTRACT(dow ...)`).
+
+### lpz_patient_demographics
+Стать × вікова група (0-17/18-29/30-44/45-59/60-74/75+), з летальністю в
+кожній комірці.
+
+### lpz_top_diagnoses
+Топ-20 кодів МКХ **на кожну лікарню окремо** (`row_number() OVER (PARTITION BY
+org_edrpou ...)`) — кейси, унікальні пацієнти, летальність, назва діагнозу з
+`lpz_icd_diagnoses`. Живий еквівалент замороженого знімку `lpz_icd_usage`.
+
+### lpz_diagnosis_stats
+Те саме, але по КОЖНОМУ коду МКХ (не тільки топ-20), + прапорець `urgent`
+через `lpz_is_urgent_icd`.
+
+### lpz_urgency_stats
+Ургентні vs планові по відділеннях: кейси, летальність, середній ліжко-день
+у кожній групі. Стара версія рахувала ще й хірургічні показники — у `lpz`
+немає таблиці операцій, тому ці колонки не перенесені.
+
+### lpz_icu_mortality
+Летальність у відділеннях реанімації/анестезіології/інтенсивної терапії —
+текстовий фільтр `department_name ILIKE '%анестез%' OR '%реанімац%' OR
+'%інтенсив%'` (розширено проти старої версії, яка перевіряла лише
+`%анестез%`, — щоб покривати обидві лікарні з різними назвами відділень).
+
+### lpz_morbidity_by_department
+Захворюваність по відділеннях × категорія хвороби (через нову функцію
+`lpz_icd_block_name`).
+
+### lpz_dept_disease_clean
+Те саме, з часткою (`%`) від загальної кількості кейсів відділення.
+
+### Свідомо не перенесено
+- **doctor_diagnoses / doctor_discharges / doctor_patient_links /
+  doctors_profile_view** — у старій схемі спирались на чисту прив'язку
+  `lsmd_doctors(doctor_id → empl)`. У `lpz` `doc_resource_id` на госпіталізації
+  завжди порожній; лікаря відновлюють лише через `lpz_episodes` (join по
+  пацієнту й діапазону дат) — той самий підхід, що вже реалізований у RPC
+  `lpz_kpi_by_doctor`/`lpz_trend_by_doctor`. Робити ще одну view з тим самим
+  крихким join без чіткого запиту від продукту — зайва вартість; ці відповіді
+  вже доступні через наявні RPC.
+- **interventions, lsmd_transfers, lsmd_deaths_24h, lsmd_shift_type,
+  lsmd_shifts** — залежать від таблиць `operations`/`dept_transfers_matrix`/
+  `doctor_shifts`, яких у `lpz` немає.
+- **v_dept_icd_by_year** — залежить від `analytics_dept_icd_profile`, якої
+  серед перенесених у `lpz` legacy-таблиць немає.
+- **v_dashboard_unified** — будується виключно на замороженому знімку
+  (`lpz_analytics_block_summary`/`lpz_analytics_dept_summary`, лише ЛШМД) —
+  додавання дало б хибне враження "живих" даних там, де їх нема.
+- **v_region_stats** — залежить від геокодованих `localities` (lat/lng),
+  яких у `lpz_patients` немає.
+- **v_import_history** — службова таблиця імпорту, не аналітика.
+- Решта ~25 view (`v_hospital_summary`, `v_case_metrics`, `v_peak_by_*`,
+  `v_department_metrics/stats`, `v_monthly_admissions` тощо) — дублюють те,
+  що вже рахують RPC-функції `lpz_kpi_*`/`lpz_trend_*`/`lpz_department_*`.
 
 ## Джерела
 
