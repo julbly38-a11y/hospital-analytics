@@ -8,8 +8,6 @@ import {
 } from 'recharts'
 import { deptIcon } from '../lib/dept-icons'
 
-const COLORS = ['#1a1917','#6b6760','#9c9890','#c0c0b8','#d8d5cf','#4a9870','#c0392b','#e8a020']
-
 /* ── hooks ─────────────────────────────────────────────── */
 
 function useQuery(key) {
@@ -189,7 +187,6 @@ export default function Analytics() {
       <Head>
         <title>ЛСМД — Аналітика</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
 
       <style jsx global>{`
@@ -325,7 +322,7 @@ export default function Analytics() {
                     <YAxis tick={{ fontSize: 10, fontFamily: 'var(--mono)' }} axisLine={false} tickLine={false} />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 11, fontFamily: 'var(--mono)' }} />
-                    <Bar dataKey="ургентних" fill="#c0392b" radius={[3,3,0,0]}
+                    <Bar dataKey="ургентних" fill="var(--brand)" radius={[3,3,0,0]}
                       isAnimationActive animationDuration={1200} />
                     <Bar dataKey="планових" fill="var(--text3)" radius={[3,3,0,0]}
                       isAnimationActive animationDuration={1400} />
@@ -383,7 +380,7 @@ export default function Analytics() {
                     <Line type="monotone" dataKey="поступлень" stroke="var(--accent)"
                       strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }}
                       isAnimationActive animationDuration={1800} animationEasing="ease-out" />
-                    <Line type="monotone" dataKey="померло" stroke="#c0392b"
+                    <Line type="monotone" dataKey="померло" stroke="var(--brand)"
                       strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }}
                       isAnimationActive animationDuration={2100} animationEasing="ease-out" />
                   </LineChart>

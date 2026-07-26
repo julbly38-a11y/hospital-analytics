@@ -221,7 +221,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>ЛСМД — Хотинська багатопрофільна лікарня</title>
+        <title>ЛСМД — Чернівецька лікарня швидкої медичної допомоги</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;1,300&family=Poppins:wght@300&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300&display=swap" rel="stylesheet" />
@@ -257,7 +257,7 @@ export default function Home() {
             textAlign: 'left',
             lineHeight: 0.8,
           }}>
-            ХОТИНСЬКА<br />БАГАТОПРОФІЛЬНА<br />ЛІКАРНЯ
+            ЧЕРНІВЕЦЬКА<br />ЛІКАРНЯ ШВИДКОЇ<br />МЕДИЧНОЇ ДОПОМОГИ
           </div>
           <div style={{
             fontFamily: "'ITF Devanagari', 'Noto Sans', 'Segoe UI', sans-serif",
@@ -349,7 +349,7 @@ export default function Home() {
               <Stat value={kpi ? fmt(kpi.total_cases) : '…'} label="ГОСПІТАЛІЗАЦІЙ" />
               <Stat value={kpi ? fmt(kpi.unique_patients) : '…'} label="ПАЦІЄНТІВ" />
               <Stat value={doctorCount != null ? fmt(doctorCount) : '…'} label="ЛІКАРІВ" />
-              <Stat value="20" label="ВІДДІЛЕНЬ" />
+              <Stat value={String(THERAPEUTIC.length + SURGICAL.length)} label="ВІДДІЛЕНЬ" />
               <Stat value={chartYear === 'all' ? 'Всі' : String(chartYear)} large />
             </div>
 

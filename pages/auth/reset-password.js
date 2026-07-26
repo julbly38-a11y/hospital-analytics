@@ -2,8 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import { createClient } from '../../lib/supabase'
-
-const MONO = { fontFamily: 'IBM Plex Mono, monospace' }
+import { MONO } from '../../components/shared'
 
 export default function ResetPassword() {
   const router = useRouter()
@@ -77,7 +76,6 @@ export default function ResetPassword() {
     <>
       <Head>
         <title>ЛСМД — Новий пароль</title>
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

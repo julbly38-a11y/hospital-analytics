@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { STATUS_COLORS, fetchStats } from '../components/shared'
 
 const card   = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px' }
 const lbl    = { fontSize: '10px', color: 'var(--text3)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }
@@ -65,22 +66,9 @@ function StatBox({ value, label, accent }) {
   )
 }
 
-const STATUS_COLORS = {
-  'Лікується': '#5ab0ff', 'З поліпшенням': '#7fd99a', 'Без змін': '#cfae5a',
-  'З погіршенням': '#e0a060', 'Помер': '#e08080', 'Переведений в інший заклад': '#a08ae0',
-}
 function StatusBadge({ status }) {
   const c = STATUS_COLORS[status] || 'var(--text3)'
   return <span style={{ fontSize: 11, color: c, border: `1px solid ${c}55`, borderRadius: '999px', padding: '2px 9px', whiteSpace: 'nowrap' }}>{status || '—'}</span>
-}
-
-async function fetchStats(key, param) {
-  const r = await fetch('/api/stats', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(param !== undefined ? { key, param } : { key }),
-  })
-  const d = await r.json()
-  return d.rows || []
 }
 
 /* ── Main Page ───────────────────────────────────── */

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
-
-const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
-const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
+import { SANS, MONO } from '../components/shared'
 
 export default function AdminHospitals() {
   const router = useRouter()
