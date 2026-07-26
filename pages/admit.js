@@ -1,45 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { createClient } from '../lib/supabase'
-
-const DEPARTMENTS = [
-  'Відділення анестезіології з ліжками інтенсивної терапії',
-  'Гастроентерологічне відділення',
-  'Гематологічне відділення',
-  'Нейрохірургічне відділення',
-  'Опікове відділення',
-  'Терапевтичне відділення №1',
-  'Терапевтичне відділення №2',
-  'Травматологічне відділення для дітей',
-  'Травматологічне відділення для дорослих',
-  'Урологічне відділення',
-  'Хірургічне відділення №1',
-  'Хірургічне відділення №2',
-  'Центр невідкладної неврології',
-]
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px 12px',
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '6px',
-  color: 'var(--text)',
-  fontSize: '14px',
-  fontFamily: 'var(--mono)',
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const labelStyle = {
-  display: 'block',
-  marginBottom: '6px',
-  fontSize: '11px',
-  color: 'var(--text3)',
-  fontFamily: 'var(--mono)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-}
+import { DEPARTMENTS, formInputStyle as inputStyle, formLabelStyle as labelStyle } from '../components/shared'
 
 function Field({ label, children }) {
   return (
