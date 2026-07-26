@@ -249,6 +249,15 @@ export default function Analytics() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = '#00e5ff'; e.currentTarget.style.color = '#00e5ff' }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text2)' }}
           >✦ Гло-графіки</Link>
+          <Link href="/charts" style={{
+            fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)',
+            textDecoration: 'none', padding: '6px 12px', borderRadius: 6,
+            border: '1px solid var(--border)',
+            transition: 'border-color .15s ease, color .15s ease',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text)' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text2)' }}
+          >▤ Бібліотека графіків</Link>
           <Link href="/" style={{
             fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text2)',
             textDecoration: 'none', padding: '6px 12px', borderRadius: 6,
