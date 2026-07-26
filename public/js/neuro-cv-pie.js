@@ -33,7 +33,14 @@ function renderNeuroCvPie(selector, data) {
   } = data;
 
   const TOTAL = data.total || outerRows.reduce((s, r) => s + r.випадків, 0);
-  const EMBLEM_RED = '#b27c8b';
+  // Кольори — з theme.css (спільна палітра лікарняних сторінок), з fallback
+  // на випадок, якщо файл використовують без theme.css.
+  const rootStyle = getComputedStyle(document.documentElement);
+  const cssVar = (name, fallback) => rootStyle.getPropertyValue(name).trim() || fallback;
+  const EMBLEM_RED = cssVar('--c-accent-pink', '#b27c8b');
+  const INK_3       = cssVar('--c-ink-3', '#3a3a3a');
+  const INK_1       = cssVar('--c-ink-1', '#1a1a1a');
+  const TAUPE_LIGHT = cssVar('--c-taupe-light', '#9a958f');
   const SAGE_LIGHT = [176, 185, 172], SAGE_DARK = [104, 116, 103];
   const RED_DARK   = [178, 124, 139], RED_LIGHT  = [220, 190, 200];
 
@@ -93,9 +100,9 @@ function renderNeuroCvPie(selector, data) {
   const trx = (cx + Rt * Math.sin(tA)).toFixed(1);
   defs += `<path id="dpTitleArc" d="M ${tlx},${tty} A ${Rt},${Rt} 0 0 1 ${trx},${tty}" fill="none"/></defs>`;
 
-  const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="#3a3a3a"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
-  const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="#1a1a1a">${fmt(TOTAL)}</text>` +
-    `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="#978f88">${centerLabel}</text>`;
+  const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="${INK_3}"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
+  const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="${INK_1}">${fmt(TOTAL)}</text>` +
+    `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="${TAUPE_LIGHT}">${centerLabel}</text>`;
 
   container.innerHTML = `<svg width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${defs}<g id="dpRing">${arcs}${hits}</g><g id="dpInnerRing">${innerArcs}${innerHits}</g>${header}${center}</svg>`;
 
@@ -128,7 +135,7 @@ function renderNeuroCvPie(selector, data) {
   function clearName() {
     paint(-1);
     titlePath.textContent = 'Структура діагнозів';
-    titleEl.setAttribute('fill', '#3a3a3a');
+    titleEl.setAttribute('fill', INK_3);
     cV.textContent = fmt(TOTAL);
     cL.textContent = centerLabel;
   }
