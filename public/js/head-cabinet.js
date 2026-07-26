@@ -63,9 +63,10 @@ function loadStaff(org, deptId) {
           <span class="doc-position">${d.position_name || ''}</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';
-      docsList.querySelectorAll('.doc-item[data-doctor]').forEach(el => {
-        el.addEventListener('click', () => selectDoctor(el.dataset.doctor));
-      });
+      // Клік на лікаря → фільтр списку пацієнтів (selectDoctor) тимчасово
+      // вимкнено за проханням користувача (2026-07-25) — .doc-item лишається
+      // лише ціллю зворотної підсвітки з census-row (utils.js), сам по собі
+      // не клікабельний.
       updateFadeMask(docsList, 'y');
     })
     .catch(() => {});

@@ -7,11 +7,14 @@ const sb = () => createClient(
 )
 
 // Тренд госпіталізацій по ОДНОМУ відділенню: всі роки → по роках, конкретний
-// рік → по місяцях. Формат {x,y} — під spark-chart.js. Той самий патерн, що
-// /api/lpz-trend-direction, лише замість напряму — department (uuid).
+// рік → по місяцях, рік+конкретний місяць → по днях того місяця (хвильовий
+// графік на head-cabinet.html, utils.js:loadKpiChartBlock). Формат {x,y} —
+// під bar-chart.js/spark-chart.js. Той самий патерн, що /api/lpz-trend-
+// direction, лише замість напряму — department (uuid).
 export default async function handler(req, res) {
   const org = String(req.query.org || '').trim()
   const year = String(req.query.year || 'all').trim().toLowerCase()
+  const month = String(req.query.month || 'all').trim().toLowerCase()
   const department = String(req.query.department || '').trim()
   if (!org) return res.status(400).json({ error: 'org (ЄДРПОУ) обовʼязковий' })
   if (!department) return res.status(400).json({ error: 'department обовʼязковий' })
@@ -19,7 +22,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await sb()
       .schema('lpz')
-      .rpc('lpz_trend_by_department', { p_org: org, p_year: year, p_department: department })
+      .rpc('lpz_trend_by_department', { p_org: org, p_year: year, p_department: department, p_month: month })
 
     if (error) return res.status(500).json({ error: error.message })
     res.status(200).json({ rows: data || [] })

@@ -477,9 +477,13 @@ function renderKpiChartBlock(root, rowId, chartId, level) {
 // census "станом на цю дату" (censusDateFromChartPoint). kind='department'|
 // 'doctor' — визначає одразу і назву обох ендпоінтів, і назву query-
 // параметра сутності (вони завжди збігаються: department=.../doctor=...).
-// month='all'|1-12 — звужує лише КПІ-ряд (6 показників) до конкретного
-// місяця обраного року; графік динаміки лишається річним (він і так
-// показує всі 12 місяців — саме там видно місячну деталізацію візуально).
+// month='all'|1-12 — звужує КПІ-ряд (6 показників) до конкретного місяця
+// обраного року; для kind='department' (head-cabinet.html) з конкретним
+// роком+місяцем графік динаміки ТЕЖ перемикається — з річної/місячної
+// гістограми на денну гістограму госпіталізацій того місяця (12→28-31
+// стовпців), з анімацією "виїзду" зліва направо (renderBarChart:{animate:
+// true}). Для doctor-cabinet.html (kind='doctor') перемикання нема — графік
+// лишається річним.
 // getCensusDoctorId — опційний колбек (не значення!), бо на head-cabinet.html
 // його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
 // лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
@@ -489,17 +493,75 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
     .then(r => r.ok ? r.json() : null)
     .then(info => applyKpi6(document.getElementById(rowId), info))
     .catch(() => {});
-  fetch(`/api/lpz-trend-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&${kind}=${encodeURIComponent(entityId)}`)
+
+  const daily = kind === 'department' && year !== 'all' && month && month !== 'all';
+  const trendUrl = `/api/lpz-trend-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&${kind}=${encodeURIComponent(entityId)}`
+    + (daily ? `&month=${encodeURIComponent(month)}` : '');
+
+  fetch(trendUrl)
     .then(r => r.ok ? r.json() : null)
     .then(data => {
       const rows = data?.rows || [];
-      if (!rows.length) return;
-      renderBarChart(document.getElementById(chartId), rows, year, null, (r) => {
+      const chartEl = document.getElementById(chartId);
+      if (!rows.length || !chartEl) return;
+      const onPoint = (r) => {
+        // Перехресне посилання: клік на стовпець МІСЯЦЯ (річна гістограма,
+        // ще не daily) на head-cabinet.html має робити те саме, що клік на
+        // пігулку місяця під роками (renderHeaderBlock) — перемикати на денну
+        // діаграму того місяця, а не одразу вантажити census за весь місяць.
+        // Реалізовано через симуляцію кліку на саму пігулку (а не дублювання
+        // її логіки тут) — так одним рухом оновлюються й активний стан
+        // пігулки, і .year-badge-month, і викликається onMonthChange
+        // (loadDeptBlock), який і перемкне графік. monthFilter.dataset.
+        // targetYear зазвичай виставляє hover на пігулку року (showMonths) —
+        // тут його явно ставимо в year (той, що вже показаний), бо кліку на
+        // сам графік такого hover не було.
+        if (!daily && kind === 'department' && year !== 'all') {
+          const monthPill = document.querySelector(`.ypill-month[data-month="${r.x}"]`);
+          const monthFilterEl = document.querySelector('.month-filter');
+          if (monthPill && monthFilterEl) {
+            monthFilterEl.dataset.targetYear = year;
+            monthPill.click();
+            return;
+          }
+        }
         loadCensus(getCensusDoctorId ? getCensusDoctorId() : null, {
-          date: censusDateFromChartPoint(year, r.x),
+          date: censusDateFromChartPoint(year, r.x, daily ? month : null),
           ...(emptyMessage ? { emptyMessage } : {}),
         });
-      });
+        // Клік на стовпець денної гістограми — дописати обраний день до
+        // назви місяця в .year-badge-month (той самий бейдж, що вже показує
+        // "ЛИПЕНЬ" при виборі місяця, renderHeaderBlock:selectYear) — щоб
+        // було видно, на яку саме дату зараз показано census нижче. Вибір
+        // нового місяця/року скидає це через власний monthBadge.textContent
+        // у selectYear, тому окремого скидання тут не треба.
+        if (daily) {
+          const monthBadge = document.querySelector('.year-badge-month');
+          if (monthBadge) monthBadge.textContent = `${Number(r.x)} ${MONTH_PILL_NAMES[Number(month) - 1]}`;
+        }
+      };
+      chartEl.classList.toggle('chart-daily', daily);
+      // viewBox має відповідати РЕАЛЬНІЙ (design-space) ширині поля (після
+      // .chart-daily: width:100%) — інакше preserveAspectRatio="none"
+      // масштабує X сильніше за Y (ширина зросла, висота ні), і текст
+      // (цифри) виглядає розтягнутим по горизонталі. НЕ getBoundingClientRect
+      // — сторінка сама масштабується як ціле (.slide-wrapper transform:
+      // scale, "авто-масштаб 1920×1080"), тож getBoundingClientRect повертає
+      // ФІЗИЧНІ (після-transform) пікселі, які гуляють залежно від розміру
+      // вікна браузера — тут потрібна логічна (design-space) ширина поля,
+      // вона стала: lf-right-top/lf-right-bottom = 1295 (BASE_LAYOUT_FIELDS)
+      // мінус відступи з обох боків (--field-pad=22px, layout.css).
+      const FIELD_PAD = 22;
+      const realWidth = daily
+        ? BASE_LAYOUT_FIELDS.find(f => f.className === 'lf-right-top').width - 2 * FIELD_PAD
+        : 624;
+      chartEl.setAttribute('viewBox', `0 0 ${realWidth} 185`);
+      // animate:true завжди (не лише daily) — перемикання років/місяців теж
+      // має плавно змінювати висоту стовпців, не лише перехід на дні.
+      // renderBarChart сам розрізняє: однакова кількість стовпців (рік↔рік)
+      // → усі "реюзаться" й просто змінюють висоту; більше стовпців (місяць
+      // →дні) → надлишок "виїжджає" за останнім.
+      renderBarChart(chartEl, rows, year, null, onPoint, { animate: true });
     })
     .catch(() => {});
 }
@@ -620,23 +682,37 @@ function loadCensus(doctorId, options = {}) {
         return;
       }
       censusList.innerHTML = rows.map(r => {
+        const diagStr = r.icd_code ? `${r.icd_code} ${r.diagnosis || '—'}` : (r.diagnosis || '—');
+        const hospCountStr = r.hosp_count > 1 ? ` · <span class="census-hosp-count">${r.hosp_count}</span>` : '';
         const repeatStr = (r.re_admission && r.re_admission !== 'Ні')
           ? ` · <span class="census-repeat">${r.re_admission.toLowerCase()}</span>` : '';
+        // days тепер рахує RPC (lpz_department_census): якщо пацієнт уже
+        // виписаний — ПОВНА відома тривалість перебування (виписка−
+        // поступлення, весь термін, а не обрізаний на вказаній даті); якщо
+        // ще перебуває — по вказану дату включно. Тож смужка показує весь
+        // ліжко-день пацієнта, а не тільки "скільки минуло на цей момент".
         const days = Math.max(0, Number(r.days) || 0);
         const segCount = Math.min(days, 60);
-        // Останній сегмент = дата, станом на яку показано список (census-when
-        // угорі, напр. "П'ЯТНИЦЯ 17.07.2026") — той самий .today зі старого
-        // doctor-cabinet.html/head-cabinet.html (.ab-bar i.today), тільки там
-        // позицію рахували вручну (selDate−admission), а тут days уже
-        // порахований сервером саме як (p_date−admission_date), тож це просто
-        // останній елемент масиву — чорний, решта — звичайний рожевий.
+        const admDate = r.admission_date ? new Date(r.admission_date + 'T00:00:00') : null;
+        const admStr = admDate
+          ? `${String(admDate.getDate()).padStart(2, '0')}.${String(admDate.getMonth() + 1).padStart(2, '0')}.${admDate.getFullYear()}`
+          : '—';
+        // Індекс сегмента, що відповідає обраній даті (census-when угорі) —
+        // точно як старий doctor-cabinet.html/head-cabinet.html (.ab-bar
+        // i.today): рахується ЗАВЖДИ від дати поступлення до обраної дати,
+        // без винятку для тих, хто ще перебуває (там теж падає на останній
+        // сегмент — так і задумано в оригіналі, це не помилка).
+        const selDate = data.date ? new Date(data.date + 'T00:00:00') : null;
+        let todayIdx = (admDate && selDate) ? Math.round((selDate - admDate) / 86400000) : segCount - 1;
+        if (todayIdx >= segCount) todayIdx = segCount - 1;
+        if (todayIdx < 0) todayIdx = 0;
         const segs = Array.from({ length: segCount }, (_, i) =>
-          i === segCount - 1 ? '<i class="census-today"></i>' : '<i></i>').join('');
+          i === todayIdx ? '<i class="census-today"></i>' : '<i></i>').join('');
         return `
-        <div class="census-row">
+        <div class="census-row" data-doctor="${r.doc_resource_id || ''}">
           <div class="census-info">
             <span class="census-name">${r.pib || '—'}</span>
-            <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · ${r.diagnosis || '—'}${repeatStr}</span>
+            <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · поступив ${admStr} · ${diagStr}${hospCountStr}${repeatStr}</span>
           </div>
           <div class="census-stay" title="${days} діб">
             <span class="census-bar">${segs}</span>
@@ -645,20 +721,48 @@ function loadCensus(doctorId, options = {}) {
         </div>`;
       }).join('');
       updateFadeMask(censusList, 'y');
+      // Клік на пацієнта → підсвітити його лікаря в ординаторській (той
+      // самий патерн, що старий head-cabinet.html: .ab-row[data-doc] →
+      // click → зняти hl/doc-active з усіх → знайти відповідний .doc-item
+      // → hl + inertialScrollToCenter). Тут data-doctor = resource_id (у
+      // старому був data-doc = ім'я лікаря текстом) — бо ординаторська в
+      // цьому проєкті й так уже ключується по resource_id (loadStaff).
+      // Покриття часткове (слабкий джойн через lpz_episodes) — не для
+      // кожного пацієнта знайдеться лікар, це очікувано, не баг.
+      censusList.querySelectorAll('.census-row[data-doctor]').forEach(row => {
+        const doc = row.getAttribute('data-doctor');
+        if (!doc) return;
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', () => {
+          document.querySelectorAll('.doc-item.hl, .doc-item.doc-active').forEach(d => {
+            d.classList.remove('hl'); d.classList.remove('doc-active');
+          });
+          document.querySelectorAll('.doc-item').forEach(d => {
+            if (d.getAttribute('data-doctor') === doc) {
+              d.classList.add('hl');
+              const dl = d.closest('.docs-list');
+              if (dl) inertialScrollToCenter(dl, d);
+            }
+          });
+        });
+      });
     })
     .catch(() => {});
 }
 
 // Дата для census за точкою графіка динаміки (utils.js:loadChart-style
 // onDotClick у head-cabinet.js/doctor-cabinet.js) — рік='all' → x це рік
-// (31 грудня), інакше x це місяць (1-12) обраного року (останній день
-// місяця). Не пізніше сьогодні (майбутнього не буває).
-function censusDateFromChartPoint(year, x) {
+// (31 грудня); рік+місяць='all' → x це місяць (1-12) обраного року (останній
+// день місяця); рік+конкретний місяць (хвильовий денний графік) → x це день
+// того місяця. Не пізніше сьогодні (майбутнього не буває).
+function censusDateFromChartPoint(year, x, month) {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
   const target = (year === 'all')
     ? new Date(Number(x), 11, 31)
-    : new Date(Number(year), Number(x), 0); // day 0 наступного місяця = останній день x-го
+    : (month && month !== 'all')
+      ? new Date(Number(year), Number(month) - 1, Number(x))
+      : new Date(Number(year), Number(x), 0); // day 0 наступного місяця = останній день x-го
   const y = target.getFullYear();
   const m = String(target.getMonth() + 1).padStart(2, '0');
   const d = String(target.getDate()).padStart(2, '0');

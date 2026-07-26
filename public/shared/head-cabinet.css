@@ -46,4 +46,4 @@
 .doc-item:hover, .doc-item.doc-active {
   text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
 }
-.doc-item.doc-active { color: var(--c-accent-pink); }
+.doc-item.doc-active, .doc-item.hl { color: var(--c-accent-pink); }

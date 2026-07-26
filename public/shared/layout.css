@@ -84,6 +84,14 @@ html, body {
   fill: var(--c-accent-pink);
   opacity: 1;
 }
+/* Нижній сегмент стовпця — ургентні випадки (МКХ-класифікація,
+   lpz_is_urgent_icd), накладається на .bar-col знизу. Верхня, непокрита
+   частина .bar-col лишається кольором sage = планові. */
+.bar-col-urgent {
+  fill: var(--c-accent-red);
+  opacity: 0.85;
+  pointer-events: none;
+}
 .bar-val {
   fill: var(--c-ink-2);
   font-weight: 300;
@@ -94,7 +102,7 @@ html, body {
 .bar-val.active { font-size: 17px; fill: var(--c-accent-pink); }
 .bar-xlabel {
   fill: var(--c-taupe);
-  font-weight: 300;
+  font-weight: 600;
   font-size: 11px;
   text-anchor: middle;
   transition: font-size .15s ease, fill .15s ease;
@@ -531,7 +539,18 @@ html, body {
 .field-chart-1, .field-chart-2 {
   position: static; left: auto; /* скасовує .bar-chart{position:absolute;left:690px} — той призначений для окремого standalone-використання поза полями, тут потрібен normal flow */
   display: block;
-  margin-top: var(--field-pad);
+  margin-top: calc(var(--field-pad) - 10px); /* на 10px вище за стандартний відступ поля */
+  transition: width .4s ease;
+}
+/* Розтягування ТІЛЬКИ для денного (по днях місяця) вигляду — svg width="624"
+   (HTML-атрибут) лишається дефолтом для річної/місячної гістограми (як і
+   було), а .chart-daily (додає/знімає loadKpiChartBlock у utils.js) тягне
+   ширину на все поле (lf-right-top=1295px, ~1251px за вирахуванням
+   паддінгів). CSS width тут переважає над атрибутом (є viewBox +
+   preserveAspectRatio="none"), тож саме розтягування (той самий момент, що
+   й "виїзд" стовпців зліва направо) — просто плавний перехід width. */
+.field-chart-1.chart-daily, .field-chart-2.chart-daily {
+  width: 100%;
 }
 
 .field-me {
@@ -609,6 +628,7 @@ html, body {
   color: #6d93d8;
 }
 .census-repeat { color: #c0704a; }
+.census-hosp-count { color: var(--c-accent-red); font-weight: 500; }
 .census-list {
   position: absolute;
   left: var(--field-pad);
@@ -638,11 +658,11 @@ html, body {
 .census-row:hover .census-meta { color: #8aa8e0; }
 .census-info { display: flex; flex-direction: row; align-items: baseline; gap: 10px; min-width: 0; }
 .census-name {
-  font-size: 15px; color: var(--c-ink-3); white-space: nowrap; flex-shrink: 0;
+  font-size: 16.5px; color: var(--c-ink-3); white-space: nowrap; flex-shrink: 0;
   transition: color .2s ease;
 }
 .census-meta {
-  font-size: 13px; color: var(--c-taupe-light);
+  font-size: 14.3px; color: var(--c-taupe-light);
   flex: 1; min-width: 0;
   transition: color .2s ease;
 }
@@ -660,7 +680,7 @@ html, body {
 .census-bar i.census-today {
   background: var(--c-black);
 }
-.census-days { font-size: 13px; color: var(--c-accent-pink); }
+.census-days { font-size: 14.3px; color: var(--c-accent-pink); }
 .census-empty {
   position: absolute;
   left: var(--field-pad);
