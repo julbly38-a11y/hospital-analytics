@@ -20,3 +20,6 @@ scripts/.env
 .DS_Store
 tables_public.sql
 schema.sql
+
+# Claude Code local config
+.claude/

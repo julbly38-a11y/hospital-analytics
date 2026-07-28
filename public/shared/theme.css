@@ -1,0 +1,18 @@
+/* Спільна кольорова палітра для всіх лікарняних сторінок (kabinet, head-cabinet,
+   doctor-cabinet, khotyn_slide). Раніше кожна сторінка мала ці значення
+   захардкоджені окремо в своєму <style> — тепер єдине джерело правди. */
+:root {
+  --c-black: #000;
+  --c-ink-1: #1a1a1a;
+  --c-ink-2: #2a2a2a;
+  --c-ink-3: #3a3a3a;
+  --c-ink-4: #4a4a4a;
+  --c-sage: #5f6e5e;
+  --c-taupe: #8a857f;
+  --c-taupe-light: #9a958f;
+  --c-accent-berry: #9c5468;
+  --c-accent-pink: #b27c8b;
+  --c-accent-red: #c0392b;
+  --c-cream: #f0ece8;
+  --c-white: #fff;
+}
