@@ -595,8 +595,15 @@ function renderCensusSection(root, { showReset = false } = {}) {
   censusList.addEventListener('scroll', () => updateFadeMask(censusList, 'y'));
 }
 
+// Остання дата, з якою реально викликався loadCensus (null = дефолт,
+// останній наявний запис) — читається head-cabinet.js:selectDoctor, щоб клік
+// на лікаря в "Ординаторській" фільтрував патентів САМЕ на вже обрану дату
+// (клік на графік/точку), а не скидав її на дефолт.
+let lastCensusDate = null;
+
 function loadCensus(doctorId, options = {}) {
   const { date, flowMode = null } = options;
+  lastCensusDate = date || null;
   const emptyMessage = options.emptyMessage || (doctorId
     ? 'Немає даних про пацієнтів цього лікаря (покриття lpz_episodes на живих випадках неповне)'
     : 'Наразі нікого немає');
