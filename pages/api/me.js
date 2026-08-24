@@ -65,13 +65,20 @@ export default async function handler(req, res) {
     const { data: lpzEmpl } = await sbService
       .schema('lpz')
       .from('lpz_empl')
-      .select('resource_id, role, department_structure_id, org_edrpou')
+      .select('resource_id, role, department_structure_id, org_edrpou, last_name, first_name, middle_name, position_name')
       .ilike('email', user.email)
       .maybeSingle()
     if (lpzEmpl) {
       lpz_role = lpzEmpl.role
       lpz_resource_id = lpzEmpl.resource_id
       lpz_department_structure_id = lpzEmpl.department_structure_id
+      // full_name — той самий фолбек, що й org_edrpou нижче: без app_users
+      // ПІБ зі старої empl нема, .field-me-name (utils.js:renderFieldMe)
+      // падав аж до email.
+      if (!full_name) {
+        full_name = [lpzEmpl.last_name, lpzEmpl.first_name, lpzEmpl.middle_name].filter(Boolean).join(' ') || null
+      }
+      if (!position) position = lpzEmpl.position_name
       if (lpzEmpl.department_structure_id) {
         const { data: dept } = await sbService
           .schema('lpz')
@@ -82,7 +89,19 @@ export default async function handler(req, res) {
           .maybeSingle()
         lpz_department = dept?.name ? displayDeptName(dept.name) : null
       }
+      // .field-me-role (utils.js:renderFieldMe) — [position, department] —
+      // без app_users department теж нема зі старої empl, а lpz_department
+      // вище вже правильно порахований з того самого lpzEmpl.
+      if (!department) department = lpz_department
     }
+
+    // org_edrpou — старий ланцюжок (app_users.empl_name_id → empl.org_edrpou)
+    // не заповнений для співробітників, доданих лише через lpz-канон (немає
+    // запису в app_users) — entry.js/head-cabinet.js/doctor-cabinet.js
+    // читають саме org_edrpou для визначення лікарні, тож без фолбеку такий
+    // користувач після логіну бачив порожню сторінку, хоча lpz_role/
+    // lpz_department вище вже коректно визначені з того самого lpzEmpl.
+    if (!org_edrpou && lpzEmpl) org_edrpou = lpzEmpl.org_edrpou
 
     return res.status(200).json({
       role: appUser?.role || 'viewer',
