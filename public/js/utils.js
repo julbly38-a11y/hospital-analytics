@@ -868,6 +868,7 @@ function initHospitalName() {
       if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
       if (tagline) tagline.textContent = info.tagline || '';
       if (logo && info.logo_url) logo.src = info.logo_url;
+      if (info.display_name) document.title = info.display_name + ' — слайд';
       applyHospitalTheme(info.theme);
     })
     .catch(() => {});
