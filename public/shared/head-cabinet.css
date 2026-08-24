@@ -51,27 +51,32 @@
 /* Інлайн-розгортка пацієнтів лікаря (head-cabinet.js:openDoctorExpand) —
    вставляється ПІСЛЯ клікнутого .doc-item, ВСЕРЕДИНІ docsList (росте й
    скролиться разом зі списком, entry.js:dept-expand тут не підходить —
-   там нема внутрішнього скролу, є push work-band). .census-row базово
-   flex-row (layout.css, для широкого праворуч поля "Перебуває у
-   відділенні") — тут рядок пацієнта вужчий, тому ПІБ+дата/вік/стать/д.н.
-   (.census-info) лишається рядком, а під ним окремим рядком діагноз
-   (.doc-census-diag), тому сам .census-row тут — колонка. */
+   там нема внутрішнього скролу, є push work-band). Один рядок на пацієнта
+   (ПІБ+дата/вік/стать/д.н.+діагноз) — поле вужче за "Перебуває у
+   відділенні" праворуч, тому nowrap+горизонтальний скрол, той самий
+   патерн, що .hosp-history-row (layout.css). */
 .doc-expand {
   padding: 4px 0 10px;
   border-top: 1px solid rgba(0,0,0,0.06);
   text-align: right;
 }
 .doc-expand .census-row {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 10px;
   padding: 6px 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.doc-expand .census-row::-webkit-scrollbar { display: none; }
+.doc-expand .census-info { flex-shrink: 0; }
 .doc-expand .census-empty {
   position: static;
   padding: 6px 0;
 }
 .doc-census-diag {
+  flex-shrink: 0;
   font-size: 14.3px;
   color: var(--c-taupe-light);
 }

@@ -9,6 +9,19 @@
 // .field-chart-1. getCensusDoctorId — читає activeDoctorId В МОМЕНТ КЛІКА на
 // графік (не зараз), бо клік на лікаря в "Ординаторській" міняє його пізніше.
 function loadDeptBlock(org, deptId, year, month = 'all') {
+  // Кожна зміна року/місяця (пігулки) — це нова точка відліку: раніше
+  // обрана "точна дата" (якщо була) до неї вже не стосується, тож ховаємо
+  // "Перебуває у відділенні" знову (в обратному напрямку до появи по кліку
+  // на денну гістограму нижче) — без ручного "✕ скинути дату".
+  const titleEl = document.querySelector('.census-title');
+  const listEl = document.getElementById('censusList');
+  if (titleEl) titleEl.style.display = 'none';
+  if (listEl) { listEl.style.display = 'none'; listEl.innerHTML = ''; }
+  // lastCensusDate (utils.js) теж скидаємо — без неї selectDoctor нижче
+  // більше не відкриває розгортку пацієнтів лікаря (нема на яку дату).
+  lastCensusDate = null;
+  closeAllDoctorExpands();
+  activeDoctorId = null;
   loadKpiChartBlock('department', org, deptId, year, month, {
     rowId: 'deptKpiRow', chartId: 'deptChart',
     getCensusDoctorId: () => activeDoctorId,
@@ -45,9 +58,9 @@ let activeDoctorId = null;
 let deptPieApi = null;
 let doctorIcdBlocks = {};
 
-function renderStaffAndCensus(root) {
+function renderStaffAndCensus(root, deptName) {
   (root.querySelector('.lf-left-top') || root).insertAdjacentHTML('beforeend', `
-    <div class="docs-title">Ординаторська</div>
+    <div class="docs-title">${deptName ? deptName + ' · ' : ''}Ординаторська</div>
     <div class="docs-list" id="docsList"></div>
   `);
   // showReset:false — "Перебуває у відділенні" праворуч тепер НЕ реагує на
@@ -140,6 +153,10 @@ function closeAllDoctorExpands() {
 function openDoctorExpand(el) {
   const doctorId = el.dataset.doctor;
   closeAllDoctorExpands();
+  // Скидаємо замок/обертання донату (клік на пацієнта в "Перебуває у
+  // відділенні" міг лишити його на чужому сегменті) — ця розгортка не
+  // стосується жодного конкретного сегмента, стара підсвітка тут зайва.
+  if (deptPieApi) deptPieApi.unlock();
   const exp = document.createElement('div');
   exp.className = 'doc-expand';
   exp.innerHTML = `<div class="census-empty">Завантаження…</div>`;
@@ -163,12 +180,23 @@ function openDoctorExpand(el) {
             <div class="doc-census-diag">${r.icd_code ? r.icd_code + ' ' : ''}${r.diagnosis || '—'}</div>
           </div>`).join('')
         : `<div class="census-empty">Немає пацієнтів цього лікаря на цю дату</div>`;
-      updateFadeMask(document.getElementById('docsList'), 'y');
+      const docsList = document.getElementById('docsList');
+      updateFadeMask(docsList, 'y');
+      // Список скролиться так, щоб розгортка опинилась посередині видимої
+      // частини (не зверху/знизу поза кадром) — та сама функція, що вже
+      // центрує лікаря в ординаторській при кліку на пацієнта (utils.js).
+      // Після завантаження контенту (не одразу на "Завантаження…") — інакше
+      // висота для розрахунку центру ще неточна.
+      inertialScrollToCenter(docsList, exp);
     })
     .catch(() => { if (exp.isConnected) exp.innerHTML = `<div class="census-empty">Помилка завантаження</div>`; });
 }
 
 function selectDoctor(doctorId) {
+  // Без обраної точної дати (lastCensusDate, utils.js — те саме, що ховає
+  // "Перебуває у відділенні") нема на яку дату показувати "перебувають
+  // пацієнти лікаря" — клік на лікаря нічого не робить.
+  if (!lastCensusDate) return;
   activeDoctorId = (activeDoctorId === doctorId) ? null : doctorId;
   if (!activeDoctorId) { closeAllDoctorExpands(); return; }
   const el = document.querySelector(`.doc-item[data-doctor="${activeDoctorId}"]`);
@@ -184,7 +212,7 @@ function loadStaff(org, deptId) {
       docsList.innerHTML = data.rows.map(d => `
         <div class="doc-item" data-doctor="${d.resource_id}">
           ${d.full_name}
-          <span class="doc-position">${d.position_name || ''}</span>
+          <span class="doc-position">Ординатор</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';
       // Клік на лікаря → інлайн-розгортка пацієнтів прямо під ним
@@ -225,7 +253,7 @@ function initHeadCabinet() {
       (year, month) => loadDeptBlock(org, me.lpz_department_structure_id, year, month));
     renderFieldMe(root, me);
     renderDutyBand(root, org);
-    renderStaffAndCensus(root);
+    renderStaffAndCensus(root, me.lpz_department);
     loadStaff(org, me.lpz_department_structure_id);
     // loadCensus(null) на старті НЕ викликаємо — "Перебуває у відділенні"
     // з'являється лише по кліку на точний день (hideCensusUntilDaily вище).

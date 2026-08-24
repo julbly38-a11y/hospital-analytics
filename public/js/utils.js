@@ -540,6 +540,7 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
           date: censusDateFromChartPoint(year, r.x, daily ? month : null),
           ...(emptyMessage ? { emptyMessage } : {}),
           onRowClick,
+          hideCensusUntilDaily,
         });
         // Клік на стовпець денної гістограми — дописати обраний день до
         // назви місяця в .year-badge-month (той самий бейдж, що вже показує
@@ -647,15 +648,18 @@ function loadCensus(doctorId, options = {}) {
         // data.date — дата, яку РЕАЛЬНО використав сервер (явно передана або,
         // якщо не передавали, дата останнього наявного запису — не "сьогодні",
         // бо на реальне сьогодні даних може й не бути). "✕ ..." — лише коли
-        // caller сам явно обрав дату (клік на графік), щоб повернутись до
-        // дефолту (знову останній наявний запис, а не жорстко "сьогодні").
+        // caller сам явно обрав дату (клік на графік) І не hideCensusUntilDaily
+        // (head-cabinet.js): там дефолту "останній наявний запис" нема, поле
+        // просто зникає при зміні року/місяця (loadDeptBlock), скидати
+        // нема на що.
         const d = data.date ? new Date(data.date + 'T00:00:00') : new Date();
         const dayName = WEEKDAY_NAMES[d.getDay()];
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const label = `${dayName} ${dd}.${mm}.${d.getFullYear()}`;
-        whenEl.innerHTML = date ? `${label} · <span class="census-reset-date">✕ скинути дату</span>` : label;
-        if (date) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage, onRowClick: options.onRowClick }));
+        const showReset = date && !options.hideCensusUntilDaily;
+        whenEl.innerHTML = showReset ? `${label} · <span class="census-reset-date">✕ скинути дату</span>` : label;
+        if (showReset) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage, onRowClick: options.onRowClick }));
       }
 
       // "Перебуває у відділенні" — клік скидає flowMode (повний список),
@@ -664,7 +668,7 @@ function loadCensus(doctorId, options = {}) {
       const activeEl = document.getElementById('censusActive');
       if (activeEl) {
         activeEl.classList.toggle('active', !flowMode);
-        activeEl.onclick = () => loadCensus(doctorId, { date, emptyMessage, flowMode: null, onRowClick: options.onRowClick });
+        activeEl.onclick = () => loadCensus(doctorId, { date, emptyMessage, flowMode: null, onRowClick: options.onRowClick, hideCensusUntilDaily: options.hideCensusUntilDaily });
       }
 
       // "поступило: N" / "виписано: N" — клікабельні фільтри списку (як
@@ -679,7 +683,7 @@ function loadCensus(doctorId, options = {}) {
         flowEl.querySelectorAll('.census-flow-item').forEach(el => {
           el.onclick = () => {
             const mode = el.getAttribute('data-flow');
-            loadCensus(doctorId, { date, emptyMessage, flowMode: flowMode === mode ? null : mode, onRowClick: options.onRowClick });
+            loadCensus(doctorId, { date, emptyMessage, flowMode: flowMode === mode ? null : mode, onRowClick: options.onRowClick, hideCensusUntilDaily: options.hideCensusUntilDaily });
           };
         });
       }
@@ -728,7 +732,7 @@ function loadCensus(doctorId, options = {}) {
         const segs = Array.from({ length: segCount }, (_, i) =>
           i === todayIdx ? '<i class="census-today"></i>' : '<i></i>').join('');
         return `
-        <div class="census-row" data-doctor="${r.doc_resource_id || ''}" data-blok="${r.blok || ''}">
+        <div class="census-row" data-doctor="${r.doc_resource_id || ''}" data-blok="${r.blok || ''}" data-patient="${r.patient_id || ''}">
           <div class="census-info">
             <span class="census-name">${r.pib || '—'}</span>
             <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · поступив ${admStr} · ${diagStr}${hospCountStr}${repeatStr}</span>
@@ -775,9 +779,94 @@ function loadCensus(doctorId, options = {}) {
           row.addEventListener('click', () => options.onRowClick(rows[idx]));
         });
       }
+      // Клік на цифру повторних госпіталізацій (.census-hosp-count) → інлайн-
+      // розгортка ВСІЄЇ історії госпіталізацій пацієнта (по всій лікарні, не
+      // лише поточному відділенню) — той самий патерн, що dept-expand/
+      // doc-expand: вставляється ПІСЛЯ клікнутого рядка, росте всередині
+      // censusList (той і так скролиться). stopPropagation — інакше клік
+      // спливає до .census-row і зайво спрацьовує doctor-highlight/onRowClick.
+      censusList.querySelectorAll('.census-hosp-count').forEach(badge => {
+        badge.style.cursor = 'pointer';
+        badge.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleHospHistory(badge.closest('.census-row'));
+        });
+      });
     })
     .catch(() => {});
 }
+
+let expandedHospHistoryEl = null;
+
+function closeAllHospHistory() {
+  document.querySelectorAll('.hosp-history').forEach(e => e.remove());
+  expandedHospHistoryEl = null;
+}
+
+function toggleHospHistory(row) {
+  if (!row) return;
+  if (expandedHospHistoryEl === row) { closeAllHospHistory(); return; }
+  closeAllHospHistory();
+  // Скидаємо замок/обертання донату "Структура діагнозів" (head-cabinet.js) —
+  // стара підсвітка від попереднього кліку на пацієнта тут зайва. deptPieApi —
+  // головна сторінка-специфічна змінна (head-cabinet.js), на doctor-cabinet.html
+  // її взагалі нема, тому перевірка typeof, а не пряме звернення.
+  if (typeof deptPieApi !== 'undefined' && deptPieApi) deptPieApi.unlock();
+  const patientId = row.getAttribute('data-patient');
+  if (!patientId) return;
+  const exp = document.createElement('div');
+  exp.className = 'hosp-history';
+  exp.innerHTML = `<div class="census-empty">Завантаження…</div>`;
+  row.insertAdjacentElement('afterend', exp);
+  expandedHospHistoryEl = row;
+
+  fetch(`/api/lpz-patient-hospitalizations?patient=${encodeURIComponent(patientId)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data || !exp.isConnected) return;
+      exp.innerHTML = data.rows.length
+        ? data.rows.map(h => {
+            const adm = h.admission_date ? new Date(h.admission_date + 'T00:00:00') : null;
+            const dis = h.discharge_date ? new Date(h.discharge_date + 'T00:00:00') : null;
+            const fmt = d => d ? `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}` : '—';
+            return `
+              <div class="hosp-history-row">
+                <span class="hosp-history-dates">${fmt(adm)} — ${dis ? fmt(dis) : 'триває'}</span>
+                <span class="hosp-history-dept">${h.department_name || '—'}</span>
+                <span class="hosp-history-diag">${h.icd_code ? h.icd_code + ' ' : ''}${h.diagnosis || '—'}</span>
+              </div>`;
+          }).join('')
+        : `<div class="census-empty">Немає даних про госпіталізації</div>`;
+      // Список скролиться так, щоб розгортка опинилась посередині видимої
+      // частини — та сама функція, що вже центрує лікаря в ординаторській
+      // при кліку на пацієнта. Після завантаження, не одразу на
+      // "Завантаження…" — інакше висота для розрахунку центру неточна.
+      const censusList = document.getElementById('censusList');
+      if (censusList) inertialScrollToCenter(censusList, exp);
+    })
+    .catch(() => { if (exp.isConnected) exp.innerHTML = `<div class="census-empty">Помилка завантаження</div>`; });
+}
+
+// Клік БУДЬ-ДЕ інде — закриває всі відкриті розгортки (doc-expand,
+// head-cabinet.js; hosp-history, тут-таки). Винятки: сам тригер (.doc-item/
+// .census-hosp-count — ті керують власним toggle-станом самі, повторний
+// close тут лише завадив би відкриттю) і вміст уже відкритої розгортки
+// (щоб скрол/виділення тексту всередині не закривало її саму). closeAll-
+// DoctorExpands — функція лише з head-cabinet.js (нема на doctor-cabinet.html),
+// тому перевірка typeof, а не пряме звернення.
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.doc-expand, .hosp-history, .doc-item, .census-hosp-count')) return;
+  closeAllHospHistory();
+  if (typeof closeAllDoctorExpands === 'function') {
+    closeAllDoctorExpands();
+    // activeDoctorId (head-cabinet.js) — не скидається всередині
+    // closeAllDoctorExpands самої (openDoctorExpand кличе її ПЕРШОЮ, до
+    // встановлення нового activeDoctorId при перемиканні між лікарями,
+    // тож скидання там зітре щойно обране); тут це безпечно — сюди
+    // доходимо, лише коли клік дійсно "деінде", а не на тригері.
+    if (typeof activeDoctorId !== 'undefined') activeDoctorId = null;
+  }
+});
 
 // Дата для census за точкою графіка динаміки (utils.js:loadChart-style
 // onDotClick у head-cabinet.js/doctor-cabinet.js) — рік='all' → x це рік

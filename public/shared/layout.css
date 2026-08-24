@@ -629,6 +629,30 @@ html, body {
 }
 .census-repeat { color: #c0704a; }
 .census-hosp-count { color: var(--c-accent-red); font-weight: 500; }
+.census-hosp-count:hover { text-decoration: underline; }
+/* Історія госпіталізацій пацієнта (клік на .census-hosp-count, utils.js:
+   toggleHospHistory) — вставляється ПІСЛЯ клікнутого .census-row, росте
+   всередині .census-list (той і так скролиться, без push-механізму). */
+.hosp-history {
+  padding: 6px 0 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+.hosp-history-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hosp-history-row::-webkit-scrollbar { display: none; }
+.hosp-history-row:not(:first-child) { border-top: 1px dashed rgba(0,0,0,0.06); }
+.hosp-history-dates { color: var(--c-ink-3); font-weight: 400; flex-shrink: 0; }
+.hosp-history-dept { color: var(--c-accent-pink); flex-shrink: 0; }
+.hosp-history-diag { color: var(--c-taupe-light); }
+.hosp-history .census-empty { position: static; padding: 6px 0; }
 .census-list {
   position: absolute;
   left: var(--field-pad);
