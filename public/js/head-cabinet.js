@@ -13,6 +13,10 @@ function loadDeptBlock(org, deptId, year, month = 'all') {
     rowId: 'deptKpiRow', chartId: 'deptChart',
     getCensusDoctorId: () => activeDoctorId,
     onRowClick: onCensusRowClick,
+    // "Перебуває у відділенні" — порожнє поле, поки не обрано точний день
+    // (клік на денну гістограму); клік на стовпець року/місяця (синтетична
+    // дата — 31 грудня/останній день місяця) її не показує.
+    hideCensusUntilDaily: true,
   });
 }
 
@@ -50,6 +54,11 @@ function renderStaffAndCensus(root) {
   // клік на лікаря (той розгортається інлайн у самій Ординаторській), тож
   // "✕ скинути лікаря" в її заголовку більше нема чого скидати.
   renderCensusSection(root);
+  // Порожнє (display:none), поки не обрано точний день на денній гістограмі
+  // (loadKpiChartBlock:hideCensusUntilDaily, utils.js) — жодного дефолтного
+  // "останній наявний день" на старті сторінки.
+  root.querySelector('.census-title').style.display = 'none';
+  document.getElementById('censusList').style.display = 'none';
   // lf-left-bottom — донат "Структура діагнозів" (dept-pie.js), завжди
   // видимий, ніщо його більше не ховає.
   (root.querySelector('.lf-left-bottom') || root).insertAdjacentHTML('beforeend', `
@@ -218,7 +227,8 @@ function initHeadCabinet() {
     renderDutyBand(root, org);
     renderStaffAndCensus(root);
     loadStaff(org, me.lpz_department_structure_id);
-    loadCensus(null, { onRowClick: onCensusRowClick });
+    // loadCensus(null) на старті НЕ викликаємо — "Перебуває у відділенні"
+    // з'являється лише по кліку на точний день (hideCensusUntilDaily вище).
     loadDeptPie(org, me.lpz_department_structure_id);
     loadIcdByDoctor(org, me.lpz_department_structure_id);
 

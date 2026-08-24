@@ -488,7 +488,7 @@ function renderKpiChartBlock(root, rowId, chartId, level) {
 // його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
 // лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
 // не передається — census і так лише свій (сервер підставляє doctor сам).
-function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId, onRowClick } = {}) {
+function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId, onRowClick, hideCensusUntilDaily } = {}) {
   fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&${kind}=${encodeURIComponent(entityId)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => applyKpi6(document.getElementById(rowId), info))
@@ -524,6 +524,17 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
             monthPill.click();
             return;
           }
+        }
+        // hideCensusUntilDaily (head-cabinet.js) — "Перебуває у відділенні"
+        // з'являється лише по кліку на СПРАВЖНІЙ день (денна гістограма),
+        // не по кліку на стовпець року/місяця (там дата — синтетична
+        // 31 грудня/останній день місяця, не "точна дата", про яку йдеться).
+        if (hideCensusUntilDaily && !daily) return;
+        if (hideCensusUntilDaily) {
+          const titleEl = document.querySelector('.census-title');
+          const listEl = document.getElementById('censusList');
+          if (titleEl) titleEl.style.display = '';
+          if (listEl) listEl.style.display = '';
         }
         loadCensus(getCensusDoctorId ? getCensusDoctorId() : null, {
           date: censusDateFromChartPoint(year, r.x, daily ? month : null),
