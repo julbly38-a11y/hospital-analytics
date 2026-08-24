@@ -13,13 +13,14 @@ export default async function handler(req, res) {
   const org = String(req.query.org || '').trim()
   const department = String(req.query.department || '').trim()
   const year = String(req.query.year || 'all').trim().toLowerCase()
+  const month = String(req.query.month || 'all').trim().toLowerCase()
   if (!org) return res.status(400).json({ error: 'org (ЄДРПОУ) обовʼязковий' })
   if (!department) return res.status(400).json({ error: 'department обовʼязковий' })
 
   try {
     const { data, error } = await sb()
       .schema('lpz')
-      .rpc('lpz_department_expand', { p_org: org, p_department: department, p_year: year })
+      .rpc('lpz_department_expand', { p_org: org, p_department: department, p_year: year, p_month: month })
       .single()
 
     if (error) return res.status(500).json({ error: error.message })

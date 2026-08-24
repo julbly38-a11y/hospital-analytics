@@ -76,10 +76,12 @@ function renderDeptList(el, depts) {
   el.innerHTML = depts.map(d => `<div class="dept" data-dept="${d.name}" data-dept-id="${d.structure_id}">${d.name}</div>`).join('');
 }
 
-// Поточний обраний рік (для розгортки відділення) — той самий activeParam,
-// що в старому kabinet.html, тримаємо в модульній змінній, бо onYearChange
-// (utils.js:renderHeaderBlock) викликається асинхронно й поза цим файлом.
+// Поточний обраний рік+місяць (для розгортки відділення) — той самий
+// activeParam, що в старому kabinet.html, тримаємо в модульних змінних, бо
+// onYearChange/onMonthChange (utils.js:renderHeaderBlock) викликаються
+// асинхронно й поза цим файлом.
 let activeYear = 'all';
+let activeMonth = 'all';
 
 // Інлайн-розгортка під назвою відділення при кліку (будь-яке, не лише своє)
 // — завідувач + 4 показники. .work-band/.dept-list* тут — position:absolute
@@ -138,17 +140,33 @@ function openDeptExpand(root, org, el) {
   el.classList.add('dept-active');
   expandedDeptEl = el;
 
-  fetch(`/api/lpz-department-expand?org=${encodeURIComponent(org)}&department=${encodeURIComponent(deptId)}&year=${encodeURIComponent(activeYear)}`)
+  fetchDeptExpand(org, deptId).then(info => applyDeptExpandInfo(exp, info));
+}
+
+// Дані попапу — окремо від DOM-створення (openDeptExpand) і застосування
+// (applyDeptExpandInfo), бо refreshDeptExpand теж підвантажує ці дані, коли
+// міняється рік/місяць, а сам попап уже відкритий і DOM чіпати не треба.
+function fetchDeptExpand(org, deptId) {
+  return fetch(`/api/lpz-department-expand?org=${encodeURIComponent(org)}&department=${encodeURIComponent(deptId)}&year=${encodeURIComponent(activeYear)}&month=${encodeURIComponent(activeMonth)}`)
     .then(r => r.ok ? r.json() : null)
-    .then(info => {
-      if (!info || !exp.isConnected) return;
-      exp.querySelector('.de-chief').textContent = info.head_name || '—';
-      exp.querySelector('[data-f="cases"]').textContent = fmt(info.cases ?? 0);
-      exp.querySelector('[data-f="patients"]').textContent = fmt(info.unique_patients ?? 0);
-      exp.querySelector('[data-f="doctors"]').textContent = info.doctors ?? '—';
-      exp.querySelector('[data-f="beds"]').textContent = info.beds ?? '—';
-    })
-    .catch(() => {});
+    .catch(() => null);
+}
+function applyDeptExpandInfo(exp, info) {
+  if (!info || !exp.isConnected) return;
+  exp.querySelector('.de-chief').textContent = info.head_name || '—';
+  exp.querySelector('[data-f="cases"]').textContent = fmt(info.cases ?? 0);
+  exp.querySelector('[data-f="patients"]').textContent = fmt(info.unique_patients ?? 0);
+  exp.querySelector('[data-f="doctors"]').textContent = info.doctors ?? '—';
+  exp.querySelector('[data-f="beds"]').textContent = info.beds ?? '—';
+}
+// Викликається при зміні року/місяця у шапці — раніше попап лишався
+// "замороженим" на даних з моменту відкриття, тепер підтягує нові.
+function refreshDeptExpand(root, org) {
+  if (!expandedDeptEl) return;
+  const exp = root.querySelector('.dept-expand');
+  const deptId = expandedDeptEl.dataset.deptId;
+  if (!exp || !deptId) return;
+  fetchDeptExpand(org, deptId).then(info => applyDeptExpandInfo(exp, info));
 }
 function wireDeptExpand(root, org) {
   root.querySelectorAll('.dept[data-dept-id]').forEach(el => {
@@ -277,10 +295,14 @@ function renderGeneralLayer(root, org) {
   renderDirectionBlocks(root);
   renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
     activeYear = year;
+    activeMonth = 'all';
     loadDirectionBlocks(org, year);
+    refreshDeptExpand(root, org);
   }, true, (year, month) => {
     activeYear = year;
+    activeMonth = month;
     loadDirectionBlocks(org, year, month);
+    refreshDeptExpand(root, org);
   });
 
   // Смуга "Чергові лікарі" — utils.js:renderDutyBand (спільна з
