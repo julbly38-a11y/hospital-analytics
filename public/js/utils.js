@@ -488,7 +488,7 @@ function renderKpiChartBlock(root, rowId, chartId, level) {
 // його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
 // лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
 // не передається — census і так лише свій (сервер підставляє doctor сам).
-function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId } = {}) {
+function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId, onRowClick } = {}) {
   fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&${kind}=${encodeURIComponent(entityId)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => applyKpi6(document.getElementById(rowId), info))
@@ -528,6 +528,7 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
         loadCensus(getCensusDoctorId ? getCensusDoctorId() : null, {
           date: censusDateFromChartPoint(year, r.x, daily ? month : null),
           ...(emptyMessage ? { emptyMessage } : {}),
+          onRowClick,
         });
         // Клік на стовпець денної гістограми — дописати обраний день до
         // назви місяця в .year-badge-month (той самий бейдж, що вже показує
@@ -643,7 +644,7 @@ function loadCensus(doctorId, options = {}) {
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const label = `${dayName} ${dd}.${mm}.${d.getFullYear()}`;
         whenEl.innerHTML = date ? `${label} · <span class="census-reset-date">✕ скинути дату</span>` : label;
-        if (date) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage }));
+        if (date) whenEl.querySelector('.census-reset-date').addEventListener('click', () => loadCensus(doctorId, { emptyMessage, onRowClick: options.onRowClick }));
       }
 
       // "Перебуває у відділенні" — клік скидає flowMode (повний список),
@@ -652,7 +653,7 @@ function loadCensus(doctorId, options = {}) {
       const activeEl = document.getElementById('censusActive');
       if (activeEl) {
         activeEl.classList.toggle('active', !flowMode);
-        activeEl.onclick = () => loadCensus(doctorId, { date, emptyMessage, flowMode: null });
+        activeEl.onclick = () => loadCensus(doctorId, { date, emptyMessage, flowMode: null, onRowClick: options.onRowClick });
       }
 
       // "поступило: N" / "виписано: N" — клікабельні фільтри списку (як
@@ -667,7 +668,7 @@ function loadCensus(doctorId, options = {}) {
         flowEl.querySelectorAll('.census-flow-item').forEach(el => {
           el.onclick = () => {
             const mode = el.getAttribute('data-flow');
-            loadCensus(doctorId, { date, emptyMessage, flowMode: flowMode === mode ? null : mode });
+            loadCensus(doctorId, { date, emptyMessage, flowMode: flowMode === mode ? null : mode, onRowClick: options.onRowClick });
           };
         });
       }
@@ -716,7 +717,7 @@ function loadCensus(doctorId, options = {}) {
         const segs = Array.from({ length: segCount }, (_, i) =>
           i === todayIdx ? '<i class="census-today"></i>' : '<i></i>').join('');
         return `
-        <div class="census-row" data-doctor="${r.doc_resource_id || ''}">
+        <div class="census-row" data-doctor="${r.doc_resource_id || ''}" data-blok="${r.blok || ''}">
           <div class="census-info">
             <span class="census-name">${r.pib || '—'}</span>
             <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · поступив ${admStr} · ${diagStr}${hospCountStr}${repeatStr}</span>
@@ -753,6 +754,16 @@ function loadCensus(doctorId, options = {}) {
           });
         });
       });
+      // opts.onRowClick(row) — окремий (не doctor-highlight вище) гачок для
+      // сторінки: клік на пацієнта → зовнішня реакція (head-cabinet.js:
+      // підсвітити+повернути вгору відповідний сегмент донату "Структура
+      // діагнозів"). Усі рядки, не лише ті з data-doctor.
+      if (options.onRowClick) {
+        censusList.querySelectorAll('.census-row').forEach((row, idx) => {
+          row.style.cursor = 'pointer';
+          row.addEventListener('click', () => options.onRowClick(rows[idx]));
+        });
+      }
     })
     .catch(() => {});
 }

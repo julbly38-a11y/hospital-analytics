@@ -47,3 +47,47 @@
   text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
 }
 .doc-item.doc-active, .doc-item.hl { color: var(--c-accent-pink); }
+
+/* Інлайн-розгортка пацієнтів лікаря (head-cabinet.js:openDoctorExpand) —
+   вставляється ПІСЛЯ клікнутого .doc-item, ВСЕРЕДИНІ docsList (росте й
+   скролиться разом зі списком, entry.js:dept-expand тут не підходить —
+   там нема внутрішнього скролу, є push work-band). .census-row базово
+   flex-row (layout.css, для широкого праворуч поля "Перебуває у
+   відділенні") — тут рядок пацієнта вужчий, тому ПІБ+дата/вік/стать/д.н.
+   (.census-info) лишається рядком, а під ним окремим рядком діагноз
+   (.doc-census-diag), тому сам .census-row тут — колонка. */
+.doc-expand {
+  padding: 4px 0 10px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  text-align: right;
+}
+.doc-expand .census-row {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 6px 0;
+}
+.doc-expand .census-empty {
+  position: static;
+  padding: 6px 0;
+}
+.doc-census-diag {
+  font-size: 14.3px;
+  color: var(--c-taupe-light);
+}
+
+/* Донат "Структура діагнозів" (dept-pie.js:renderDeptPie, перенесено зі
+   старого проекту) — lf-left-bottom, той самий left/right/top:field-pad
+   патерн, що й .census-list вище; SVG має власний viewBox (560×490) —
+   width:100%/height:auto зберігає пропорції під вужче поле (545px), ніж
+   було в оригіналі (580px). Завжди видимий (не ховається кліком на
+   лікаря — той тепер розгортається інлайн у самій Ординаторській). */
+.dept-pie {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: var(--field-pad);
+  pointer-events: none;
+}
+.dept-pie svg { display: block; width: 100%; height: auto; }
+.dept-pie .dp-hit { pointer-events: stroke; }
