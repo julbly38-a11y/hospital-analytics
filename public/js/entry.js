@@ -19,16 +19,69 @@
 function renderDirectionBlocks(root) {
   (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>
-    <svg class="bar-chart field-chart-1" id="chartTherap" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
-      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
-    </svg>
+    <div class="chart-row-1">
+      <div class="side-stack" id="sideStackTherap"></div>
+      <svg class="bar-chart field-chart-1" id="chartTherap" viewBox="0 0 624 80" width="624" height="80" preserveAspectRatio="none">
+        <line class="bar-base" x1="0" x2="624" y1="62" y2="62"></line>
+      </svg>
+    </div>
   `);
   (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>
-    <svg class="bar-chart field-chart-2" id="chartSurg" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
-      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
-    </svg>
+    <div class="chart-row-2">
+      <div class="side-stack" id="sideStackSurg"></div>
+      <svg class="bar-chart field-chart-2" id="chartSurg" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
+        <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
+      </svg>
+    </div>
   `);
+
+  // ── Бічний стек праворуч від графіка (обидва напрямки, той самий патерн) —
+  // хвилястий графік ургентні/планові (lpz-trend-direction-kpi), рендер/кліки
+  // — спільні функції wave-chart.js. WAVE_DIRS — конфіг: направлення →
+  // {key стану, suffix DOM id}. ──
+  Object.values(WAVE_DIRS).forEach(({ key, suffix }) => {
+    renderWaveCard(document.getElementById('sideStack' + suffix), suffix);
+    wireWaveKpiClicks(document.getElementById('block' + suffix), WAVE_STATE[key].activeKpi, dk => {
+      WAVE_STATE[key].activeKpi = dk;
+      updateWaveChart(key);
+    });
+  });
+}
+
+// direction (як у /api) → {key стану WAVE_STATE, suffix DOM id (Therap/Surg)}.
+const WAVE_DIRS = {
+  'терапевтичний': { key: 'therap', suffix: 'Therap' },
+  'хірургічний':   { key: 'surg',   suffix: 'Surg' },
+};
+// Показник, який зараз малює хвиля (data-dk з КПІ_6: hosp/pat/bed/age/imp/
+// let), і закешовані дані останнього фетчу (усі 6 показників за раз —
+// перемикання кліком на плитку не вимагає повторного запиту). Окремий стан
+// на кожен напрямок (therap/surg) — незалежні хвилі, незалежний обраний КПІ.
+const WAVE_STATE = {
+  therap: { suffix: 'Therap', activeKpi: 'hosp', rows: [] },
+  surg:   { suffix: 'Surg',   activeKpi: 'hosp', rows: [] },
+};
+
+// updateWaveChart(key) — перемальовує хвилю напрямку key з уже закешованих
+// WAVE_STATE[key].rows (wave-chart.js:updateWaveCard), викликається і після
+// фетчу (loadDirectionBlocks), і по кліку на КПІ-плитку (без нового фетчу).
+function updateWaveChart(key) {
+  const state = WAVE_STATE[key];
+  updateWaveCard({
+    svg: document.getElementById('wave' + state.suffix),
+    xlabelsEl: document.getElementById('waveXlabels' + state.suffix),
+    barUrgentEl: document.getElementById('waveBarUrgent' + state.suffix),
+    barPlannedEl: document.getElementById('waveBarPlanned' + state.suffix),
+    tipUrgentEl: document.getElementById('waveTipUrgent' + state.suffix),
+    tipPlannedEl: document.getElementById('waveTipPlanned' + state.suffix),
+    rows: state.rows,
+    activeKpi: state.activeKpi,
+    activeYear, activeMonth,
+    // onDayClick не передаємо — entry.html не має "Перебуває у відділенні"
+    // (те поле лише на head-cabinet.html), клік на день тут просто нічого
+    // не робить (найдрібніший рівень, глибше дробити нема куди).
+  });
 }
 
 function loadDirectionBlocks(org, year, month = 'all') {
@@ -62,6 +115,19 @@ function loadDirectionBlocks(org, year, month = 'all') {
     if (tRows.length) renderBarChart(document.getElementById('chartTherap'), tRows, year, bounds);
     if (sRows.length) renderBarChart(document.getElementById('chartSurg'), sRows, year, bounds);
   }).catch(() => {});
+
+  // Хвилястий графік (обидва напрямки, sideStackTherap/sideStackSurg) — рік+
+  // конкретний місяць перемикає на щоденну деталізацію того місяця (той
+  // самий перехід, що в lpz_trend_by_department/head-cabinet.html).
+  Object.entries(WAVE_DIRS).forEach(([direction, { key }]) => {
+    fetch(`/api/lpz-trend-direction-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}&month=${encodeURIComponent(month)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        WAVE_STATE[key].rows = data?.rows || [];
+        updateWaveChart(key);
+      })
+      .catch(() => {});
+  });
 }
 
 // HOSPITAL_KPI/HOSPITAL_YEARS_BACK — utils.js (спільні з head-cabinet.js/
@@ -228,7 +294,7 @@ function fitDeptListHeights(root) {
   fitHeightTo(bottomList, offsetInSlide(root) + root.clientHeight);
 }
 
-function renderClinicalBlock(root, org, own) {
+function renderClinicalBlock(root, org, own, isOwner) {
   (root.querySelector('.lf-left-top') || root).insertAdjacentHTML('beforeend', '<div class="dept-list"></div>');
   (root.querySelector('.lf-left-bottom') || root).insertAdjacentHTML('beforeend', '<div class="dept-list2"></div>');
   // Списки мають динамічну висоту (fitDeptListHeights) і свій вертикальний
@@ -252,6 +318,7 @@ function renderClinicalBlock(root, org, own) {
       wireDeptHover(root);
       wireDeptExpand(root, org);
       markOwnDepartment(root, own);
+      if (isOwner) wireAdminDeptNav(root, org);
     })
     .catch(() => {});
 }
@@ -267,6 +334,23 @@ function markOwnDepartment(root, own) {
   if (!el) return;
   el.classList.add('own');
   el.addEventListener('click', () => { window.location.href = own.href; });
+}
+
+// Власник сайту (is_owner) не має свого lpz_department (не завідувач і не
+// лікар), тож markOwnDepartment вище для нього нічого не підсвічує — замість
+// одного "свого" відділення клік на БУДЬ-ЯКЕ веде у head-cabinet.html з
+// org/dept/deptName у URL. head-cabinet.js:initHeadCabinet приймає ці
+// параметри лише коли сесія підтверджує me.is_owner === true (сторінка й
+// далі не бере ідентичність з URL для звичайних завідувачів/лікарів).
+function wireAdminDeptNav(root, org) {
+  root.querySelectorAll('.dept[data-dept-id]').forEach(el => {
+    if (el._adminNavBound) return;
+    el._adminNavBound = true;
+    el.addEventListener('click', () => {
+      const params = new URLSearchParams({ org, dept: el.dataset.deptId, deptName: el.dataset.dept });
+      window.location.href = '/head-cabinet.html?' + params.toString();
+    });
+  });
 }
 
 // Джерело — lpz_empl через сесію (me.lpz_role/me.lpz_department з /api/me),
@@ -320,15 +404,31 @@ function renderGeneralLayer(root, org) {
 function initEntry() {
   fetch('/api/me').then(r => r.json()).then(me => {
     if (!me || !me.role) { window.location.href = '/layout.html'; return; }
-    const org = me.org_edrpou;
-    if (!org) return; // TODO: власник/адмін без empl_name_id — вибір лікарні ще не підключено
+    const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
+    if (!org) { renderOwnerOrgSwitch(); return; }
     window.HOSPITAL_ORG_EDRPOU = org;
     const root = document.getElementById('slideRoot');
     renderGeneralLayer(root, org);
-    renderClinicalBlock(root, org, buildOwnDeptLink(me));
+    renderClinicalBlock(root, org, buildOwnDeptLink(me), me.is_owner);
     renderFieldMe(root, me);
     applyMeProfile(me);
     initHospitalName();
+  });
+}
+
+// Власник сайту (is_owner, без empl_name_id) не прив'язаний до жодної
+// лікарні — той самий тимчасовий перемикач, що на layout.html
+// (#devOrgSwitch), лише тут веде на /entry.html?org=<val>, а не /layout.html.
+function renderOwnerOrgSwitch() {
+  document.body.insertAdjacentHTML('afterbegin', `
+    <select id="devOrgSwitch" style="position:fixed; top:8px; left:8px; z-index:9999; font-family:sans-serif; font-size:13px; padding:3px 6px;">
+      <option value="" disabled selected>Оберіть лікарню</option>
+      <option value="02005875">Хотинська</option>
+      <option value="43342788">ЛШМД</option>
+    </select>
+  `);
+  document.getElementById('devOrgSwitch').addEventListener('change', (e) => {
+    location.href = '/entry.html?org=' + e.target.value;
   });
 }
 

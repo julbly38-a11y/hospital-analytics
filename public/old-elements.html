@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Галерея елементів зі старих проєктів</title>
+<link rel="stylesheet" href="/shared/theme.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 24px 80px;
+    background: #f0ece8;
+    font-family: 'Palatino', 'Palatino Linotype', serif;
+    color: #3a3a3a;
+  }
+  h1 { font-weight: 300; font-size: 30px; margin: 0 0 6px; }
+  .intro { color: #8a857f; font-size: 14px; max-width: 900px; margin-bottom: 40px; line-height: 1.5; }
+  h2 {
+    font-weight: 300; font-size: 20px; margin: 56px 0 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 10px;
+  }
+  .h2-sub { color: #9a958f; font-size: 13px; margin: 0 0 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .card {
+    background: #fff; border-radius: 10px; padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .card h3 { font-size: 14px; font-weight: 500; margin: 0 0 2px; color: #1a1a1a; font-family: 'IBM Plex Sans', sans-serif; }
+  .card .src {
+    font-size: 10.5px; color: #9a958f; font-family: 'IBM Plex Mono', monospace;
+    margin: 0 0 14px;
+  }
+  .chart-box { min-height: 160px; display: flex; align-items: center; justify-content: center; overflow: auto; }
+  svg { max-width: 100%; }
+  iframe { width: 100%; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: #fff; }
+
+  /* spark-chart.js — адаптовано під тему qwerty (той самий патерн, що
+     .bar-col/.bar-base/.bar-val у layout.css): var(--c-sage)/var(--c-accent-pink)
+     замість захардкоджених hex зі старого репо (значення й так майже
+     збігались — це той самий дизайн, просто до переходу на CSS-змінні). */
+  .spark-line { fill: none; stroke: var(--c-sage); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .spark-base { stroke: var(--c-accent-pink); stroke-width: 1; opacity: 0.55; }
+  .spark-dot { fill: var(--c-accent-pink); stroke: var(--c-cream); stroke-width: 1.5; cursor: pointer; transition: r .15s ease; }
+  .spark-val { fill: var(--c-ink-2); font-family: 'ITFLight', 'Palatino', serif; font-size: 11px; text-anchor: middle; transition: font-size .15s ease, fill .15s ease; }
+  .spark-val.active { font-size: 15px; fill: var(--c-accent-pink); }
+  .spark-xlabel { fill: var(--c-taupe); font-family: 'ITFLight', 'Palatino', serif; font-size: 9.5px; text-anchor: middle; transition: font-size .15s ease, fill .15s ease; }
+  .spark-xlabel.active { font-size: 13px; fill: var(--c-accent-pink); }
+
+  /* dept-pie.js / neuro-cv-pie.js — pointer-events, з layout.css */
+  .dept-pie { pointer-events: none; }
+  .dept-pie .dp-hit, .dept-pie .dp-inner-hit { pointer-events: stroke; }
+
+  /* neuro-treemap.js — легенда (власний стиль, оригінал ніде не був підключений) */
+  .legend { list-style: none; margin: 10px 0 0; padding: 0; font-size: 11px; font-family: 'IBM Plex Mono', monospace; color: #666; }
+  .legend li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .legend .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .react-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; font-family: 'IBM Plex Sans', sans-serif; }
+  .react-card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+</style>
+</head>
+<body>
+
+<h1>Галерея елементів зі старих проєктів</h1>
+<p class="intro">
+  Усі готові діаграми/графіки/КПІ-компоненти, знайдені в старих репозиторіях
+  (<code>hospital-analytics</code> main, <code>lsmd</code>, <code>lsmd-design-system</code>),
+  зібрані на одній сторінці з тестовими даними — жодна з них зараз не використовується
+  в поточному проєкті qwerty (крім <code>dept-pie.js</code>, який уже активний на head-cabinet.html).
+</p>
+
+<h2>SVG-графіки (vanilla JS, <code>public/js/*.js</code>)</h2>
+<p class="h2-sub">Ті самі рушії, що вже є в репо (частина файлів уже лежала в <code>public/js/</code>, просто ніде не підключена)</p>
+<div class="grid">
+
+  <div class="card">
+    <h3>spark-chart.js</h3>
+    <p class="src">спарклайн-тренд · вже НЕ використовується в qwerty (замінено на bar-chart.js)</p>
+    <div class="chart-box"><svg id="sparkDemo" viewBox="0 0 560 160" width="100%"><path class="spark-line"/><line class="spark-base" x1="0" x2="560" y1="130" y2="130"/></svg></div>
+  </div>
+
+  <div class="card">
+    <h3>dept-pie.js</h3>
+    <p class="src">донат структури діагнозів · активний на head-cabinet.html</p>
+    <div class="chart-box"><div class="dept-pie" id="deptPieDemo" style="width:400px;height:350px;position:relative"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>doc-trend.js</h3>
+    <p class="src">хвиляста лінія тренду лікаря (Catmull-Rom) · орфан</p>
+    <div class="chart-box"><svg id="docTrendDemo" viewBox="0 0 700 160" width="100%"></svg></div>
+  </div>
+
+  <div class="card">
+    <h3>double-donut.js</h3>
+    <p class="src">подвійний донат терапевтичний/хірургічний напрямок + відділення · орфан</p>
+    <div class="chart-box"><div id="doubleDonutDemo" style="max-width:420px;margin:0 auto"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>neuro-cv-pie.js</h3>
+    <p class="src">ішемічний/геморагічний інсульт, подвійний донат · орфан (для неврології)</p>
+    <div class="chart-box"><div class="dept-pie" id="neuroCvPieDemo"></div></div>
+  </div>
+
+  <div class="card">
+    <h3>neuro-treemap.js</h3>
+    <p class="src">treemap груп МКХ (неврологія) · орфан</p>
+    <div class="chart-box" style="flex-direction:column;align-items:stretch">
+      <svg id="neuroTreemapDemo" viewBox="0 0 900 530" width="100%"></svg>
+      <ul id="neuroTreemapLegend" class="legend"></ul>
+    </div>
+  </div>
+
+</div>
+
+<h2>React + Recharts компоненти (<code>components/*.js</code>)</h2>
+<p class="h2-sub">Інший стек (React + Recharts, не SVG-руками) — з hospital-analytics main, живили старий Next.js-дашборд</p>
+<div id="reactRoot" class="react-grid"></div>
+
+<h2>Готовий прототип дашборду (<code>public/dashboard/</code>)</h2>
+<p class="h2-sub">Самодостатній React (CDN + Babel standalone) — маркетинг-сайт + повний дашборд із бічним меню, ~880 рядків</p>
+<iframe src="/dashboard/index.html" style="height:820px"></iframe>
+
+<h2>lsmd-design-system — прев'ю компонентів</h2>
+<p class="h2-sub">Легкі HTML/CSS-патерни (не рушії) з окремого репозиторію дизайн-системи</p>
+<div class="grid">
+  <div class="card"><h3>Stat grid</h3><p class="src">components-statgrid.html</p><iframe src="/design-preview/components-statgrid.html" style="height:140px"></iframe></div>
+  <div class="card"><h3>Table</h3><p class="src">components-table.html</p><iframe src="/design-preview/components-table.html" style="height:220px"></iframe></div>
+  <div class="card"><h3>Bubbles</h3><p class="src">components-bubbles.html</p><iframe src="/design-preview/components-bubbles.html" style="height:140px"></iframe></div>
+  <div class="card"><h3>Token badge</h3><p class="src">components-tokenbadge.html</p><iframe src="/design-preview/components-tokenbadge.html" style="height:140px"></iframe></div>
+</div>
+
+<script src="/js/spark-chart.js"></script>
+<script src="/js/dept-pie.js"></script>
+<script src="/js/doc-trend.js"></script>
+<script src="/js/double-donut.js"></script>
+<script src="/js/neuro-cv-pie.js"></script>
+<script src="/js/neuro-treemap.js"></script>
+<script>
+  // ── spark-chart ──
+  renderSpark(
+    document.getElementById('sparkDemo'),
+    [820,760,910,880,795,930,1010,960,870,905,840,770].map((y, i) => ({ x: i + 1, y })),
+    2026, null, null, { dotRadius: 5, dotRadiusHover: 8 }
+  );
+
+  // ── dept-pie ──
+  renderDeptPie(document.getElementById('deptPieDemo'), [
+    { назва: 'J18 Пневмонія', відс: 22, випадків: 410 },
+    { назва: 'I11 Гіпертензивна хвороба серця', відс: 18, випадків: 335 },
+    { назва: 'K74 Цироз печінки', відс: 14, випадків: 260 },
+    { назва: 'I25 Хронічна ішемічна хвороба серця', відс: 12, випадків: 225 },
+    { назва: 'E11 Цукровий діабет 2 типу', відс: 9, випадків: 168 },
+  ], { centerLabel: 'випадків' });
+
+  // ── doc-trend ──
+  (function () {
+    const cats = [1,2,3,4,5,6,7,8,9,10,11,12];
+    const labels = ['Січ','Лют','Бер','Кві','Тра','Чер','Лип','Сер','Вер','Жов','Лис','Гру'];
+    const vals = [12,15,9,18,21,17,14,19,16,13,11,20];
+    const rows = cats.map((m, i) => ({ місяць: m, випадків: vals[i] }));
+    renderDocTrend(document.getElementById('docTrendDemo'), rows, 'місяць', cats, labels, {});
+  })();
+
+  // ── double-donut ──
+  renderDoubleDonut('#doubleDonutDemo', {
+    grand: 11116, tTot: 4803, sTot: 6313,
+    therapeutic: [
+      { name: 'Терапевтичне №1', s: 'Т1', n: 1200, c: '#6FA8A0' },
+      { name: 'Гематологічне', s: 'Гем', n: 980, c: '#7fb5ad' },
+      { name: 'Гастроентерологічне', s: 'Гастро', n: 860, c: '#8fc2ba' },
+      { name: 'Центр неврології', s: 'Невро', n: 1063, c: '#9fcfc7' },
+      { name: 'Терапевтичне №2', s: 'Т2', n: 700, c: '#afdcd4' },
+    ],
+    surgical: [
+      { name: 'Хірургічне №1', s: 'Х1', n: 1200, c: '#B09090' },
+      { name: 'Хірургічне №2', s: 'Х2', n: 1100, c: '#bd9d9d' },
+      { name: 'Травматологія дорослі', s: 'Тр.д', n: 980, c: '#caaaaa' },
+      { name: 'Травматологія діти', s: 'Тр.д2', n: 850, c: '#d7b7b7' },
+      { name: 'Нейрохірургічне', s: 'Нейрох', n: 790, c: '#e4c4c4' },
+      { name: 'Урологічне', s: 'Урол', n: 720, c: '#f1d1d1' },
+      { name: 'Опікове', s: 'Опік', n: 673, c: '#fedede' },
+    ],
+  });
+
+  // ── neuro-cv-pie ──
+  renderNeuroCvPie('#neuroCvPieDemo', {
+    outerRows: [
+      { назва: 'Ішемічний інсульт', випадків: 620, g: 'i' },
+      { назва: 'ТІА', випадків: 140, g: 'i' },
+      { назва: 'Геморагічний інсульт', випадків: 210, g: 'h' },
+      { назва: 'Субарахноїдальний крововилив', випадків: 65, g: 'h' },
+    ],
+    innerRows: [
+      { назва: 'Ішемічний', випадків: 760, c: '#7fb5ad' },
+      { назва: 'Геморагічний', випадків: 275, c: '#c99' },
+    ],
+    centerLabel: 'випадків',
+  });
+
+  // ── neuro-treemap ──
+  renderNeuroTreemap('#neuroTreemapDemo', {
+    grand: 1035,
+    groups: [
+      { label: 'Ішемічний інсульт', n: 620, gc: '#6FA8A0', items: [
+        { code: 'I63.0', name: 'Тромбоз церебральних артерій', n: 280, c: '#8fc2ba' },
+        { code: 'I63.3', name: 'Інфаркт мозку', n: 220, c: '#9fcfc7' },
+        { code: 'I63.9', name: 'Неуточнений', n: 120, c: '#afdcd4' },
+      ]},
+      { label: 'Геморагічний інсульт', n: 275, gc: '#B09090', items: [
+        { code: 'I61.0', name: 'Внутрішньомозковий крововилив', n: 180, c: '#caa8a8' },
+        { code: 'I60.9', name: 'Субарахноїдальний', n: 95, c: '#d7b7b7' },
+      ]},
+      { label: 'ТІА', n: 140, gc: '#8a857f', items: [
+        { code: 'G45.9', name: 'Транзиторна ішемічна атака', n: 140, c: '#a89aa0' },
+      ]},
+    ],
+  }, { legendEl: '#neuroTreemapLegend' });
+</script>
+
+<!-- React + Recharts секція — той самий стек, що hospital-analytics/components/*.js -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/prop-types@15.8.1/prop-types.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script type="text/babel" data-presets="react">
+const { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } = Recharts;
+
+// ── shared.js (адаптовано, без ES-модулів) ──
+const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' };
+const MONO = { fontFamily: '"IBM Plex Mono", monospace' };
+function fmt(n, suffix = '') {
+  if (n == null || n === '') return '—';
+  const num = Number(n);
+  if (isNaN(num)) return String(n);
+  return num.toLocaleString('uk-UA') + suffix;
+}
+function initials(name = '') {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('');
+}
+const glass = {
+  background: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14,
+};
+
+// ── Stat.js ──
+function Stat({ value, label, large }) {
+  return (
+    <div>
+      <div style={{ fontSize: large ? 52 : 32, fontWeight: 300, color: '#1a1a1a', ...MONO, lineHeight: 1, letterSpacing: '-0.02em' }}>{value}</div>
+      {label && <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 6, ...MONO }}>{label}</div>}
+    </div>
+  );
+}
+
+// ── BlockStats.js ──
+function BlockStats({ stats, loading, color }) {
+  if (loading) return <div style={{ fontSize: 12, color: '#999', ...MONO }}>завантаження…</div>;
+  if (!stats) return null;
+  const items = [
+    { l: 'СЕРЕДНІЙ ВІК', v: stats.середній_вік },
+    { l: 'ЛІЖКО-ДЕНЬ', v: stats.ліжкодень },
+    { l: 'ПОВТОРНІ', v: fmt(stats.повторні) },
+    { l: 'З ПОКРАЩЕННЯМ', v: stats.випадків > 0 ? (Number(stats.поліпшення) / Number(stats.випадків) * 100).toFixed(1) + '%' : '—' },
+    { l: 'ЛЕТАЛЬНІСТЬ', v: stats.летальність + '%' },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+      {items.map((it, i) => (
+        <div key={i} style={{ flex: '1 1 80px', textAlign: 'center', padding: '8px 12px', borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+          <div style={{ fontSize: 22, fontWeight: 300, color: color || '#1a1a1a', ...MONO, lineHeight: 1 }}>{it.v ?? '—'}</div>
+          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 5, ...MONO }}>{it.l}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── SplitBar.js ──
+function SplitBar({ label, leftLabel, rightLabel, leftValue, rightValue, leftColor = '#6b8cba', rightColor = '#c4a882', isPercent = false, height = 10 }) {
+  const lv = Number(leftValue) || 0, rv = Number(rightValue) || 0, total = lv + rv;
+  const leftPct = isPercent ? lv : (total > 0 ? Math.round(lv / total * 100) : 0);
+  const rightPct = isPercent ? rv : 100 - leftPct;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      {label && <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8, ...MONO }}>{label}</div>}
+      <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', height }}>
+        <div style={{ width: leftPct + '%', background: leftColor, transition: 'width .5s ease' }} />
+        <div style={{ width: rightPct + '%', background: rightColor, transition: 'width .5s ease' }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: leftColor, flexShrink: 0 }} />
+          <span style={{ fontSize: 11, color: '#555', ...SANS }}>{leftLabel}</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', ...MONO }}>{leftPct}%</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: '#1a1a1a', ...MONO }}>{rightPct}%</span>
+          <span style={{ fontSize: 11, color: '#555', ...SANS }}>{rightLabel}</span>
+          <div style={{ width: 8, height: 8, borderRadius: 2, background: rightColor, flexShrink: 0 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DeptItem.js ──
+function DeptItem({ name, hovered, stats, onEnter, onLeave }) {
+  return (
+    <div onMouseEnter={onEnter} onMouseLeave={onLeave} style={{ borderRadius: 6, margin: '1px 8px', transition: 'background .15s', background: hovered ? 'rgba(0,0,0,0.04)' : 'transparent' }}>
+      <div style={{ padding: '5px 32px', fontSize: 14, color: hovered ? '#1a1a1a' : '#333', textAlign: 'right', cursor: 'default', ...SANS }}>{name}</div>
+      {hovered && (
+        <div style={{ padding: '8px 32px 10px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          {stats.head && <div style={{ fontSize: 12, color: '#555', textAlign: 'right', marginBottom: 10, ...SANS }}><span style={{ color: '#aaa', fontSize: 11 }}>Завідувач:&nbsp;</span>{stats.head}</div>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 0 }}>
+            {[
+              { v: fmt(stats.випадків), l: 'ВИПАДКІВ' },
+              { v: fmt(stats.унікальних), l: 'ПАЦІЄНТІВ' },
+              { v: fmt(stats.doctors), l: 'ЛІКАРІВ' },
+              { v: stats.beds ? fmt(stats.beds) : '—', l: 'ЛІЖОК' },
+            ].map((it, i) => (
+              <div key={i} style={{ textAlign: 'center', padding: '0 14px', borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.08)' : 'none' }}>
+                <div style={{ fontSize: 18, fontWeight: 300, color: '#1a1a1a', lineHeight: 1, ...MONO }}>{it.v}</div>
+                <div style={{ fontSize: 7, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4, ...MONO }}>{it.l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── MiniChart.js ──
+function MiniChart({ data, loading, color = '#8b8fa8', height = 90 }) {
+  if (loading) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: 10, ...MONO }}>завантаження…</div>;
+  if (!data?.length) return null;
+  const rows = data.map(r => ({ м: r.місяць, випадків: Number(r.випадків) || 0 }));
+  return (
+    <div style={{ marginTop: 10 }}>
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
+          <XAxis dataKey="м" tick={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fill: '#999' }} axisLine={false} tickLine={false} />
+          <YAxis hide />
+          <Tooltip contentStyle={{ background: 'rgba(255,255,255,0.95)', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 6, fontSize: 11, fontFamily: 'IBM Plex Mono' }} />
+          <Line type="monotone" dataKey="випадків" stroke={color} strokeWidth={2} dot={{ r: 3, fill: color, strokeWidth: 0 }} activeDot={{ r: 4 }} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── DeptPanel.js ──
+const PIE_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2'];
+function DeptPanel({ dept, deptProfile, deptHead, deptDocs, deptIcd, deptToday }) {
+  const headDoc = deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'));
+  const ordDocs = deptDocs.filter(d => !d.посада?.toLowerCase().includes('завідувач'));
+  const val = (v, suf = '') => fmt(v) + (fmt(v) !== '—' ? suf : '');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: '#1a1a1a', ...SANS }}>{dept}</div>
+      <div style={{ ...glass, padding: '16px 20px' }}>
+        <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>Показники відділення</div>
+        <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+          {[
+            { l: 'ВИПАДКІВ', v: val(deptProfile.випадків) },
+            { l: 'ПАЦІЄНТІВ', v: val(deptProfile.унікальних) },
+            { l: 'ЛЕТАЛЬНІСТЬ', v: val(deptProfile.летальність, '%') },
+            { l: 'ЛІЖОК', v: fmt(deptHead.beds) },
+          ].map((s, i) => (
+            <div key={i} style={{ flex: '1 1 80px', padding: '4px 14px', borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.07)' : 'none' }}>
+              <div style={{ fontSize: 22, fontWeight: 300, color: '#2563eb', ...MONO, lineHeight: 1 }}>{s.v}</div>
+              <div style={{ fontSize: 7, color: '#888', textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 4, ...MONO }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ background: 'rgba(26,39,68,0.85)', backdropFilter: 'blur(8px)', borderRadius: 14, padding: '14px 20px', color: '#fff', minWidth: 140 }}>
+          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.14em', ...MONO, marginBottom: 8 }}>Сьогодні</div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div><div style={{ fontSize: 26, fontWeight: 300, ...MONO }}>{deptToday.discharged}</div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginTop: 2, ...MONO }}>ВИПИСАНО</div></div>
+            <div style={{ fontSize: 20, color: 'rgba(255,255,255,0.2)', fontWeight: 200 }}>/</div>
+            <div><div style={{ fontSize: 26, fontWeight: 300, ...MONO }}>{deptToday.admitted}</div><div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginTop: 2, ...MONO }}>ПОСТУПИЛО</div></div>
+          </div>
+        </div>
+        <div style={{ ...glass, padding: '14px 18px', flex: '0 0 auto', minWidth: 160, maxHeight: 200, overflowY: 'auto' }}>
+          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 10 }}>Ординаторська</div>
+          {headDoc && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 600, color: '#fff', flexShrink: 0, ...MONO }}>{initials(headDoc.emp_name)}</div>
+              <div><div style={{ fontSize: 10, fontWeight: 500, color: '#1a1a1a', ...SANS }}>{headDoc.emp_name}</div><div style={{ fontSize: 8, color: '#2563eb', ...MONO }}>завідувач</div></div>
+            </div>
+          )}
+          {ordDocs.map((d, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, color: '#666', flexShrink: 0, ...MONO }}>{initials(d.emp_name)}</div>
+              <div style={{ fontSize: 10, color: '#333', ...SANS }}>{d.emp_name}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...glass, padding: '14px 18px', flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 10 }}>Топ МКХ-10</div>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <ResponsiveContainer width={100} height={100}>
+              <PieChart>
+                <Pie data={deptIcd} dataKey="випадків" innerRadius={28} outerRadius={46} paddingAngle={2}>
+                  {deptIcd.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Tooltip contentStyle={{ fontSize: 10, borderRadius: 6, border: 'none', background: 'rgba(26,26,26,0.9)', color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ flex: 1 }}>
+              {deptIcd.map((d, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
+                  <div style={{ fontSize: 10, color: '#333', flex: 1, ...SANS }}>{d.назва}</div>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: '#2563eb', ...MONO }}>{d.відс}%</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── DoctorPanel.js (спрощено — без вкладок, лише таблиця "Останні") ──
+const STATUS_COLORS = { 'Лікується': '#5ab0ff', 'З поліпшенням': '#7fd99a', 'Помер': '#e08080' };
+function StatusBadge({ status }) {
+  const c = STATUS_COLORS[status] || '#999';
+  return <span style={{ fontSize: 10, color: c, border: `1px solid ${c}55`, borderRadius: 999, padding: '1px 7px', whiteSpace: 'nowrap' }}>{status || '—'}</span>;
+}
+function DoctorPanel({ cabinet }) {
+  const { profile, summary, recent } = cabinet;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 13, fontWeight: 500, color: '#1a1a1a', ...SANS }}>
+        {profile.full_name}<span style={{ marginLeft: 10, fontSize: 10, color: '#888', fontWeight: 400, ...MONO }}>{profile.specialization}</span>
+      </div>
+      <div style={{ ...glass, padding: '16px 20px' }}>
+        <div style={{ fontSize: 8, color: '#888', textTransform: 'uppercase', letterSpacing: '0.12em', ...MONO, marginBottom: 12 }}>Моя статистика</div>
+        <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
+          {[{ l: 'ВИПАДКІВ', v: fmt(summary.всього) }, { l: 'АКТИВНИХ', v: fmt(summary.активних) }, { l: 'ЛЕТАЛЬНІСТЬ', v: fmt(summary.померло) }].map((s, i) => (
+            <div key={i} style={{ flex: '1 1 80px', padding: '4px 14px', borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.07)' : 'none' }}>
+              <div style={{ fontSize: 22, fontWeight: 300, color: '#2563eb', ...MONO, lineHeight: 1 }}>{s.v}</div>
+              <div style={{ fontSize: 7, color: '#888', textTransform: 'uppercase', letterSpacing: '0.09em', marginTop: 4, ...MONO }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+          <SplitBar label="Стать" leftLabel="Жінки" rightLabel="Чоловіки" leftValue={summary.жінки} rightValue={summary.чоловіки} leftColor="#c0392b" rightColor="#2563eb" />
+        </div>
+      </div>
+      <div style={{ ...glass, padding: 0, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead><tr style={{ borderBottom: '1px solid rgba(0,0,0,0.07)', background: 'rgba(255,255,255,0.4)' }}>{['№', 'Пацієнт', 'Дата', 'Статус'].map(h => <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 8, color: '#888', textTransform: 'uppercase', ...MONO, fontWeight: 400 }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {recent.map((r, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                <td style={{ padding: '7px 10px', color: '#999', ...MONO }}>{r.номер}</td>
+                <td style={{ padding: '7px 10px', ...SANS }}>{r.пацієнт}</td>
+                <td style={{ padding: '7px 10px', color: '#888', ...MONO }}>{r.дата}</td>
+                <td style={{ padding: '7px 10px' }}><StatusBadge status={r.статус} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── тестові дані й монтування ──
+function Gallery() {
+  return (
+    <>
+      <div className="react-card"><h3 style={{ fontSize: 13, marginBottom: 10 }}>Stat.js</h3><Stat value="11 116" label="Госпіталізацій" large /></div>
+      <div className="react-card"><h3 style={{ fontSize: 13, marginBottom: 10 }}>BlockStats.js</h3><BlockStats stats={{ середній_вік: 49.2, ліжкодень: 10.6, повторні: 214, поліпшення: 8123, випадків: 11116, летальність: 1.52 }} color="#2563eb" /></div>
+      <div className="react-card"><h3 style={{ fontSize: 13, marginBottom: 10 }}>SplitBar.js</h3><SplitBar label="Стать" leftLabel="Жінки" rightLabel="Чоловіки" leftValue={5820} rightValue={5296} leftColor="#c0392b" rightColor="#2563eb" /></div>
+      <div className="react-card"><h3 style={{ fontSize: 13, marginBottom: 10 }}>DeptItem.js <span style={{ fontWeight: 400, color: '#999' }}>(наведи курсор)</span></h3>
+        <DeptItemDemo />
+      </div>
+      <div className="react-card"><h3 style={{ fontSize: 13, marginBottom: 10 }}>MiniChart.js</h3><MiniChart data={[{ місяць: 'Січ', випадків: 82 }, { місяць: 'Лют', випадків: 76 }, { місяць: 'Бер', випадків: 91 }, { місяць: 'Кві', випадків: 88 }, { місяць: 'Тра', випадків: 79 }, { місяць: 'Чер', випадків: 93 }]} color="#7c3aed" /></div>
+      <div className="react-card" style={{ gridColumn: '1 / -1' }}><h3 style={{ fontSize: 13, marginBottom: 10 }}>DeptPanel.js</h3>
+        <DeptPanel
+          dept="Гастроентерологічне відділення"
+          deptProfile={{ випадків: 4803, унікальних: 4255, летальність: 0.75 }}
+          deptHead={{ beds: 40 }}
+          deptDocs={[{ emp_name: 'Ткачук О.М.', посада: 'завідувач' }, { emp_name: 'Бойко Л.В.', посада: 'ординатор' }, { emp_name: 'Семенюк П.І.', посада: 'ординатор' }]}
+          deptIcd={[{ назва: 'K74 Цироз печінки', відс: 28, випадків: 1345 }, { назва: 'K29 Гастрит', відс: 19, випадків: 913 }, { назва: 'K80 Жовчнокам\'яна хвороба', відс: 14, випадків: 672 }]}
+          deptToday={{ admitted: 6, discharged: 4 }}
+        />
+      </div>
+      <div className="react-card" style={{ gridColumn: '1 / -1' }}><h3 style={{ fontSize: 13, marginBottom: 10 }}>DoctorPanel.js</h3>
+        <DoctorPanel cabinet={{
+          profile: { full_name: 'Ткачук Олена Миколаївна', specialization: 'Гастроентеролог' },
+          summary: { всього: 214, активних: 12, померло: 2, жінки: 128, чоловіки: 86 },
+          recent: [
+            { номер: 1, пацієнт: 'Іваненко В.П.', дата: '24.08.2026', статус: 'Лікується' },
+            { номер: 2, пацієнт: 'Коваль С.М.', дата: '22.08.2026', статус: 'З поліпшенням' },
+            { номер: 3, пацієнт: 'Петренко А.О.', дата: '19.08.2026', статус: 'Лікується' },
+          ],
+        }} />
+      </div>
+    </>
+  );
+}
+
+function DeptItemDemo() {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <div style={{ border: '1px solid rgba(0,0,0,0.06)', borderRadius: 8, padding: '4px 0' }}>
+      <DeptItem
+        name="Гастроентерологічне відділення"
+        hovered={hovered}
+        onEnter={() => setHovered(true)}
+        onLeave={() => setHovered(false)}
+        stats={{ head: 'Ткачук О.М.', випадків: 4803, унікальних: 4255, doctors: 6, beds: 40 }}
+      />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('reactRoot')).render(<Gallery />);
+</script>
+
+</body>
+</html>

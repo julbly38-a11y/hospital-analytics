@@ -4,11 +4,20 @@
    власного, з сесії (/api/me), без ?dept= у URL (той самий принцип, що на
    entry.html: сторінка сама визначає себе). */
 
+// Компактна висота гістограми відділення (замість дефолтних 185px) —
+// вона тепер стоїть ПІД хвилею в тому самому тісному полі lf-right-top
+// (270px, там ще й КПІ-рядок): 185+хвиля туди не влазять, переповнюють
+// смугу "Чергові лікарі" знизу. doctor-cabinet.html далі використовує
+// дефолтні 185 (хвилі там нема, повний бюджет поля вільний).
+const DEPT_CHART_HEIGHT = 80;
+
 // КПІ+графік відділення — utils.js:renderKpiChartBlock/loadKpiChartBlock
 // (спільні з doctor-cabinet.js), позиція — layout.css:.field-kpi-1/
 // .field-chart-1. getCensusDoctorId — читає activeDoctorId В МОМЕНТ КЛІКА на
 // графік (не зараз), бо клік на лікаря в "Ординаторській" міняє його пізніше.
 function loadDeptBlock(org, deptId, year, month = 'all') {
+  activeYear = year;
+  activeMonth = month;
   // Кожна зміна року/місяця (пігулки) — це нова точка відліку: раніше
   // обрана "точна дата" (якщо була) до неї вже не стосується, тож ховаємо
   // "Перебуває у відділенні" знову (в обратному напрямку до появи по кліку
@@ -30,7 +39,84 @@ function loadDeptBlock(org, deptId, year, month = 'all') {
     // (клік на денну гістограму); клік на стовпець року/місяця (синтетична
     // дата — 31 грудня/останній день місяця) її не показує.
     hideCensusUntilDaily: true,
+    chartHeight: DEPT_CHART_HEIGHT,
   });
+  loadDeptWave(org, deptId, year, month);
+}
+
+// ── Хвилястий графік ургентні/планові (wave-chart.js, той самий стек, що
+// entry.html:.chart-row-1/.chart-row-2) — тут лише ОДНЕ відділення замість
+// двох напрямків, тому DEPT_WAVE_STATE без dict-обгортки. Поточний рік/
+// місяць (activeYear/activeMonth) — для перехресного посилання клік-на-
+// підпис-хвилі (wave-chart.js:wireWaveDateLabels), той самий принцип, що
+// entry.js. ──
+let activeYear = 'all';
+let activeMonth = 'all';
+const DEPT_WAVE_STATE = { activeKpi: 'hosp', rows: [] };
+
+// wireDeptWave() — викликається ОДИН РАЗ (initHeadCabinet), одразу після
+// renderKpiChartBlock: той вставляє #deptChart прямим нащадком .lf-right-top
+// (без обгортки), тут дообгортаємо його в .chart-row-dept (head-cabinet.css)
+// і додаємо side-stack ПЕРЕД ним (хвиля зверху, гістограма під нею) — той
+// самий DOM-патерн, що entry.js будує одразу в своєму innerHTML (тут
+// доводиться дообгорнути постфактум, бо #deptChart — спільна розмітка з
+// doctor-cabinet.html, яка хвилі не має).
+function wireDeptWave() {
+  const chartEl = document.getElementById('deptChart');
+  if (!chartEl || chartEl.closest('.chart-row-dept')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'chart-row-dept';
+  chartEl.parentNode.insertBefore(wrap, chartEl);
+  wrap.insertAdjacentHTML('beforeend', '<div class="side-stack" id="sideStackDept"></div>');
+  wrap.appendChild(chartEl); // після side-stack у DOM — гістограма нижче хвилі
+  renderWaveCard(document.getElementById('sideStackDept'), 'Dept');
+  wireWaveKpiClicks(document.getElementById('deptKpiRow'), DEPT_WAVE_STATE.activeKpi, dk => {
+    DEPT_WAVE_STATE.activeKpi = dk;
+    updateDeptWaveChart();
+  });
+}
+
+function updateDeptWaveChart() {
+  updateWaveCard({
+    svg: document.getElementById('waveDept'),
+    xlabelsEl: document.getElementById('waveXlabelsDept'),
+    barUrgentEl: document.getElementById('waveBarUrgentDept'),
+    barPlannedEl: document.getElementById('waveBarPlannedDept'),
+    tipUrgentEl: document.getElementById('waveTipUrgentDept'),
+    tipPlannedEl: document.getElementById('waveTipPlannedDept'),
+    rows: DEPT_WAVE_STATE.rows,
+    activeKpi: DEPT_WAVE_STATE.activeKpi,
+    activeYear, activeMonth,
+    onDayClick: onWaveDayClick,
+  });
+}
+
+// onWaveDayClick(day) — клік на підпис дня під хвилею (найдрібніший рівень,
+// wave-chart.js:wireWaveDateLabels) — той самий ефект, що клік на стовпець
+// денної гістограми (utils.js:loadKpiChartBlock:onPoint): показує
+// "Перебуває у відділенні" станом на цю дату.
+function onWaveDayClick(day) {
+  const titleEl = document.querySelector('.census-title');
+  const listEl = document.getElementById('censusList');
+  if (titleEl) titleEl.style.display = '';
+  if (listEl) listEl.style.display = '';
+  loadCensus(activeDoctorId, {
+    date: censusDateFromChartPoint(activeYear, day, activeMonth),
+    onRowClick: onCensusRowClick,
+    hideCensusUntilDaily: true,
+  });
+  const monthBadge = document.querySelector('.year-badge-month');
+  if (monthBadge) monthBadge.textContent = `${day} ${MONTH_PILL_NAMES[Number(activeMonth) - 1]}`;
+}
+
+function loadDeptWave(org, deptId, year, month) {
+  fetch(`/api/lpz-trend-department-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&department=${encodeURIComponent(deptId)}&month=${encodeURIComponent(month)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      DEPT_WAVE_STATE.rows = data?.rows || [];
+      updateDeptWaveChart();
+    })
+    .catch(() => {});
 }
 
 // Клік на пацієнта в "Перебуває у відділенні" (utils.js:loadCensus,
@@ -203,14 +289,14 @@ function selectDoctor(doctorId) {
   if (el) openDoctorExpand(el);
 }
 
-function loadStaff(org, deptId) {
+function loadStaff(org, deptId, isOwner, deptName) {
   fetch(`/api/lpz-department-staff?org=${encodeURIComponent(org)}&department=${encodeURIComponent(deptId)}`)
     .then(r => r.ok ? r.json() : null)
     .then(data => {
       const docsList = document.getElementById('docsList');
       if (!data || !docsList) return;
       docsList.innerHTML = data.rows.map(d => `
-        <div class="doc-item" data-doctor="${d.resource_id}">
+        <div class="doc-item" data-doctor="${d.resource_id}" data-doctor-name="${d.full_name}">
           ${d.full_name}
           <span class="doc-position">Ординатор</span>
         </div>
@@ -231,34 +317,64 @@ function loadStaff(org, deptId) {
         });
         el.addEventListener('mouseleave', () => { if (deptPieApi) deptPieApi.clearHighlight(); });
       });
+      if (isOwner) wireAdminDoctorNav(docsList, org, deptId, deptName);
       updateFadeMask(docsList, 'y');
     })
     .catch(() => {});
 }
 
+// Власник сайту (is_owner) — клік на лікаря в "Ординаторській" веде у його
+// doctor-cabinet.html (org/doctor/doctorName у URL), той самий принцип, що
+// entry.js:wireAdminDeptNav для відділень. Реєструється ПІСЛЯ selectDoctor
+// вище (той для адміна зазвичай no-op, бо lastCensusDate ще не обрана) —
+// навігація виграє. doctor-cabinet.js:initDoctorCabinet приймає ці
+// параметри лише коли сесія підтверджує me.is_owner === true.
+function wireAdminDoctorNav(docsList, org, deptId, deptName) {
+  docsList.querySelectorAll('.doc-item[data-doctor]').forEach(el => {
+    el.addEventListener('click', () => {
+      const params = new URLSearchParams({ org, dept: deptId, deptName: deptName || '', doctor: el.dataset.doctor, doctorName: el.dataset.doctorName || '' });
+      window.location.href = '/doctor-cabinet.html?' + params.toString();
+    });
+  });
+}
+
 function initHeadCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {
     if (!me || !me.role) { window.location.href = '/layout.html'; return; }
-    if (me.lpz_role !== 'head' || !me.lpz_department_structure_id) { window.location.href = '/entry.html'; return; }
-    const org = me.org_edrpou;
-    if (!org) return;
+
+    // Власник сайту (is_owner) — вхід у БУДЬ-ЯКЕ відділення з entry.js:
+    // wireAdminDeptNav передає org/dept/deptName у URL. Довіряємо цим
+    // параметрам ЛИШЕ коли сесія підтверджує me.is_owner === true (це
+    // серверне поле з /api/me, клієнт його підмінити не може) — для
+    // звичайного завідувача/лікаря is_owner завжди false, і сторінка й
+    // далі бере ідентичність тільки з сесії, як і раніше.
+    const params = new URLSearchParams(location.search)
+    const adminOverride = me.is_owner && params.get('org') && params.get('dept')
+    if (!adminOverride && (me.lpz_role !== 'head' || !me.lpz_department_structure_id)) { window.location.href = '/entry.html'; return; }
+
+    const org = adminOverride ? params.get('org') : me.org_edrpou;
+    const deptId = adminOverride ? params.get('dept') : me.lpz_department_structure_id;
+    const deptName = adminOverride ? (params.get('deptName') || '') : me.lpz_department;
+    if (!org || !deptId) return;
     window.HOSPITAL_ORG_EDRPOU = org;
+    window.HOSPITAL_DEPARTMENT_ID = deptId;
 
     const root = document.getElementById('slideRoot');
     renderBgLayers(root);
-    renderKpiChartBlock(root, 'deptKpiRow', 'deptChart', 'department');
+    renderKpiChartBlock(root, 'deptKpiRow', 'deptChart', 'department', DEPT_CHART_HEIGHT);
+    wireDeptWave();
     renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK,
-      (year) => loadDeptBlock(org, me.lpz_department_structure_id, year),
+      (year) => loadDeptBlock(org, deptId, year),
       true,
-      (year, month) => loadDeptBlock(org, me.lpz_department_structure_id, year, month));
+      (year, month) => loadDeptBlock(org, deptId, year, month));
     renderFieldMe(root, me);
     renderDutyBand(root, org);
-    renderStaffAndCensus(root, me.lpz_department);
-    loadStaff(org, me.lpz_department_structure_id);
+    renderStaffAndCensus(root, deptName);
+    loadStaff(org, deptId, me.is_owner, deptName);
     // loadCensus(null) на старті НЕ викликаємо — "Перебуває у відділенні"
     // з'являється лише по кліку на точний день (hideCensusUntilDaily вище).
-    loadDeptPie(org, me.lpz_department_structure_id);
-    loadIcdByDoctor(org, me.lpz_department_structure_id);
+    loadDeptPie(org, deptId);
+    loadIcdByDoctor(org, deptId);
 
     initHospitalName();
   });

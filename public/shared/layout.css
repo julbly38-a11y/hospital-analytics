@@ -529,6 +529,100 @@ html, body {
 .kpi-lvl-doctor .kpi-num  { font-size: 27.86px; } /* 29.33 × 0.95 — doctor-cabinet.html (лікар) */
 .kpi-lvl-doctor .kpi-label { font-size: 13.89px; }
 
+/* ── Хвилястий графік ургентні/планові (wave-chart.js) — бічний стек
+   праворуч від bar-chart (спільний з entry.html:.chart-row-1/.chart-row-2
+   і head-cabinet.html:.chart-row-dept). Поле (lf-right-top/lf-right-bottom)
+   ширше за сам bar-chart (624px), вільний простір праворуч — під стек
+   карток; сам bar-chart ховається (display:none в entry.css/head-cabinet
+   .chart-row-dept), лишається в DOM для легкого повернення. ── */
+.side-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: calc(var(--field-pad) - 10px);
+}
+.wave-card {
+  background: rgba(255,255,255,0.55);
+  border-radius: 10px;
+  padding: 6px 12px;
+}
+/* wave-chart-wrap — position:relative, щоб .wave-hover-bar/.wave-tip
+   (звичайний HTML, не SVG) могли позиціюватись у % / px відносно самого
+   контейнера, а не всередині координатної системи SVG (там
+   preserveAspectRatio="none" тягне 600×99 під реальні, набагато ширші
+   пропорції контейнера — будь-який елемент усередині SVG виглядав би
+   спотвореним по X). overflow:visible (за замовчуванням, але явно) —
+   стовпчик по наведенню (WAVE_MAX_BAR_H=92px) вищий за сам .wave-chart
+   (59px), навмисно "виростає" над хвилею, не має обрізатись. */
+.wave-chart-wrap { position: relative; overflow: visible; }
+.wave-chart { display: block; width: 100%; height: 59px; }
+.wave-line-urgent  { stroke: var(--c-accent-red); stroke-width: 1.6; }
+.wave-line-planned { stroke: var(--c-accent-blue); stroke-width: 1.6; }
+/* Стовпчик міні-гістограми по наведенню на дату (wave-chart.js:
+   wireWaveDateLabels) — росте від низу .wave-chart-wrap (де сидить підпис
+   дати, wave-xlabels) вгору: ургентний сегмент знизу, плановий — одразу
+   над ним (bottom = висота ургентного), той самий принцип "накладання", що
+   .bar-col-urgent поверх .bar-col у bar-chart.js. Напівпрозорість — сам
+   колір + opacity 0.55 (JS виставляє на hover), 0 — приховано. */
+.wave-hover-bar {
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .12s ease, height .12s ease, bottom .12s ease;
+  border-radius: 2px 2px 0 0;
+}
+.wave-hover-bar-urgent  { background: var(--c-accent-red); }
+.wave-hover-bar-planned { background: var(--c-accent-blue); }
+/* Число по наведенню на дату — два HTML-div (не SVG-текст, щоб не
+   розтягувався), кожне ВСЕРЕДИНІ свого сегмента стовпчика (по центру
+   висоти — translateY(50%) від bottom-точки, а не над нею), обидва разом
+   (не по черзі). Білий колір + тінь — читається на обох кольорах фону
+   (колір самого .wave-tip-* тепер лише для fallback/консистентності),
+   позиціюються в % по X / px по Y від низу (wave-chart.js:
+   wireWaveDateLabels), з'являються/зникають через opacity. */
+.wave-tip {
+  position: absolute;
+  transform: translate(-50%, 50%);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--c-white);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s ease, bottom .12s ease;
+}
+.wave-tip-urgent  { color: var(--c-white); }
+.wave-tip-planned { color: var(--c-white); }
+/* Номер періоду знизу (місяць/день) — той самий bar-chart.js:.bar-xlabel
+   патерн, звичайний flex-рядок під графіком (не SVG), завжди видимий. */
+.wave-xlabels { display: flex; margin-top: 2px; }
+.wave-xlabels span {
+  flex: 1;
+  text-align: center;
+  color: var(--c-taupe);
+  font-weight: 600;
+  font-size: 11px;
+}
+/* Перехресне посилання (wave-chart.js:wireWaveDateLabels) — підпис "рік"/
+   "місяць" клікабельний і перемикає весь блок на цей період (той самий
+   .bar-xlabel.active hover-акцент, що на bar-chart). "День" (найдрібніший
+   рівень) лишається без цього класу — не клікабельний. */
+.wave-xlabel-clickable { cursor: pointer; }
+.wave-xlabel-clickable:hover { color: var(--c-accent-pink); }
+/* КПІ-плитки блоку, до якого підключена хвиля (клас додає JS —
+   wireWaveKpiClicks), клікабельні — перемикають показник хвилі поруч,
+   .active підсвічує обрану. Не .kpi глобально — на doctor-cabinet.html
+   плитки й далі не клікабельні (хвилі там нема). */
+.wave-kpi-row .kpi { cursor: pointer; }
+.wave-kpi-row .kpi.active .kpi-num,
+.wave-kpi-row .kpi.active .kpi-label { color: var(--c-accent-pink); }
+
 /* Графік динаміки (12 місяців обраного року) — наступний normal-flow
    елемент одразу під КПІ-рядком, у тому самому полі lf-right-top. Клік на
    стовпець — census "станом на цю дату" (utils.js:loadCensus(..., {date})),
@@ -718,7 +812,9 @@ html, body {
    зсуваємо work-band/staff-fields (і dept-list2, якщо розгортка йде вгору)
    через CSS-змінну --push на висоту самої картки. */
 .dept-expand {
-  padding: 4px 0;
+  padding: 4px 8px;
+  margin: 0 -8px;
+  background: rgba(0,0,0,0.025);
   border-top: 1px solid rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
@@ -765,3 +861,106 @@ html, body {
 .work-band { transform: translateY(var(--band-shift, 0px)); }
 .staff-fields { transform: translateY(var(--band-shift, 0px)) translateZ(0); }
 .dept-list2 { transform: translateY(var(--list2-shift, 0px)); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   МОБІЛЬНА ВЕРСІЯ (2026-08-25) — той самий контент, стеково. Канва вище
+   1920×1080 з position:absolute-координатами тут скасовується цілком:
+   scale-slide.js нижче цієї ширини НЕ масштабує (див. js/scale-slide.js),
+   а кожен елемент переходить у звичайний document flow (position:static) —
+   порядок стеку визначається порядком вставки в DOM (той самий порядок,
+   що вже є: лого/назва → лікарняний КПІ-рядок → роки → поля розмітки →
+   смуга "Чергові лікарі"). Спершу перевірено на entry.html; head-cabinet.
+   html/doctor-cabinet.html ділять цю саму розмітку, тож мають отримати
+   стекову поведінку теж, але предметно (на реальному телефоні/емуляції)
+   ще не пройдені — можливі шорсткості в polish. ══════════════════════ */
+@media (max-width: 768px) {
+  html, body { height: auto; overflow-y: auto; overflow-x: hidden; }
+  .slide-wrapper { position: static; width: 100%; height: auto; }
+  /* display:flex — .layout-field (dept-list/КПІ-блоки) потрапляють у DOM
+     РАНІШЕ за шапку (лого/КПІ-рядок/роки), бо utils.js:renderLayoutFields()
+     викликається зі свого окремого DOMContentLoaded, який реєструється
+     першим (utils.js підключається в <head> раніше за entry.js/head-
+     cabinet.js/doctor-cabinet.js). У звичайному document flow це поставило
+     б списки/графіки ПЕРЕД шапкою — order нижче примусово задає бажаний
+     візуальний порядок незалежно від фактичного порядку вставки в DOM. */
+  .slide { width: 100%; height: auto; overflow: visible; display: flex; flex-direction: column; }
+  .logo       { order: 1; }
+  .name-block { order: 2; }
+  .kpi-row    { order: 3; }
+  .year-filter{ order: 4; }
+  .month-filter{ order: 5; }
+  .year-badge { order: 6; }
+  .lf-left-top    { order: 7; }
+  .lf-right-top   { order: 8; }
+  .lf-left-bottom { order: 9; }
+  .lf-right-bottom{ order: 10; }
+  .work-band  { order: 11; }
+  .staff-fields{ order: 12; }
+  .field-me   { order: 13; }
+
+  .logo, .name-block, .kpi-row, .year-filter, .month-filter, .year-badge,
+  .layout-field, .work-band, .staff-fields,
+  .dept-list, .dept-list2, .docs-list, .dept-pie,
+  .census-title, .census-list, .field-me,
+  .duty-docs, .me-logout, .wb-title, .wb-login, .wb-pass {
+    position: static !important;
+    left: auto !important; right: auto !important;
+    top: auto !important; bottom: auto !important;
+    transform: none !important;
+  }
+  .vline, .vline2, .hline, .hline2 { display: none !important; }
+
+  .logo { width: 90px; margin: 16px auto 4px; display: block; }
+  .name-block {
+    width: auto; height: auto;
+    align-items: center; text-align: center;
+    margin: 0 auto 18px;
+  }
+
+  .kpi-row {
+    width: 100% !important; height: auto !important;
+    flex-wrap: wrap; justify-content: center; gap: 16px 22px;
+    padding: 0 var(--field-pad); margin-bottom: 18px;
+  }
+  .kpi { flex: 0 0 auto; text-align: center; }
+
+  .year-filter {
+    width: 100%; flex-wrap: wrap; justify-content: center;
+    padding: 0 var(--field-pad); margin-bottom: 10px;
+  }
+  .month-filter.visible {
+    width: 100%; flex-wrap: wrap; justify-content: center;
+    padding: 0 var(--field-pad); margin-bottom: 10px;
+  }
+  .year-badge { width: 100%; margin-bottom: 18px; }
+
+  .layout-field {
+    width: 100% !important; height: auto !important;
+    background: none; padding: var(--field-pad) var(--field-pad) 0;
+    margin-bottom: 14px;
+  }
+  .field-kpi-1, .field-kpi-2 { flex-wrap: wrap; justify-content: center; gap: 14px 20px; }
+  .field-chart-1, .field-chart-2, .bar-chart {
+    width: 100% !important; height: auto !important; left: auto !important;
+  }
+
+  .dept-list, .dept-list2, .docs-list, .census-list {
+    height: auto !important; max-height: none !important; overflow-y: visible !important;
+  }
+
+  .work-band {
+    width: 100% !important; height: auto !important;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    padding: 12px var(--field-pad);
+    mask-image: none; -webkit-mask-image: none;
+  }
+  .me-logout, .wb-title { order: 1; }
+  .wb-login { order: 2; }
+  .wb-pass { order: 3; }
+  .duty-docs { flex: 1 1 100%; order: 4; }
+
+  .census-title { margin-bottom: 10px; }
+  .field-me { text-align: center; margin-top: 14px; }
+
+  .dept-expand, .doc-expand { margin: 0; }
+}

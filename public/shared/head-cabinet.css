@@ -5,6 +5,28 @@
    відділенні" (.census-*) перенесено в layout.css — спільне з
    doctor-cabinet.html. */
 
+/* Хвиля + гістограма відділення (wave-chart.js) — той самий патерн, що
+   entry.html:.chart-row-1/.chart-row-2 (layout.css:.side-stack/.wave-* —
+   спільна частина стилю), тут лише один блок (одне відділення) замість
+   двох напрямків. Колонка: хвиля зверху, під нею — гістограма
+   (bar-chart.js), яку раніше ховали — тепер знову видима. .field-chart-1 —
+   position:static (замість базового position:absolute у layout.css:
+   .bar-chart) — щоб бралася участь у звичайному flex-потоці колонки й
+   лягала точно під хвилею. */
+.chart-row-dept {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-row-dept .side-stack {
+  flex: none;
+  width: 100%;
+}
+.chart-row-dept .field-chart-1 {
+  position: static;
+  align-self: flex-start;
+}
+
 /* Ординаторська — ліва колонка (x=20..565), повністю вільна на цій сторінці
    (тут немає dept-list, як на entry.html). Висота списку — динамічна, до
    верху смуги "Чергові лікарі" (fitHeightTo, як dept-list на entry.html). */
@@ -56,7 +78,9 @@
    відділенні" праворуч, тому nowrap+горизонтальний скрол, той самий
    патерн, що .hosp-history-row (layout.css). */
 .doc-expand {
-  padding: 4px 0 10px;
+  padding: 4px 8px 10px;
+  margin: 0 -8px;
+  background: rgba(0,0,0,0.025);
   border-top: 1px solid rgba(0,0,0,0.06);
   text-align: right;
 }

@@ -462,12 +462,17 @@ const HOSPITAL_YEARS_BACK = 7;
 // .field-kpi-1 (kpi6RowHtml) + .field-chart-1 (12-місячна гістограма). level —
 // 'department'|'doctor', додає .kpi-lvl-<level> для ієрархії шрифтів
 // (layout.css: напрямок→відділення→лікар, кожен -5% від попереднього).
-function renderKpiChartBlock(root, rowId, chartId, level) {
+// chartHeight — за замовчуванням 185 (самостійна гістограма, doctor-
+// cabinet.html і head-cabinet.html БЕЗ хвилі); head-cabinet.js передає
+// менше значення, коли гістограма стоїть під хвилею в тісному полі
+// lf-right-top (270px, там ще й КПІ-рядок) — інакше не влазить.
+function renderKpiChartBlock(root, rowId, chartId, level, chartHeight = 185) {
   const field = root.querySelector('.lf-right-top');
+  const baseY = chartHeight - 18;
   (field || root).insertAdjacentHTML('beforeend', `
     <div class="kpi-row field-kpi-1 kpi-lvl-${level}" id="${rowId}">${kpi6RowHtml()}</div>
-    <svg class="bar-chart field-chart-1" id="${chartId}" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
-      <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
+    <svg class="bar-chart field-chart-1" id="${chartId}" viewBox="0 0 624 ${chartHeight}" width="624" height="${chartHeight}" preserveAspectRatio="none">
+      <line class="bar-base" x1="0" x2="624" y1="${baseY}" y2="${baseY}"></line>
     </svg>
   `);
 }
@@ -488,7 +493,7 @@ function renderKpiChartBlock(root, rowId, chartId, level) {
 // його треба читати В МОМЕНТ КЛІКА (activeDoctorId міняється кліком на
 // лікаря в "Ординаторській" вже ПІСЛЯ рендеру графіка); на doctor-cabinet.html
 // не передається — census і так лише свій (сервер підставляє doctor сам).
-function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId, onRowClick, hideCensusUntilDaily } = {}) {
+function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, emptyMessage, getCensusDoctorId, onRowClick, hideCensusUntilDaily, chartHeight = 185 } = {}) {
   fetch(`/api/lpz-kpi-${kind}?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&${kind}=${encodeURIComponent(entityId)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => applyKpi6(document.getElementById(rowId), info))
@@ -503,7 +508,14 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
     .then(data => {
       const rows = data?.rows || [];
       const chartEl = document.getElementById(chartId);
-      if (!rows.length || !chartEl) return;
+      if (!chartEl) return;
+      if (!rows.length) {
+        // Порожній результат (напр. немає випадків за обраний рік) —
+        // очистити графік до базової лінії, інакше лишаються стовпчики з
+        // ПОПЕРЕДНЬОГО вибору року/місяця (стара, вже нерелевантна картинка).
+        chartEl.innerHTML = `<line class="bar-base" x1="0" x2="624" y1="${chartHeight - 18}" y2="${chartHeight - 18}"></line>`;
+        return;
+      }
       const onPoint = (r) => {
         // Перехресне посилання: клік на стовпець МІСЯЦЯ (річна гістограма,
         // ще не daily) на head-cabinet.html має робити те саме, що клік на
@@ -568,7 +580,7 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
       const realWidth = daily
         ? BASE_LAYOUT_FIELDS.find(f => f.className === 'lf-right-top').width - 2 * FIELD_PAD
         : 624;
-      chartEl.setAttribute('viewBox', `0 0 ${realWidth} 185`);
+      chartEl.setAttribute('viewBox', `0 0 ${realWidth} ${chartHeight}`);
       // animate:true завжди (не лише daily) — перемикання років/місяців теж
       // має плавно змінювати висоту стовпців, не лише перехід на дні.
       // renderBarChart сам розрізняє: однакова кількість стовпців (рік↔рік)
@@ -623,6 +635,13 @@ function loadCensus(doctorId, options = {}) {
   const params = new URLSearchParams();
   if (doctorId) params.set('doctor', doctorId);
   if (date) params.set('date', date);
+  // org/department — для звичайного завідувача/лікаря сервер їх ігнорує
+  // (бере з сесії), але для власника сайту (is_owner) без власного
+  // lpz_empl-запису це єдиний спосіб дати серверу знати, яке відділення
+  // показувати (head-cabinet.js/doctor-cabinet.js виставляють ці глобали
+  // при вході в чужий кабінет через admin-override).
+  if (window.HOSPITAL_ORG_EDRPOU) params.set('org', window.HOSPITAL_ORG_EDRPOU);
+  if (window.HOSPITAL_DEPARTMENT_ID) params.set('department', window.HOSPITAL_DEPARTMENT_ID);
   const qs = params.toString();
   const url = `/api/lpz-department-census${qs ? '?' + qs : ''}`;
   fetch(url)

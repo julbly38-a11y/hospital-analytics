@@ -46,21 +46,38 @@ export default async function handler(req, res) {
       .ilike('email', user.email)
       .maybeSingle()
 
-    if (!lpzEmpl?.department_structure_id || (lpzEmpl.role !== 'head' && lpzEmpl.role !== 'doctor')) {
+    // Власник сайту (is_owner) не має власного lpz_empl-запису — для нього
+    // org/department прийшли б з клієнтського параметра, чого цей ендпоінт
+    // навмисно уникає для звичайних завідувачів/лікарів (див. коментар
+    // вище). Виняток — лише коли сесія підтверджує is_owner (app_users,
+    // серверне поле, клієнт підмінити не може), той самий принцип, що й у
+    // head-cabinet.js:initHeadCabinet на фронтенді.
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('is_owner')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+    const queryOrg = req.query.org ? String(req.query.org).trim() : null
+    const queryDept = req.query.department ? String(req.query.department).trim() : null
+    const adminOverride = appUser?.is_owner && queryOrg && queryDept
+
+    if (!adminOverride && (!lpzEmpl?.department_structure_id || (lpzEmpl.role !== 'head' && lpzEmpl.role !== 'doctor'))) {
       return res.status(403).json({ error: 'доступ лише для завідувача або лікаря відділення' })
     }
 
-    const doctor = lpzEmpl.role === 'doctor'
-      ? lpzEmpl.resource_id
-      : (req.query.doctor ? String(req.query.doctor).trim() : null)
+    const org = adminOverride ? queryOrg : lpzEmpl.org_edrpou
+    const department = adminOverride ? queryDept : lpzEmpl.department_structure_id
+    const doctor = adminOverride
+      ? (req.query.doctor ? String(req.query.doctor).trim() : null)
+      : (lpzEmpl.role === 'doctor' ? lpzEmpl.resource_id : (req.query.doctor ? String(req.query.doctor).trim() : null))
 
     const dateParam = req.query.date ? String(req.query.date).trim() : null
     let date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : undefined
 
     if (!date) {
       const { data: lastDate } = await sbService.schema('lpz').rpc('lpz_department_last_date', {
-        p_org: lpzEmpl.org_edrpou,
-        p_department: lpzEmpl.department_structure_id,
+        p_org: org,
+        p_department: department,
         p_doctor: doctor,
       })
       if (lastDate) date = lastDate
@@ -68,14 +85,14 @@ export default async function handler(req, res) {
 
     const [{ data, error }, { data: flowData, error: flowError }] = await Promise.all([
       sbService.schema('lpz').rpc('lpz_department_census', {
-        p_org: lpzEmpl.org_edrpou,
-        p_department: lpzEmpl.department_structure_id,
+        p_org: org,
+        p_department: department,
         p_doctor: doctor,
         ...(date ? { p_date: date } : {}),
       }),
       sbService.schema('lpz').rpc('lpz_department_flow', {
-        p_org: lpzEmpl.org_edrpou,
-        p_department: lpzEmpl.department_structure_id,
+        p_org: org,
+        p_department: department,
         ...(date ? { p_date: date } : {}),
       }).single(),
     ])

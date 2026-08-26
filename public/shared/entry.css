@@ -49,3 +49,30 @@
 .year-badge { animation-delay: 0.60s; }
 .dept-list2 { animation-delay: 0.70s; }
 .work-band  { animation-delay: 0.80s; }
+
+/* Хвилястий графік ургентні/планові — спільна частина (.side-stack/.wave-*)
+   перенесена в layout.css (2026-08-25, head-cabinet.html теж має цей стек
+   тепер). Тут лишається лише entry-специфічне: два ряди (терапевтичний/
+   хірургічний), на відміну від одного .chart-row-dept на head-cabinet.html
+   (layout.css).
+   Колонка (не ряд): хвиля зверху, під нею — та сама гістограма
+   (bar-chart.js), яку раніше ховали (display:none) — тепер знову видима.
+   .field-chart-1/2 — position:static (замість базового position:absolute
+   у layout.css:.bar-chart, розрахованого на самостійне розміщення) — щоб
+   бралася участь у звичайному flex-потоці колонки й лягала точно під
+   хвилею, а не поверх довільного місця сторінки. */
+.chart-row-1, .chart-row-2 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-row-1 .side-stack,
+.chart-row-2 .side-stack {
+  flex: none;
+  width: 100%;
+}
+.chart-row-1 .field-chart-1,
+.chart-row-2 .field-chart-2 {
+  position: static;
+  align-self: flex-start;
+}
