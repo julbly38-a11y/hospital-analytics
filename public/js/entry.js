@@ -1,0 +1,435 @@
+/* Перехідна сторінка після авторизації (public/entry.html) — два незалежні
+   шари в #slideRoot:
+   1. renderGeneralLayer   — логотип, назва, лінії, КПІ-рядок лікарні, роки, "Вийти"
+   2. renderClinicalBlock  — зліва два списки клінічних відділень (терапевтичний
+      зверху, хірургічний знизу, без підписів блоку)
+   Навмисно НЕ використовує page-shell.js (той — лише для неавторизованого
+   шару layout.html): тут інший стан — вже після входу,
+   форма логіну не потрібна, натомість "Вийти" + чергові лікарі.
+   Дані КПІ/відділень — org-scoped, org_edrpou береться з сесії (/api/me). */
+
+// ── КПІ по напрямках (терапевтичний/хірургічний), 6 показників —
+// utils.js:kpi6RowHtml/applyKpi6 (спільні з head-cabinet.js/doctor-cabinet.js),
+// позиція — layout.css:.field-kpi-1/.field-kpi-2 (та сама, що й на тих
+// сторінках). Дані — /api/lpz-kpi-direction. Графік динаміки під кожним
+// рядком (.field-chart-1/.field-chart-2, той самий .bar-chart-патерн, що на
+// head-cabinet.html/doctor-cabinet.html) — без click-фільтра (немає census
+// на entry.html) і зі спільною Y-шкалою між обома напрямками (loadDirectionBlocks),
+// щоб масштаби порівнювались візуально. ──
+function renderDirectionBlocks(root) {
+  (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend', `
+    <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>
+    <div class="chart-row-1">
+      <div class="side-stack" id="sideStackTherap"></div>
+      <svg class="bar-chart field-chart-1" id="chartTherap" viewBox="0 0 624 80" width="624" height="80" preserveAspectRatio="none">
+        <line class="bar-base" x1="0" x2="624" y1="62" y2="62"></line>
+      </svg>
+    </div>
+  `);
+  (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend', `
+    <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>
+    <div class="chart-row-2">
+      <div class="side-stack" id="sideStackSurg"></div>
+      <svg class="bar-chart field-chart-2" id="chartSurg" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
+        <line class="bar-base" x1="0" x2="624" y1="167" y2="167"></line>
+      </svg>
+    </div>
+  `);
+
+  // ── Бічний стек праворуч від графіка (обидва напрямки, той самий патерн) —
+  // хвилястий графік ургентні/планові (lpz-trend-direction-kpi), рендер/кліки
+  // — спільні функції wave-chart.js. WAVE_DIRS — конфіг: направлення →
+  // {key стану, suffix DOM id}. ──
+  Object.values(WAVE_DIRS).forEach(({ key, suffix }) => {
+    renderWaveCard(document.getElementById('sideStack' + suffix), suffix);
+    wireWaveKpiClicks(document.getElementById('block' + suffix), WAVE_STATE[key].activeKpi, dk => {
+      WAVE_STATE[key].activeKpi = dk;
+      updateWaveChart(key);
+    });
+  });
+}
+
+// direction (як у /api) → {key стану WAVE_STATE, suffix DOM id (Therap/Surg)}.
+const WAVE_DIRS = {
+  'терапевтичний': { key: 'therap', suffix: 'Therap' },
+  'хірургічний':   { key: 'surg',   suffix: 'Surg' },
+};
+// Показник, який зараз малює хвиля (data-dk з КПІ_6: hosp/pat/bed/age/imp/
+// let), і закешовані дані останнього фетчу (усі 6 показників за раз —
+// перемикання кліком на плитку не вимагає повторного запиту). Окремий стан
+// на кожен напрямок (therap/surg) — незалежні хвилі, незалежний обраний КПІ.
+const WAVE_STATE = {
+  therap: { suffix: 'Therap', activeKpi: 'hosp', rows: [] },
+  surg:   { suffix: 'Surg',   activeKpi: 'hosp', rows: [] },
+};
+
+// updateWaveChart(key) — перемальовує хвилю напрямку key з уже закешованих
+// WAVE_STATE[key].rows (wave-chart.js:updateWaveCard), викликається і після
+// фетчу (loadDirectionBlocks), і по кліку на КПІ-плитку (без нового фетчу).
+function updateWaveChart(key) {
+  const state = WAVE_STATE[key];
+  updateWaveCard({
+    svg: document.getElementById('wave' + state.suffix),
+    xlabelsEl: document.getElementById('waveXlabels' + state.suffix),
+    barUrgentEl: document.getElementById('waveBarUrgent' + state.suffix),
+    barPlannedEl: document.getElementById('waveBarPlanned' + state.suffix),
+    tipUrgentEl: document.getElementById('waveTipUrgent' + state.suffix),
+    tipPlannedEl: document.getElementById('waveTipPlanned' + state.suffix),
+    rows: state.rows,
+    activeKpi: state.activeKpi,
+    activeYear, activeMonth,
+    // onDayClick не передаємо — entry.html не має "Перебуває у відділенні"
+    // (те поле лише на head-cabinet.html), клік на день тут просто нічого
+    // не робить (найдрібніший рівень, глибше дробити нема куди).
+  });
+}
+
+function loadDirectionBlocks(org, year, month = 'all') {
+  const blockTherap = document.getElementById('blockTherap');
+  const blockSurg = document.getElementById('blockSurg');
+
+  ['терапевтичний', 'хірургічний'].forEach(direction => {
+    fetch(`/api/lpz-kpi-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}&direction=${encodeURIComponent(direction)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(info => applyKpi6(direction === 'терапевтичний' ? blockTherap : blockSurg, info))
+      .catch(() => {});
+  });
+
+  // Спільна шкала Y для обох графіків (як у старому проекті) — рахуємо, коли
+  // обидва тренди готові, а не окремо (інакше шкали "стрибають" одна проти
+  // одної). Графік — завжди по РОКУ (12 місяців), місяць його не звужує (та
+  // сама логіка, що й у loadKpiChartBlock: місяць впливає лише на КПІ-числа).
+  Promise.all(['терапевтичний', 'хірургічний'].map(direction =>
+    fetch(`/api/lpz-trend-direction?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}`)
+      .then(r => r.ok ? r.json() : null)
+  )).then(([tData, sData]) => {
+    const tRows = tData?.rows || [];
+    const sRows = sData?.rows || [];
+    if (!tRows.length && !sRows.length) return;
+    // 15% запасу над найвищим значенням з ОБОХ напрямків — той самий підхід,
+    // що й у bar-chart.js для окремого графіка без sharedBounds (нема
+    // підписаних рисок осі, тож не потрібне "кругле" округлення до тисяч).
+    const allVals = [...tRows, ...sRows].map(r => Number(r.y));
+    const niceMax = Math.max(Math.max(...allVals, 1) * 1.15, 1);
+    const bounds = { niceMax };
+    if (tRows.length) renderBarChart(document.getElementById('chartTherap'), tRows, year, bounds);
+    if (sRows.length) renderBarChart(document.getElementById('chartSurg'), sRows, year, bounds);
+  }).catch(() => {});
+
+  // Хвилястий графік (обидва напрямки, sideStackTherap/sideStackSurg) — рік+
+  // конкретний місяць перемикає на щоденну деталізацію того місяця (той
+  // самий перехід, що в lpz_trend_by_department/head-cabinet.html).
+  Object.entries(WAVE_DIRS).forEach(([direction, { key }]) => {
+    fetch(`/api/lpz-trend-direction-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&direction=${encodeURIComponent(direction)}&month=${encodeURIComponent(month)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        WAVE_STATE[key].rows = data?.rows || [];
+        updateWaveChart(key);
+      })
+      .catch(() => {});
+  });
+}
+
+// HOSPITAL_KPI/HOSPITAL_YEARS_BACK — utils.js (спільні з head-cabinet.js/
+// doctor-cabinet.js, раніше тут була окрема копія ENTRY_KPI/ENTRY_YEARS_BACK
+// з тим самим вмістом).
+
+// ── Шар "клінічний блок": два списки зліва (терапевтичний/хірургічний
+// напрямок), без підписів блоку. Дані — /api/lpz-departments, org-scoped.
+// data-dept — назва (для крос-підсвітки з duty-docs, той самий формат, що
+// й раніше), data-dept-id — uuid (для розгортки, openDeptExpand). ──
+function renderDeptList(el, depts) {
+  el.innerHTML = depts.map(d => `<div class="dept" data-dept="${d.name}" data-dept-id="${d.structure_id}">${d.name}</div>`).join('');
+}
+
+// Поточний обраний рік+місяць (для розгортки відділення) — той самий
+// activeParam, що в старому kabinet.html, тримаємо в модульних змінних, бо
+// onYearChange/onMonthChange (utils.js:renderHeaderBlock) викликаються
+// асинхронно й поза цим файлом.
+let activeYear = 'all';
+let activeMonth = 'all';
+
+// Інлайн-розгортка під назвою відділення при кліку (будь-яке, не лише своє)
+// — завідувач + 4 показники. .work-band/.dept-list* тут — position:absolute
+// з фіксованими top у px (не звичайний flow, як у старому kabinet.html),
+// тому "смуга Чергові лікарі" (work-band + staff-fields) позиціонується
+// ДИНАМІЧНО: якщо верхній список (dept-list) виріс настільки, що його
+// нижній край заліз би на смугу — смуга зсувається вниз рівно на величину
+// перекриття; а якщо через це смуга сама наїхала б на нижній список
+// (dept-list2) — той теж зсувається вниз на ту саму величину, щоб зазор
+// між смугою і списком не зникав. Розрахунок — по offsetTop/offsetHeight
+// (не залежать від transform:scale на .slide-wrapper), а не по фіксованих
+// px-константах, тому працює для будь-якої кількості відділень.
+let expandedDeptEl = null;
+// offsetInSlide — тепер спільна в utils.js (fitHeightTo теж на ній базується).
+function repositionMiddleBand(root) {
+  const workBand = root.querySelector('.work-band');
+  const topList = root.querySelector('.dept-list');
+  const bottomList = root.querySelector('.dept-list2');
+  if (!workBand || !topList) return;
+  const bandDefaultTop = offsetInSlide(workBand) - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--band-shift') || 0);
+  const topListBottom = offsetInSlide(topList) + topList.scrollHeight;
+  const bandShift = Math.max(0, topListBottom - bandDefaultTop);
+  document.documentElement.style.setProperty('--band-shift', bandShift + 'px');
+  if (bottomList) {
+    // якщо зсунута смуга тепер налазить на нижній список — тягнемо і його вниз
+    const bandBottom = bandDefaultTop + bandShift + workBand.offsetHeight;
+    const list2DefaultTop = offsetInSlide(bottomList) - parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--list2-shift') || 0);
+    const gap = 10;
+    const list2Shift = Math.max(0, bandBottom + gap - list2DefaultTop);
+    document.documentElement.style.setProperty('--list2-shift', list2Shift + 'px');
+  }
+}
+function closeAllDeptExpands(root) {
+  root.querySelectorAll('.dept-expand').forEach(e => e.remove());
+  document.documentElement.style.setProperty('--band-shift', '0px');
+  document.documentElement.style.setProperty('--list2-shift', '0px');
+  if (expandedDeptEl) expandedDeptEl.classList.remove('dept-active');
+  expandedDeptEl = null;
+}
+function openDeptExpand(root, org, el) {
+  const deptId = el.dataset.deptId;
+  if (!deptId) return;
+  closeAllDeptExpands(root);
+  const exp = document.createElement('div');
+  exp.className = 'dept-expand';
+  exp.innerHTML = `
+    <div class="de-head"><span class="de-label">Завідувач:</span> <span class="de-chief">…</span></div>
+    <div class="de-stats">
+      <div class="de-s"><div class="de-v" data-f="cases">…</div><div class="de-l">ВИПАДКІВ</div></div>
+      <div class="de-s"><div class="de-v" data-f="patients">…</div><div class="de-l">ПАЦІЄНТІВ</div></div>
+      <div class="de-s"><div class="de-v" data-f="doctors">…</div><div class="de-l">ЛІКАРІВ</div></div>
+      <div class="de-s"><div class="de-v" data-f="beds">…</div><div class="de-l">ЛІЖОК</div></div>
+    </div>`;
+  el.insertAdjacentElement('afterend', exp);
+  requestAnimationFrame(() => repositionMiddleBand(root));
+  el.classList.add('dept-active');
+  expandedDeptEl = el;
+
+  fetchDeptExpand(org, deptId).then(info => applyDeptExpandInfo(exp, info));
+}
+
+// Дані попапу — окремо від DOM-створення (openDeptExpand) і застосування
+// (applyDeptExpandInfo), бо refreshDeptExpand теж підвантажує ці дані, коли
+// міняється рік/місяць, а сам попап уже відкритий і DOM чіпати не треба.
+function fetchDeptExpand(org, deptId) {
+  return fetch(`/api/lpz-department-expand?org=${encodeURIComponent(org)}&department=${encodeURIComponent(deptId)}&year=${encodeURIComponent(activeYear)}&month=${encodeURIComponent(activeMonth)}`)
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+}
+function applyDeptExpandInfo(exp, info) {
+  if (!info || !exp.isConnected) return;
+  exp.querySelector('.de-chief').textContent = info.head_name || '—';
+  exp.querySelector('[data-f="cases"]').textContent = fmt(info.cases ?? 0);
+  exp.querySelector('[data-f="patients"]').textContent = fmt(info.unique_patients ?? 0);
+  exp.querySelector('[data-f="doctors"]').textContent = info.doctors ?? '—';
+  exp.querySelector('[data-f="beds"]').textContent = info.beds ?? '—';
+}
+// Викликається при зміні року/місяця у шапці — раніше попап лишався
+// "замороженим" на даних з моменту відкриття, тепер підтягує нові.
+function refreshDeptExpand(root, org) {
+  if (!expandedDeptEl) return;
+  const exp = root.querySelector('.dept-expand');
+  const deptId = expandedDeptEl.dataset.deptId;
+  if (!exp || !deptId) return;
+  fetchDeptExpand(org, deptId).then(info => applyDeptExpandInfo(exp, info));
+}
+function wireDeptExpand(root, org) {
+  root.querySelectorAll('.dept[data-dept-id]').forEach(el => {
+    if (el._expandBound) return;
+    el._expandBound = true;
+    el.addEventListener('click', () => {
+      if (expandedDeptEl === el) { closeAllDeptExpands(root); return; }
+      openDeptExpand(root, org, el);
+    });
+  });
+}
+
+// Перехресна підсвітка лікар↔відділення (як у старому кабінеті), але з живим
+// пошуком елементів у момент наведення — бо обидва списки (dept-list і
+// duty-docs) підвантажуються асинхронно в невідомому порядку, і кешувати
+// NodeList на момент виклику (як робить utils.js:initCrossHighlight) тут
+// не можна: список ще може бути порожній.
+function clearEntryHl(root) {
+  root.querySelectorAll('.hl').forEach(e => e.classList.remove('hl'));
+}
+function wireDeptHover(root) {
+  root.querySelectorAll('.dept[data-dept]').forEach(el => {
+    if (el._hlBound) return;
+    el._hlBound = true;
+    el.addEventListener('mouseenter', () => {
+      el.classList.add('hl');
+      root.querySelectorAll('.duty-docs span[data-home]').forEach(s => {
+        if (s.dataset.home === el.dataset.dept) s.classList.add('hl');
+      });
+    });
+    el.addEventListener('mouseleave', () => clearEntryHl(root));
+  });
+}
+function wireDutyHover(root) {
+  root.querySelectorAll('.duty-docs span[data-home]').forEach(el => {
+    if (el._hlBound) return;
+    el._hlBound = true;
+    el.addEventListener('mouseenter', () => {
+      el.classList.add('hl');
+      root.querySelectorAll('.dept[data-dept]').forEach(d => {
+        if (d.dataset.dept === el.dataset.home) d.classList.add('hl');
+      });
+    });
+    el.addEventListener('mouseleave', () => clearEntryHl(root));
+  });
+}
+
+// enableDragScroll/updateFadeMask/fitHeightTo — спільні для будь-якого списку
+// на будь-якій сторінці, живуть у utils.js (не дублюємо тут).
+// Висота списків — рахується з реальних offsetTop сусідніх елементів (верхній
+// обмежений початком смуги "Чергові лікарі", нижній — низом канви), а не
+// хардкодиться під конкретні px-значення з layout.css.
+function fitDeptListHeights(root) {
+  const topList = root.querySelector('.dept-list');
+  const bottomList = root.querySelector('.dept-list2');
+  const workBand = root.querySelector('.work-band');
+  if (!topList || !bottomList || !workBand) return;
+  fitHeightTo(topList, offsetInSlide(workBand));
+  fitHeightTo(bottomList, offsetInSlide(root) + root.clientHeight);
+}
+
+function renderClinicalBlock(root, org, own, isOwner) {
+  (root.querySelector('.lf-left-top') || root).insertAdjacentHTML('beforeend', '<div class="dept-list"></div>');
+  (root.querySelector('.lf-left-bottom') || root).insertAdjacentHTML('beforeend', '<div class="dept-list2"></div>');
+  // Списки мають динамічну висоту (fitDeptListHeights) і свій вертикальний
+  // скрол (замість зсуву смуги "Чергові лікарі") — той самий стиль/поведінка,
+  // що й у duty-docs: інерція, приховна смуга прокрутки, fade-маска на живих краях.
+  const topList = root.querySelector('.dept-list');
+  const bottomList = root.querySelector('.dept-list2');
+  fitDeptListHeights(root);
+  [topList, bottomList].forEach(list => {
+    enableDragScroll(list, 'y');
+    list.addEventListener('scroll', () => updateFadeMask(list, 'y'));
+  });
+  fetch(`/api/lpz-departments?org=${encodeURIComponent(org)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!data) return;
+      renderDeptList(topList, data.therapeutic || []);
+      renderDeptList(bottomList, data.surgical || []);
+      updateFadeMask(topList, 'y');
+      updateFadeMask(bottomList, 'y');
+      wireDeptHover(root);
+      wireDeptExpand(root, org);
+      markOwnDepartment(root, own);
+      if (isOwner) wireAdminDeptNav(root, org);
+    })
+    .catch(() => {});
+}
+
+// Власне відділення завідувача/лікаря — постійна підсвітка (клас .own, той
+// самий glow, що й .hl при hover — див. utils.js:injectDutyStyles) + клік на
+// весь рядок веде у відповідний кабінет (поки порожній, чекає на перебудову
+// під lpz-схему). own = { department, href } або null (немає клінічного
+// відділення чи роль не head_dept/doctor) — див. buildOwnDeptLink().
+function markOwnDepartment(root, own) {
+  if (!own) return;
+  const el = [...root.querySelectorAll('.dept[data-dept]')].find(d => d.dataset.dept === own.department);
+  if (!el) return;
+  el.classList.add('own');
+  el.addEventListener('click', () => { window.location.href = own.href; });
+}
+
+// Власник сайту (is_owner) не має свого lpz_department (не завідувач і не
+// лікар), тож markOwnDepartment вище для нього нічого не підсвічує — замість
+// одного "свого" відділення клік на БУДЬ-ЯКЕ веде у head-cabinet.html з
+// org/dept/deptName у URL. head-cabinet.js:initHeadCabinet приймає ці
+// параметри лише коли сесія підтверджує me.is_owner === true (сторінка й
+// далі не бере ідентичність з URL для звичайних завідувачів/лікарів).
+function wireAdminDeptNav(root, org) {
+  root.querySelectorAll('.dept[data-dept-id]').forEach(el => {
+    if (el._adminNavBound) return;
+    el._adminNavBound = true;
+    el.addEventListener('click', () => {
+      const params = new URLSearchParams({ org, dept: el.dataset.deptId, deptName: el.dataset.dept });
+      window.location.href = '/head-cabinet.html?' + params.toString();
+    });
+  });
+}
+
+// Джерело — lpz_empl через сесію (me.lpz_role/me.lpz_department з /api/me),
+// НЕ стара empl/app_users.role: та мала прогалини (напр. Семенюк не мав
+// head_dept, хоча в lpz-каноні тепер коректно head). Без ?dept=/?doc= у href —
+// head-cabinet.html/doctor-cabinet.html самі визначать себе з сесії (той
+// самий принцип, що й тут: сторінка не бере ідентичність з URL).
+function buildOwnDeptLink(me) {
+  if (!me.lpz_department) return null;
+  if (me.lpz_role === 'head') {
+    return { department: me.lpz_department, href: '/head-cabinet.html' };
+  }
+  if (me.lpz_role === 'doctor') {
+    return { department: me.lpz_department, href: '/doctor-cabinet.html' };
+  }
+  return null;
+}
+
+// ── Шар "перший шар": логотип, назва, лінії, КПІ-рядок лікарні, роки,
+// смуга "Чергові лікарі" + "Вийти". Спільна частина (логотип/лінії/KPI-рядок/
+// фільтр років) — utils.js:renderHeaderBlock(), як і на layout.html; тут
+// лишається лише mesh-фон і специфічний для entry.html підвал. ──
+function renderGeneralLayer(root, org) {
+  renderBgLayers(root);
+
+  renderDirectionBlocks(root);
+  renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
+    activeYear = year;
+    activeMonth = 'all';
+    loadDirectionBlocks(org, year);
+    refreshDeptExpand(root, org);
+  }, true, (year, month) => {
+    activeYear = year;
+    activeMonth = month;
+    loadDirectionBlocks(org, year, month);
+    refreshDeptExpand(root, org);
+  });
+
+  // Смуга "Чергові лікарі" — utils.js:renderDutyBand (спільна з
+  // head-cabinet.html/doctor-cabinet.html). Дані — ТЕСТОВИЙ РЕЖИМ (див.
+  // коментар у /api/lpz-duty-doctors): реального графіка чергувань ще
+  // немає, тимчасово по одному лікарю на відділення. onLoaded — тут-таки
+  // чіпляємо крос-підсвітку з dept-list (лише entry.html, бо тільки тут є
+  // список відділень поруч).
+  // .me-bar (utils.js:renderMeBar) тут навмисно не викликаємо — ПІБ/посада
+  // авторизованого показує renderFieldMe() в нижньому правому куті поля
+  // розмітки, дублювати той самий профіль ще раз вгорі не потрібно.
+  renderDutyBand(root, org, () => wireDutyHover(root));
+}
+
+function initEntry() {
+  fetch('/api/me').then(r => r.json()).then(me => {
+    if (!me || !me.role) { window.location.href = '/layout.html'; return; }
+    const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
+    if (!org) { renderOwnerOrgSwitch(); return; }
+    window.HOSPITAL_ORG_EDRPOU = org;
+    const root = document.getElementById('slideRoot');
+    renderGeneralLayer(root, org);
+    renderClinicalBlock(root, org, buildOwnDeptLink(me), me.is_owner);
+    renderFieldMe(root, me);
+    applyMeProfile(me);
+    initHospitalName();
+  });
+}
+
+// Власник сайту (is_owner, без empl_name_id) не прив'язаний до жодної
+// лікарні — той самий тимчасовий перемикач, що на layout.html
+// (#devOrgSwitch), лише тут веде на /entry.html?org=<val>, а не /layout.html.
+function renderOwnerOrgSwitch() {
+  document.body.insertAdjacentHTML('afterbegin', `
+    <select id="devOrgSwitch" style="position:fixed; top:8px; left:8px; z-index:9999; font-family:sans-serif; font-size:13px; padding:3px 6px;">
+      <option value="" disabled selected>Оберіть лікарню</option>
+      <option value="02005875">Хотинська</option>
+      <option value="43342788">ЛШМД</option>
+    </select>
+  `);
+  document.getElementById('devOrgSwitch').addEventListener('change', (e) => {
+    location.href = '/entry.html?org=' + e.target.value;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initEntry);

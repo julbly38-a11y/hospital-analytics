@@ -1,0 +1,122 @@
+/* Візуальні доповнення лише для head-cabinet.html (не чіпає layout.css,
+   спільний з entry.html) — КПІ ОДНОГО відділення (Етап 2 staged-плану)
+   рендериться через .field-kpi-1 (layout.css, спільний з entry.html/
+   doctor-cabinet.html), тут лишається решта: ординаторська. "Перебуває у
+   відділенні" (.census-*) перенесено в layout.css — спільне з
+   doctor-cabinet.html. */
+
+/* Хвиля + гістограма відділення (wave-chart.js) — той самий патерн, що
+   entry.html:.chart-row-1/.chart-row-2 (layout.css:.side-stack/.wave-* —
+   спільна частина стилю), тут лише один блок (одне відділення) замість
+   двох напрямків. Колонка: хвиля зверху, під нею — гістограма
+   (bar-chart.js), яку раніше ховали — тепер знову видима. .field-chart-1 —
+   position:static (замість базового position:absolute у layout.css:
+   .bar-chart) — щоб бралася участь у звичайному flex-потоці колонки й
+   лягала точно під хвилею. */
+.chart-row-dept {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-row-dept .side-stack {
+  flex: none;
+  width: 100%;
+}
+.chart-row-dept .field-chart-1 {
+  position: static;
+  align-self: flex-start;
+}
+
+/* Ординаторська — ліва колонка (x=20..565), повністю вільна на цій сторінці
+   (тут немає dept-list, як на entry.html). Висота списку — динамічна, до
+   верху смуги "Чергові лікарі" (fitHeightTo, як dept-list на entry.html). */
+.docs-title {
+  position: absolute;
+  font-weight: 300;
+  font-size: 16.2px; /* як .tagline (layout.css) — "турбуємось про найцінніше" під назвою лікарні */
+  letter-spacing: 0.5px;
+  color: var(--c-taupe-light);
+  text-transform: uppercase;
+  text-align: right;
+  left: var(--field-pad); right: var(--field-pad); top: var(--field-pad);
+}
+.docs-list {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: calc(var(--field-pad) + 30px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.docs-list::-webkit-scrollbar { display: none; }
+.doc-item {
+  padding: 7px 0;
+  text-align: right;
+  font-weight: 300;
+  font-size: 20px;
+  color: var(--c-ink-3);
+  cursor: pointer;
+  transition: text-shadow .2s ease, color .2s ease;
+}
+.doc-item .doc-position {
+  display: block;
+  font-size: 12px;
+  color: var(--c-taupe-light);
+  text-transform: uppercase;
+}
+.doc-item:hover, .doc-item.doc-active {
+  text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
+}
+.doc-item.doc-active, .doc-item.hl { color: var(--c-accent-pink); }
+
+/* Інлайн-розгортка пацієнтів лікаря (head-cabinet.js:openDoctorExpand) —
+   вставляється ПІСЛЯ клікнутого .doc-item, ВСЕРЕДИНІ docsList (росте й
+   скролиться разом зі списком, entry.js:dept-expand тут не підходить —
+   там нема внутрішнього скролу, є push work-band). Один рядок на пацієнта
+   (ПІБ+дата/вік/стать/д.н.+діагноз) — поле вужче за "Перебуває у
+   відділенні" праворуч, тому nowrap+горизонтальний скрол, той самий
+   патерн, що .hosp-history-row (layout.css). */
+.doc-expand {
+  padding: 4px 8px 10px;
+  margin: 0 -8px;
+  background: rgba(0,0,0,0.025);
+  border-top: 1px solid rgba(0,0,0,0.06);
+  text-align: right;
+}
+.doc-expand .census-row {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.doc-expand .census-row::-webkit-scrollbar { display: none; }
+.doc-expand .census-info { flex-shrink: 0; }
+.doc-expand .census-empty {
+  position: static;
+  padding: 6px 0;
+}
+.doc-census-diag {
+  flex-shrink: 0;
+  font-size: 14.3px;
+  color: var(--c-taupe-light);
+}
+
+/* Донат "Структура діагнозів" (dept-pie.js:renderDeptPie, перенесено зі
+   старого проекту) — lf-left-bottom, той самий left/right/top:field-pad
+   патерн, що й .census-list вище; SVG має власний viewBox (560×490) —
+   width:100%/height:auto зберігає пропорції під вужче поле (545px), ніж
+   було в оригіналі (580px). Завжди видимий (не ховається кліком на
+   лікаря — той тепер розгортається інлайн у самій Ординаторській). */
+.dept-pie {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: var(--field-pad);
+  pointer-events: none;
+}
+.dept-pie svg { display: block; width: 100%; height: auto; }
+.dept-pie .dp-hit { pointer-events: stroke; }

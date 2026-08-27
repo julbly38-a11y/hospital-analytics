@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 
-// Серверний логін для статичного слайда (public/khotyn_slide.html).
+// Серверний логін для статичного слайда (public/layout.html).
 // Приймає { email, password }, виконує Supabase signInWithPassword
 // і виставляє auth-cookie через @supabase/ssr, щоб middleware впізнав сесію.
 
