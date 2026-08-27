@@ -10,18 +10,85 @@
    клієнтського фільтра. Дані КПІ/графіка — /api/lpz-kpi-doctor,
    /api/lpz-trend-doctor (звʼязок лікар↔випадок через lpz_episodes, бо
    lpz_hospitalizations.doc_resource_id порожній; те саме обмеження покриття,
-   що й у "Перебуває у відділенні"). Решта чекає перебудови під lpz-схему
-   (див. коментар у doctor-cabinet.html). */
+   що й у "Перебуває у відділенні") + хвилястий графік ургентні/планові
+   (wave-chart.js, /api/lpz-trend-doctor-kpi — той самий звʼязок через
+   lpz_episodes, без daily-деталізації). Решта чекає перебудови під
+   lpz-схему (див. коментар у doctor-cabinet.html). */
+
+// Компактна висота гістограми лікаря (замість дефолтних 185px) — той самий
+// бюджет поля lf-right-top (270px), що на head-cabinet.html
+// (head-cabinet.js:DEPT_CHART_HEIGHT): тепер над гістограмою стоїть хвиля,
+// разом 185+хвиля туди не влазять.
+const DOCTOR_CHART_HEIGHT = 80;
 
 // КПІ+графік лікаря — utils.js:renderKpiChartBlock/loadKpiChartBlock
 // (спільні з head-cabinet.js). census не фільтрується (getCensusDoctorId не
 // передаємо) — /api/lpz-department-census сам підставляє doctor=свій
 // resource_id на сервері, лікар завжди бачить лише своїх пацієнтів.
+let activeYear = 'all';
+let activeMonth = 'all';
+
 function loadDoctorKpi(org, doctorId, year, month = 'all') {
+  activeYear = year;
+  activeMonth = month;
   loadKpiChartBlock('doctor', org, doctorId, year, month, {
     rowId: 'doctorKpiRow', chartId: 'doctorChart',
     emptyMessage: 'Наразі немає ваших пацієнтів у відділенні',
+    chartHeight: DOCTOR_CHART_HEIGHT,
   });
+  loadDoctorWave(org, doctorId, year);
+}
+
+// ── Хвилястий графік ургентні/планові (wave-chart.js, той самий стек, що
+// entry.html/head-cabinet.html) — тут лише ОДИН лікар, тому DOCTOR_WAVE_STATE
+// без dict-обгортки (той самий принцип, що head-cabinet.js:DEPT_WAVE_STATE).
+// onDayClick не передаємо — kind='doctor' у loadKpiChartBlock (utils.js)
+// ніколи не перемикає графік на щоденну деталізацію (лишається річним),
+// тож дробити на дні нема куди (той самий випадок, що entry.js). ──
+const DOCTOR_WAVE_STATE = { activeKpi: 'hosp', rows: [] };
+
+// wireDoctorWave() — викликається ОДИН РАЗ (initDoctorCabinet), одразу після
+// renderKpiChartBlock: той вставляє #doctorChart прямим нащадком
+// .lf-right-top, тут дообгортаємо його в .chart-row-dept (head-cabinet.css,
+// та сама розмітка — вже підключена через <link>) і додаємо side-stack
+// ПЕРЕД ним (хвиля зверху, гістограма під нею).
+function wireDoctorWave() {
+  const chartEl = document.getElementById('doctorChart');
+  if (!chartEl || chartEl.closest('.chart-row-dept')) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'chart-row-dept';
+  chartEl.parentNode.insertBefore(wrap, chartEl);
+  wrap.insertAdjacentHTML('beforeend', '<div class="side-stack" id="sideStackDoctor"></div>');
+  wrap.appendChild(chartEl);
+  renderWaveCard(document.getElementById('sideStackDoctor'), 'Doctor');
+  wireWaveKpiClicks(document.getElementById('doctorKpiRow'), DOCTOR_WAVE_STATE.activeKpi, dk => {
+    DOCTOR_WAVE_STATE.activeKpi = dk;
+    updateDoctorWaveChart();
+  });
+}
+
+function updateDoctorWaveChart() {
+  updateWaveCard({
+    svg: document.getElementById('waveDoctor'),
+    xlabelsEl: document.getElementById('waveXlabelsDoctor'),
+    barUrgentEl: document.getElementById('waveBarUrgentDoctor'),
+    barPlannedEl: document.getElementById('waveBarPlannedDoctor'),
+    tipUrgentEl: document.getElementById('waveTipUrgentDoctor'),
+    tipPlannedEl: document.getElementById('waveTipPlannedDoctor'),
+    rows: DOCTOR_WAVE_STATE.rows,
+    activeKpi: DOCTOR_WAVE_STATE.activeKpi,
+    activeYear, activeMonth,
+  });
+}
+
+function loadDoctorWave(org, doctorId, year) {
+  fetch(`/api/lpz-trend-doctor-kpi?org=${encodeURIComponent(org)}&year=${encodeURIComponent(year)}&doctor=${encodeURIComponent(doctorId)}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      DOCTOR_WAVE_STATE.rows = data?.rows || [];
+      updateDoctorWaveChart();
+    })
+    .catch(() => {});
 }
 
 // Ординаторська — та сама назва відділення + список колег, що на
@@ -99,7 +166,8 @@ function initDoctorCabinet() {
 
     const root = document.getElementById('slideRoot');
     renderBgLayers(root);
-    renderKpiChartBlock(root, 'doctorKpiRow', 'doctorChart', 'doctor');
+    renderKpiChartBlock(root, 'doctorKpiRow', 'doctorChart', 'doctor', DOCTOR_CHART_HEIGHT);
+    wireDoctorWave();
     renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
       loadDoctorKpi(org, doctorId, year);
     }, true, (year, month) => {

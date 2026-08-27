@@ -181,7 +181,18 @@ function wireWaveDateLabels({ xlabelsEl, urgentVals, plannedVals, barUrgentEl, b
 // кожного фетчу /api/lpz-trend-*-kpi і після кожного кліку на КПІ-плитку
 // (з уже закешованих rows, без повторного запиту).
 function updateWaveCard({ svg, xlabelsEl, barUrgentEl, barPlannedEl, tipUrgentEl, tipPlannedEl, rows, activeKpi, activeYear, activeMonth, onDayClick }) {
-  if (!svg || !rows || !rows.length) return;
+  if (!svg) return;
+  if (!rows || !rows.length) {
+    // Порожній результат (напр. немає госпіталізацій за обраний рік) —
+    // очистити лінії/підписи, інакше лишається хвиля з ПОПЕРЕДНЬОГО вибору
+    // року/місяця (стара, вже нерелевантна картинка) — той самий принцип,
+    // що utils.js:loadKpiChartBlock робить для звичайної гістограми.
+    svg.querySelectorAll('.wave-line-urgent, .wave-line-planned, .wave-area-urgent, .wave-area-planned')
+      .forEach(el => el.removeAttribute('d'));
+    if (xlabelsEl) xlabelsEl.innerHTML = '';
+    [barUrgentEl, barPlannedEl, tipUrgentEl, tipPlannedEl].forEach(el => { if (el) el.style.opacity = '0'; });
+    return;
+  }
   const urgentVals = rows.map(r => Number(r[activeKpi + '_urgent']) || 0);
   const plannedVals = rows.map(r => Number(r[activeKpi + '_planned']) || 0);
   // Підпис знизу — номер періоду (bar-chart.js:xLabel — той самий формат:
