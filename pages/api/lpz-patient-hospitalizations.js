@@ -8,6 +8,11 @@ import { createClient } from '@supabase/supabase-js'
 // в часі. Дозвіл — лише завідувач/лікар (як і /api/lpz-department-census),
 // org — виключно з сесії, patient — з клієнта (лише вибирає, ЯКОГО зі
 // своїх видимих пацієнтів показати, не інше org_edrpou).
+//
+// Власник сайту (is_owner) не має власного lpz_empl-запису (той самий
+// admin-override, що в /api/lpz-department-census) — без цього винятку
+// клік на повторні госпіталізації в чужому кабінеті завжди повертав 403
+// (лікар/завідувач шукався по email власника і не знаходився).
 export default async function handler(req, res) {
   try {
     const supabase = createServerClient(
@@ -40,12 +45,22 @@ export default async function handler(req, res) {
       .ilike('email', user.email)
       .maybeSingle()
 
-    if (!lpzEmpl || (lpzEmpl.role !== 'head' && lpzEmpl.role !== 'doctor')) {
+    const { data: appUser } = await supabase
+      .from('app_users')
+      .select('is_owner')
+      .eq('auth_user_id', user.id)
+      .maybeSingle()
+    const queryOrg = req.query.org ? String(req.query.org).trim() : null
+    const adminOverride = appUser?.is_owner && queryOrg
+
+    if (!adminOverride && (!lpzEmpl || (lpzEmpl.role !== 'head' && lpzEmpl.role !== 'doctor'))) {
       return res.status(403).json({ error: 'доступ лише для завідувача або лікаря відділення' })
     }
 
+    const org = adminOverride ? queryOrg : lpzEmpl.org_edrpou
+
     const { data, error } = await sbService.schema('lpz').rpc('lpz_patient_hospitalizations', {
-      p_org: lpzEmpl.org_edrpou,
+      p_org: org,
       p_patient: patient,
     })
 

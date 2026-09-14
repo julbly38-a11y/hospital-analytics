@@ -839,8 +839,13 @@ function toggleHospHistory(row) {
   row.insertAdjacentElement('afterend', exp);
   expandedHospHistoryEl = row;
 
-  fetch(`/api/lpz-patient-hospitalizations?patient=${encodeURIComponent(patientId)}`)
-    .then(r => r.ok ? r.json() : null)
+  // org — той самий admin-override параметр, що loadCensus вище передає в
+  // /api/lpz-department-census: без нього власник сайту (is_owner) у чужому
+  // кабінеті отримує 403 (немає власного lpz_empl-запису, сервер не знає,
+  // з якої лікарні брати пацієнта).
+  const orgParam = window.HOSPITAL_ORG_EDRPOU ? `&org=${encodeURIComponent(window.HOSPITAL_ORG_EDRPOU)}` : '';
+  fetch(`/api/lpz-patient-hospitalizations?patient=${encodeURIComponent(patientId)}${orgParam}`)
+    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
     .then(data => {
       if (!data || !exp.isConnected) return;
       exp.innerHTML = data.rows.length
