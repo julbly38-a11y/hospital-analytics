@@ -89,7 +89,7 @@ function renderBarChart(svg, rows, period, sharedBounds, onBarClick, opts) {
   // тендітну reuse/animate-логіку основного стовпця заради нього. При
   // переході місяць→день він просто "стрибне" на нову позицію одразу, а не
   // проїде плавно — прийнятний компроміс.
-  svg.querySelectorAll('.bar-col-urgent').forEach(e => e.remove());
+  svg.querySelectorAll('.bar-col-urgent, .bar-col-lost').forEach(e => e.remove());
   const oldBars    = animate ? allOldBars : [];
   const oldVals    = animate ? allOldVals : [];
   const oldXlabels = animate ? allOldXlabels : [];
@@ -228,6 +228,20 @@ function renderBarChart(svg, rows, period, sharedBounds, onBarClick, opts) {
       urgentBar.setAttribute('width', barW.toFixed(1));
       urgentBar.setAttribute('height', urgentH.toFixed(1));
       svg.appendChild(urgentBar);
+    }
+    // Другий нижній шар (фінансовий режим, utils.js:financeBarRows) —
+    // непоправимі епізоди поверх ургентного: знизу непоправимі, над ними
+    // решта y_urgent (поправимі), угорі sage — правильні.
+    if (r.y_lost != null && Number(r.y) > 0) {
+      const lostH = hgt * (Number(r.y_lost) / Number(r.y));
+      const lostBar = mkNS('rect');
+      lostBar.setAttribute('class', 'bar-col-lost');
+      lostBar.setAttribute('rx', '3');
+      lostBar.setAttribute('x', finalBarX);
+      lostBar.setAttribute('y', (zeroY - lostH).toFixed(1));
+      lostBar.setAttribute('width', barW.toFixed(1));
+      lostBar.setAttribute('height', lostH.toFixed(1));
+      svg.appendChild(lostBar);
     }
   });
 

@@ -92,6 +92,14 @@ html, body {
   opacity: 0.85;
   pointer-events: none;
 }
+/* Фінансовий режим (.fin-chart): знизу непоправимі (.bar-col-lost, червоний),
+   над ними поправимі (.bar-col-urgent, бурштиновий), угорі — правильні. */
+.bar-col-lost {
+  fill: var(--c-accent-red);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.bar-chart.fin-chart .bar-col-urgent { fill: var(--c-accent-amber); }
 .bar-val {
   fill: var(--c-ink-2);
   font-weight: 300;
@@ -122,6 +130,9 @@ html, body {
   animation: fadein 0.9s ease forwards,
              logopulse 5s ease-in-out 1.5s infinite;
 }
+/* Емблема — перемикач фінансового режиму (utils.js:wireFinanceEmblem). */
+.logo.logo-toggle { cursor: pointer; }
+.logo.fin-active { filter: drop-shadow(0 0 10px rgba(156, 84, 104, 0.6)) drop-shadow(0 0 24px rgba(156, 84, 104, 0.35)); }
 
 .name-block {
   position: absolute;

@@ -28,7 +28,43 @@ const DOCTOR_CHART_HEIGHT = 80;
 let activeYear = 'all';
 let activeMonth = 'all';
 
+// ── Фінансовий режим (клік на емблему, utils.js:isFinanceMode) — той самий
+// принцип, що head-cabinet.js: КПІ-ряд, хвиля й гістограма — контроль
+// записів лікаря за період; праве нижнє поле — його епізоди з зауваженнями й
+// підказками (quality-notes.js). Лікар бачить кількість, власник сайту — ще й
+// суми (сервер вирішує сам). ──
+let FIN_MODE = null;   // null або { org, doctorId }
+let finCases = null;   // відповідь /api/lpz-case-quality (усі епізоди лікаря)
+let finDay = null;
+
+function refreshFinanceCases() {
+  renderFinanceCases({ data: finCases, year: activeYear, month: activeMonth, day: finDay });
+}
+
+function selectFinanceDay(day) {
+  finDay = day;
+  const monthBadge = document.querySelector('.year-badge-month');
+  if (monthBadge) monthBadge.textContent = `${day} ${MONTH_PILL_NAMES[Number(activeMonth) - 1]}`;
+  const seq = FINANCE_REQUEST_SEQ.doctorChart;
+  fetchFinance({ org: FIN_MODE.org, doctor: FIN_MODE.doctorId, year: activeYear, month: activeMonth, day })
+    .then(data => { if (seq === FINANCE_REQUEST_SEQ.doctorChart && finDay === day) applyFinanceKpi(document.getElementById('doctorKpiRow'), 'dk', data); });
+  refreshFinanceCases();
+}
+
+function loadDoctorFinance(year, month) {
+  activeYear = year;
+  activeMonth = month;
+  finDay = null;
+  loadFinanceChartBlock({ org: FIN_MODE.org, doctor: FIN_MODE.doctorId }, year, month, {
+    rowId: 'doctorKpiRow', chartId: 'doctorChart', chartHeight: DOCTOR_CHART_HEIGHT,
+    onWaveRows: rows => { DOCTOR_WAVE_STATE.rows = rows; updateDoctorWaveChart(); },
+    onDay: selectFinanceDay,
+  });
+  refreshFinanceCases();
+}
+
 function loadDoctorKpi(org, doctorId, year, month = 'all') {
+  if (FIN_MODE) { loadDoctorFinance(year, month); return; }
   activeYear = year;
   activeMonth = month;
   loadKpiChartBlock('doctor', org, doctorId, year, month, {
@@ -78,6 +114,8 @@ function updateDoctorWaveChart() {
     rows: DOCTOR_WAVE_STATE.rows,
     activeKpi: DOCTOR_WAVE_STATE.activeKpi,
     activeYear, activeMonth,
+    // Лише у фінансовому режимі: там гістограма й хвиля дробляться до днів.
+    ...(FIN_MODE ? { onDayClick: selectFinanceDay } : {}),
   });
 }
 
@@ -164,16 +202,30 @@ function initDoctorCabinet() {
     window.HOSPITAL_ORG_EDRPOU = org;
     window.HOSPITAL_DEPARTMENT_ID = deptId;
 
+    // Фінансовий режим тут — лікарю (свої епізоди) і власнику сайту.
+    const finAllowed = !!me.is_owner || me.lpz_role === 'doctor';
+    if (finAllowed && isFinanceMode()) {
+      FIN_MODE = { org, doctorId };
+      DOCTOR_WAVE_STATE.activeKpi = 'ok';
+      fetch(`/api/lpz-case-quality?${new URLSearchParams({ org, doctor: doctorId })}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { finCases = data || { rows: [] }; refreshFinanceCases(); })
+        .catch(() => {});
+    }
+
     const root = document.getElementById('slideRoot');
     renderBgLayers(root);
-    renderKpiChartBlock(root, 'doctorKpiRow', 'doctorChart', 'doctor', DOCTOR_CHART_HEIGHT);
+    renderKpiChartBlock(root, 'doctorKpiRow', 'doctorChart', 'doctor', DOCTOR_CHART_HEIGHT,
+      FIN_MODE ? financeKpiConfig(!!me.is_owner, true) : undefined);
     wireDoctorWave();
-    renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
+    renderHeaderBlock(root, FIN_MODE ? financeKpiConfig(!!me.is_owner) : HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
       loadDoctorKpi(org, doctorId, year);
     }, true, (year, month) => {
       loadDoctorKpi(org, doctorId, year, month);
-    });
-    renderCensusSection(root);
+    }, FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
+    wireFinanceEmblem(root, finAllowed);
+    if (FIN_MODE) renderFinanceCasesSection(root);
+    else renderCensusSection(root);
     renderFieldMe(root, me);
     renderDutyBand(root, org);
     if (deptId) {
@@ -182,7 +234,7 @@ function initDoctorCabinet() {
     }
     initHospitalName();
 
-    loadCensus(adminOverride ? doctorId : null, { emptyMessage: 'Наразі немає ваших пацієнтів у відділенні' });
+    if (!FIN_MODE) loadCensus(adminOverride ? doctorId : null, { emptyMessage: 'Наразі немає ваших пацієнтів у відділенні' });
   });
 }
 

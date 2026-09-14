@@ -15,7 +15,47 @@ const DEPT_CHART_HEIGHT = 80;
 // (спільні з doctor-cabinet.js), позиція — layout.css:.field-kpi-1/
 // .field-chart-1. getCensusDoctorId — читає activeDoctorId В МОМЕНТ КЛІКА на
 // графік (не зараз), бо клік на лікаря в "Ординаторській" міняє його пізніше.
+// ── Фінансовий режим (клік на емблему, utils.js:isFinanceMode): КПІ-ряд,
+// хвиля й гістограма — контроль записів відділення за період; праве нижнє
+// поле — епізоди з зауваженнями й підказками (quality-notes.js). Завідувач
+// бачить кількість, власник сайту — ще й суми (сервер вирішує сам). ──
+let FIN_MODE = null;     // null або { org, deptId }
+let finCases = null;     // відповідь /api/lpz-case-quality (усі епізоди відділення)
+let finDay = null;       // обраний день (клік на денний стовпець / підпис хвилі)
+let finDoctor = null;    // { id, name } — клік на лікаря в Ординаторській
+
+function refreshFinanceCases() {
+  renderFinanceCases({
+    data: finCases, year: activeYear, month: activeMonth, day: finDay,
+    doctorId: finDoctor?.id, doctorName: finDoctor?.name,
+    onResetDoctor: () => { finDoctor = null; closeAllDoctorExpands(); refreshFinanceCases(); },
+  });
+}
+
+function selectFinanceDay(day) {
+  finDay = day;
+  const monthBadge = document.querySelector('.year-badge-month');
+  if (monthBadge) monthBadge.textContent = `${day} ${MONTH_PILL_NAMES[Number(activeMonth) - 1]}`;
+  const seq = FINANCE_REQUEST_SEQ.deptChart;
+  fetchFinance({ org: FIN_MODE.org, dept: FIN_MODE.deptId, year: activeYear, month: activeMonth, day })
+    .then(data => { if (seq === FINANCE_REQUEST_SEQ.deptChart && finDay === day) applyFinanceKpi(document.getElementById('deptKpiRow'), 'dk', data); });
+  refreshFinanceCases();
+}
+
+function loadDeptBlockFinance(year, month) {
+  activeYear = year;
+  activeMonth = month;
+  finDay = null;
+  loadFinanceChartBlock({ org: FIN_MODE.org, dept: FIN_MODE.deptId }, year, month, {
+    rowId: 'deptKpiRow', chartId: 'deptChart', chartHeight: DEPT_CHART_HEIGHT,
+    onWaveRows: rows => { DEPT_WAVE_STATE.rows = rows; updateDeptWaveChart(); },
+    onDay: selectFinanceDay,
+  });
+  refreshFinanceCases();
+}
+
 function loadDeptBlock(org, deptId, year, month = 'all') {
+  if (FIN_MODE) { loadDeptBlockFinance(year, month); return; }
   activeYear = year;
   activeMonth = month;
   // Кожна зміна року/місяця (пігулки) — це нова точка відліку: раніше
@@ -96,6 +136,7 @@ function updateDeptWaveChart() {
 // денної гістограми (utils.js:loadKpiChartBlock:onPoint): показує
 // "Перебуває у відділенні" станом на цю дату.
 function onWaveDayClick(day) {
+  if (FIN_MODE) { selectFinanceDay(day); return; }
   const titleEl = document.querySelector('.census-title');
   const listEl = document.getElementById('censusList');
   if (titleEl) titleEl.style.display = '';
@@ -152,12 +193,16 @@ function renderStaffAndCensus(root, deptName) {
   // showReset:false — "Перебуває у відділенні" праворуч тепер НЕ реагує на
   // клік на лікаря (той розгортається інлайн у самій Ординаторській), тож
   // "✕ скинути лікаря" в її заголовку більше нема чого скидати.
-  renderCensusSection(root);
-  // Порожнє (display:none), поки не обрано точний день на денній гістограмі
-  // (loadKpiChartBlock:hideCensusUntilDaily, utils.js) — жодного дефолтного
-  // "останній наявний день" на старті сторінки.
-  root.querySelector('.census-title').style.display = 'none';
-  document.getElementById('censusList').style.display = 'none';
+  if (FIN_MODE) {
+    renderFinanceCasesSection(root);
+  } else {
+    renderCensusSection(root);
+    // Порожнє (display:none), поки не обрано точний день на денній гістограмі
+    // (loadKpiChartBlock:hideCensusUntilDaily, utils.js) — жодного дефолтного
+    // "останній наявний день" на старті сторінки.
+    root.querySelector('.census-title').style.display = 'none';
+    document.getElementById('censusList').style.display = 'none';
+  }
   // lf-left-bottom — донат "Структура діагнозів" (dept-pie.js), завжди
   // видимий, ніщо його більше не ховає.
   (root.querySelector('.lf-left-bottom') || root).insertAdjacentHTML('beforeend', `
@@ -279,6 +324,16 @@ function openDoctorExpand(el) {
 }
 
 function selectDoctor(doctorId) {
+  // Фінансовий режим — клік на лікаря фільтрує епізоди з зауваженнями праворуч
+  // (повторний клік знімає фільтр), без розгортки пацієнтів.
+  if (FIN_MODE) {
+    const el = document.querySelector(`.doc-item[data-doctor="${doctorId}"]`);
+    closeAllDoctorExpands();
+    finDoctor = finDoctor?.id === doctorId ? null : { id: doctorId, name: el?.dataset.doctorName || '' };
+    if (finDoctor && el) { el.classList.add('doc-active'); expandedDoctorEl = el; }
+    refreshFinanceCases();
+    return;
+  }
   // Без обраної точної дати (lastCensusDate, utils.js — те саме, що ховає
   // "Перебуває у відділенні") нема на яку дату показувати "перебувають
   // пацієнти лікаря" — клік на лікаря нічого не робить.
@@ -359,14 +414,31 @@ function initHeadCabinet() {
     window.HOSPITAL_ORG_EDRPOU = org;
     window.HOSPITAL_DEPARTMENT_ID = deptId;
 
+    // Фінансовий режим тут — завідувачу (своє відділення) і власнику сайту.
+    const finAllowed = !!me.is_owner || me.lpz_role === 'head';
+    if (finAllowed && isFinanceMode()) {
+      FIN_MODE = { org, deptId };
+      DEPT_WAVE_STATE.activeKpi = 'ok';
+      const params = new URLSearchParams({ org, dept: deptId });
+      fetch(`/api/lpz-case-quality?${params}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { finCases = data || { rows: [] }; refreshFinanceCases(); })
+        .catch(() => {});
+    }
+    const finKpi = FIN_MODE ? financeKpiConfig(!!me.is_owner, true) : undefined;
+
     const root = document.getElementById('slideRoot');
     renderBgLayers(root);
-    renderKpiChartBlock(root, 'deptKpiRow', 'deptChart', 'department', DEPT_CHART_HEIGHT);
+    renderKpiChartBlock(root, 'deptKpiRow', 'deptChart', 'department', DEPT_CHART_HEIGHT, finKpi);
     wireDeptWave();
-    renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK,
+    renderHeaderBlock(root, FIN_MODE ? financeKpiConfig(!!me.is_owner) : HOSPITAL_KPI, HOSPITAL_YEARS_BACK,
       (year) => loadDeptBlock(org, deptId, year),
       true,
-      (year, month) => loadDeptBlock(org, deptId, year, month));
+      (year, month) => loadDeptBlock(org, deptId, year, month),
+      // Шапка у фінансовому режимі — уся лікарня (level=hospital): завідувачу
+      // лише кількість, власнику сайту — ще й суми.
+      FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
+    wireFinanceEmblem(root, finAllowed);
     renderFieldMe(root, me);
     renderDutyBand(root, org);
     renderStaffAndCensus(root, deptName);

@@ -17,8 +17,9 @@
 // на entry.html) і зі спільною Y-шкалою між обома напрямками (loadDirectionBlocks),
 // щоб масштаби порівнювались візуально. ──
 function renderDirectionBlocks(root) {
+  const kpiConfig = FIN_MODE ? financeKpiConfig(FIN_MODE.money, true) : undefined;
   (root.querySelector('.lf-right-top') || root).insertAdjacentHTML('beforeend', `
-    <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml()}</div>
+    <div class="kpi-row field-kpi-1 kpi-lvl-direction" id="blockTherap">${kpi6RowHtml(kpiConfig)}</div>
     <div class="chart-row-1">
       <div class="side-stack" id="sideStackTherap"></div>
       <svg class="bar-chart field-chart-1" id="chartTherap" viewBox="0 0 624 80" width="624" height="80" preserveAspectRatio="none">
@@ -27,7 +28,7 @@ function renderDirectionBlocks(root) {
     </div>
   `);
   (root.querySelector('.lf-right-bottom') || root).insertAdjacentHTML('beforeend', `
-    <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml()}</div>
+    <div class="kpi-row field-kpi-2 kpi-lvl-direction" id="blockSurg">${kpi6RowHtml(kpiConfig)}</div>
     <div class="chart-row-2">
       <div class="side-stack" id="sideStackSurg"></div>
       <svg class="bar-chart field-chart-2" id="chartSurg" viewBox="0 0 624 185" width="624" height="185" preserveAspectRatio="none">
@@ -84,7 +85,41 @@ function updateWaveChart(key) {
   });
 }
 
+// Фінансовий режим (клік на емблему, utils.js:isFinanceMode) — null у
+// звичайному режимі, інакше { money } (суми бачать лише адмін і головний).
+let FIN_MODE = null;
+
+// Той самий блок напрямків, що loadDirectionBlocks, але з контролю записів
+// (/api/lpz-quality-finance): КПІ і хвиля — за обраний період, гістограма —
+// завжди по року (місяць її не звужує), спільна Y-шкала для обох напрямків.
+function loadDirectionBlocksFinance(org, year, month = 'all') {
+  const cfg = financeKpiConfig(FIN_MODE.money, true);
+  const dirs = Object.entries(WAVE_DIRS);
+  const seq = FINANCE_REQUEST_SEQ.directions = (FINANCE_REQUEST_SEQ.directions || 0) + 1;
+  Promise.all(dirs.map(([direction]) => Promise.all([
+    fetchFinance({ org, year, month, direction }),
+    month === 'all' ? null : fetchFinance({ org, year, direction }),
+  ]))).then(results => {
+    if (seq !== FINANCE_REQUEST_SEQ.directions) return;
+    const barRows = results.map(([period, wholeYear]) => financeBarRows(wholeYear || period));
+    const allVals = barRows.flat().map(r => Number(r.y));
+    const bounds = { niceMax: Math.max(Math.max(...allVals, 1) * 1.15, 1) };
+    // animate:true — bar-chart.js малює нижні шари (y_urgent/y_lost) лише в
+    // анімованому рендері.
+    const barOpts = FIN_MODE.money ? { fmt: fmtMoney, animate: true } : { animate: true };
+    dirs.forEach(([, { key, suffix }], i) => {
+      applyFinanceKpi(document.getElementById('block' + suffix), 'dk', results[i][0]);
+      const chartEl = document.getElementById('chart' + suffix);
+      chartEl.classList.add('fin-chart');
+      if (barRows[i].length) renderBarChart(chartEl, barRows[i], year, bounds, null, barOpts);
+      WAVE_STATE[key].rows = financeWaveRows(results[i][0], cfg);
+      updateWaveChart(key);
+    });
+  }).catch(() => {});
+}
+
 function loadDirectionBlocks(org, year, month = 'all') {
+  if (FIN_MODE) { loadDirectionBlocksFinance(org, year, month); return; }
   const blockTherap = document.getElementById('blockTherap');
   const blockSurg = document.getElementById('blockSurg');
 
@@ -377,7 +412,10 @@ function renderGeneralLayer(root, org) {
   renderBgLayers(root);
 
   renderDirectionBlocks(root);
-  renderHeaderBlock(root, HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
+  const headerOpts = FIN_MODE
+    ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month }) }
+    : {};
+  renderHeaderBlock(root, FIN_MODE ? financeKpiConfig(FIN_MODE.money) : HOSPITAL_KPI, HOSPITAL_YEARS_BACK, (year) => {
     activeYear = year;
     activeMonth = 'all';
     loadDirectionBlocks(org, year);
@@ -387,7 +425,7 @@ function renderGeneralLayer(root, org) {
     activeMonth = month;
     loadDirectionBlocks(org, year, month);
     refreshDeptExpand(root, org);
-  });
+  }, headerOpts);
 
   // Смуга "Чергові лікарі" — utils.js:renderDutyBand (спільна з
   // head-cabinet.html/doctor-cabinet.html). Дані — ТЕСТОВИЙ РЕЖИМ (див.
@@ -407,8 +445,16 @@ function initEntry() {
     const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
     if (!org) { renderOwnerOrgSwitch(); return; }
     window.HOSPITAL_ORG_EDRPOU = org;
+    // Фінансовий режим на головній — лише адміну (власнику сайту) і головному
+    // лікарю; завідувач і лікар перемикають його у своїх кабінетах.
+    const finAllowed = !!me.is_owner || me.lpz_role === 'chief';
+    if (finAllowed && isFinanceMode()) {
+      FIN_MODE = { money: true };
+      WAVE_STATE.therap.activeKpi = WAVE_STATE.surg.activeKpi = 'ok';
+    }
     const root = document.getElementById('slideRoot');
     renderGeneralLayer(root, org);
+    wireFinanceEmblem(root, finAllowed);
     renderClinicalBlock(root, org, buildOwnDeptLink(me), me.is_owner);
     renderFieldMe(root, me);
     applyMeProfile(me);

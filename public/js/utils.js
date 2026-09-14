@@ -127,7 +127,9 @@ function applyLpzKpi(info) {
 // ховає рядок місяців). НЕ просто приховані CSS на неавторизованих сторінках
 // (page-shell.js/layout.html не передає authorized) — їх узагалі нема в DOM,
 // якщо не авторизовано. onMonthChange(year, month) — опційно, як onYearChange.
-function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized = false, onMonthChange) {
+// opts.loadKpi(year, month) — заміна завантаження КПІ-рядка шапки (фінансовий
+// режим); без нього — /api/lpz-kpi, як завжди.
+function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized = false, onMonthChange, opts = {}) {
   const org = window.HOSPITAL_ORG_EDRPOU;
 
   // src заповнює initHospitalName() з /api/hospital-info (логотип — per-лікарня)
@@ -200,7 +202,8 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized 
     if (yearParam !== 'all') { yearNum.textContent = t; yearNum.classList.remove('small'); }
     else { yearNum.textContent = 'ВСІ РОКИ'; yearNum.classList.add('small'); }
     monthBadge.textContent = (month !== 'all') ? MONTH_PILL_NAMES[Number(month) - 1] : '';
-    fetchLpzKpi(org, yearParam, month).then(applyLpzKpi);
+    if (opts.loadKpi) opts.loadKpi(yearParam, month);
+    else fetchLpzKpi(org, yearParam, month).then(applyLpzKpi);
     if (!silent && onYearChange) onYearChange(yearParam);
   }
 
@@ -271,7 +274,11 @@ function renderHeaderBlock(root, kpiConfig, yearsBack, onYearChange, authorized 
     const lastYear = info?.max_admission_date ? info.max_admission_date.slice(0, 4) : null;
     const pill = lastYear && [...yearFilter.querySelectorAll('.ypill')].find(p => p.textContent.trim() === lastYear);
     if (pill) selectYear(pill);
-    else { applyLpzKpi(info); if (onYearChange) onYearChange('all'); }
+    else {
+      if (opts.loadKpi) opts.loadKpi('all', 'all');
+      else applyLpzKpi(info);
+      if (onYearChange) onYearChange('all');
+    }
   });
 }
 
@@ -418,8 +425,8 @@ const KPI_6 = [
 const KPI_6_DECIMAL_KEYS = new Set(['bed', 'age']);
 const KPI_6_PERCENT_KEYS = new Set(['imp', 'let']);
 
-function kpi6RowHtml() {
-  return KPI_6.map(k => `
+function kpi6RowHtml(config = KPI_6) {
+  return config.map(k => `
     <div class="kpi">
       <div class="kpi-num" data-dk="${k.key}">—</div>
       <div class="kpi-label">${k.label}</div>
@@ -457,6 +464,122 @@ const HOSPITAL_KPI = [
 ];
 const HOSPITAL_YEARS_BACK = 7;
 
+// ── Фінансовий режим (клік на емблему): ті самі сторінки, пігулки періоду й
+// графіки, але показники контролю записів (/api/lpz-quality-finance) —
+// правильні / поправимі / непоправимі епізоди. Режим — лише для поточної
+// сторінки (?fin=1 в адресі): кожна сторінка відкривається у звичайному
+// вигляді, фінансовий вмикається кліком на емблему саме на ній. Суми (грн) —
+// лише адміну й головному лікарю (сервер віддає їх лише їм), решта бачить
+// кількість епізодів. ──
+// Лічильники запитів по блоках — щоб малювати лише останню відповідь.
+const FINANCE_REQUEST_SEQ = {};
+
+function isFinanceMode() {
+  return new URLSearchParams(location.search).get('fin') === '1';
+}
+
+// Емблема (.logo з renderHeaderBlock) — перемикач режиму для тих, кому він
+// доступний на цій сторінці (allowed). Перемикання перезавантажує сторінку з
+// ?fin=1 або без нього: кожна сторінка будує свої блоки один раз на старті,
+// під обраний режим; решта параметрів адреси (org/dept/doctor) лишається.
+function wireFinanceEmblem(root, allowed) {
+  const logo = root.querySelector('.logo');
+  if (!logo || !allowed) return;
+  logo.classList.add('logo-toggle');
+  logo.classList.toggle('fin-active', isFinanceMode());
+  logo.title = isFinanceMode() ? 'Повернутись до звичайних показників' : 'Контроль записів і фінанси';
+  logo.addEventListener('click', () => {
+    const url = new URL(location.href);
+    if (isFinanceMode()) url.searchParams.delete('fin');
+    else url.searchParams.set('fin', '1');
+    location.href = url.toString();
+  });
+}
+
+function fmtMoney(v) {
+  const n = Number(v) || 0;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1).replace('.', ',')} млн`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)} тис`;
+  return String(Math.round(n));
+}
+
+// КПІ-рядки фінансового режиму: шапка — 5 плиток (data-k), блоки напрямків/
+// відділення/лікаря — 6 (data-dk, kpi6RowHtml).
+function financeKpiConfig(money, six = false) {
+  const cfg = money
+    ? [
+        { key: 'ok', label: 'ПРАВИЛЬНІ, ГРН' },
+        { key: 'fixable', label: 'ВРЯТУВАТИ, ГРН' },
+        { key: 'lost', label: 'ВТРАЧЕНО, ГРН' },
+        { key: 'err_pct', label: 'З ПОМИЛКАМИ' },
+        { key: 'cases', label: 'ЕПІЗОДІВ' },
+      ]
+    : [
+        { key: 'ok', label: 'ПРАВИЛЬНІ' },
+        { key: 'fixable', label: 'ПОПРАВИМІ' },
+        { key: 'lost', label: 'НЕПОПРАВИМІ' },
+        { key: 'err_pct', label: 'З ПОМИЛКАМИ' },
+        { key: 'cases', label: 'ЕПІЗОДІВ' },
+      ];
+  return six ? [...cfg, { key: 'open_issues', label: 'ВІДКРИТІ З ЗАУВАЖ.' }] : cfg;
+}
+
+// КПІ-рядок шапки у фінансовому режимі (renderHeaderBlock opts.loadKpi) —
+// лише відповідь на останній запит, як у loadFinanceChartBlock.
+function loadFinanceHeaderKpi(params) {
+  const seq = FINANCE_REQUEST_SEQ.header = (FINANCE_REQUEST_SEQ.header || 0) + 1;
+  fetchFinance(params).then(data => {
+    if (seq === FINANCE_REQUEST_SEQ.header) applyFinanceKpi(document, 'k', data);
+  });
+}
+
+function fetchFinance(params) {
+  const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== ''));
+  return fetch(`/api/lpz-quality-finance?${q}`)
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+}
+
+// attr — 'k' (шапка) або 'dk' (6-плитковий рядок); scope — елемент, у якому
+// шукати плитки (document для шапки, сам рядок для блоку).
+function applyFinanceKpi(scope, attr, data) {
+  if (!scope) return;
+  const kpi = data?.kpi;
+  const money = !!data?.money;
+  scope.querySelectorAll(`.kpi-num[data-${attr}]`).forEach(el => {
+    const k = el.dataset[attr];
+    if (!kpi) { el.textContent = '—'; return; }
+    if (k === 'err_pct') { el.textContent = kpi.err_pct == null ? '—' : `${String(kpi.err_pct).replace('.', ',')}%`; return; }
+    if (money && k === 'ok') { el.textContent = fmtMoney(kpi.ok_price); return; }
+    if (money && (k === 'fixable' || k === 'lost')) { el.textContent = fmtMoney(kpi[`${k}_risk`]); return; }
+    const v = kpi[k];
+    if (v == null) { el.textContent = '—'; return; }
+    countUp(el, v, 900, 0);
+  });
+}
+
+// Стовпці гістограми (bar-chart.js): увесь стовпець — усі епізоди (або їхня
+// вартість), знизу — поправимі (y_urgent, червоний) і поверх них
+// непоправимі (y_lost). У грошах нижні частини — сума під ризиком.
+function financeBarRows(data) {
+  return (data?.trend || []).map(t => data.money
+    ? { x: t.x, y: t.ok_price + t.fixable_price + t.lost_price, y_urgent: t.fixable_risk + t.lost_risk, y_lost: t.lost_risk }
+    : { x: t.x, y: t.cases, y_urgent: t.fixable + t.lost, y_lost: t.lost });
+}
+
+// Хвиля (wave-chart.js) — кількість епізодів: "ургентна" лінія — з
+// помилками, "планова" — правильні; однакова для будь-якої обраної плитки.
+function financeWaveRows(data, config) {
+  return (data?.trend || []).map(t => {
+    const row = { x: t.x };
+    config.forEach(({ key }) => {
+      row[`${key}_urgent`] = t.fixable + t.lost;
+      row[`${key}_planned`] = t.ok;
+    });
+    return row;
+  });
+}
+
 // Блок "КПІ-ряд (6 показників) + графік динаміки" — той самий патерн на
 // head-cabinet.html (по відділенню) і doctor-cabinet.html (по лікарю):
 // .field-kpi-1 (kpi6RowHtml) + .field-chart-1 (12-місячна гістограма). level —
@@ -466,11 +589,12 @@ const HOSPITAL_YEARS_BACK = 7;
 // cabinet.html і head-cabinet.html БЕЗ хвилі); head-cabinet.js передає
 // менше значення, коли гістограма стоїть під хвилею в тісному полі
 // lf-right-top (270px, там ще й КПІ-рядок) — інакше не влазить.
-function renderKpiChartBlock(root, rowId, chartId, level, chartHeight = 185) {
+// kpiConfig — опційно інший набір плиток (фінансовий режим, financeKpiConfig).
+function renderKpiChartBlock(root, rowId, chartId, level, chartHeight = 185, kpiConfig) {
   const field = root.querySelector('.lf-right-top');
   const baseY = chartHeight - 18;
   (field || root).insertAdjacentHTML('beforeend', `
-    <div class="kpi-row field-kpi-1 kpi-lvl-${level}" id="${rowId}">${kpi6RowHtml()}</div>
+    <div class="kpi-row field-kpi-1 kpi-lvl-${level}" id="${rowId}">${kpi6RowHtml(kpiConfig)}</div>
     <svg class="bar-chart field-chart-1" id="${chartId}" viewBox="0 0 624 ${chartHeight}" width="624" height="${chartHeight}" preserveAspectRatio="none">
       <line class="bar-base" x1="0" x2="624" y1="${baseY}" y2="${baseY}"></line>
     </svg>
@@ -589,6 +713,58 @@ function loadKpiChartBlock(kind, org, entityId, year, month, { rowId, chartId, e
       renderBarChart(chartEl, rows, year, null, onPoint, { animate: true });
     })
     .catch(() => {});
+}
+
+// Фінансовий аналог loadKpiChartBlock (head-cabinet.html/doctor-cabinet.html):
+// КПІ-ряд, гістограма й хвиля з /api/lpz-quality-finance за обраний період.
+// scope — { org, dept } або { org, doctor } (для звичайного завідувача/лікаря
+// сервер їх ігнорує й бере обсяг із сесії). Клік на стовпець — той самий
+// drill-down, що в loadKpiChartBlock (рік → місяці → дні, через симуляцію
+// кліку на пігулку); клік на день — onDay(day).
+function loadFinanceChartBlock(scope, year, month, { rowId, chartId, chartHeight = 185, onWaveRows, onDay } = {}) {
+  // Швидкі перемикання пігулок (або дефолтний рік, що довантажився вже після
+  // кліку на місяць) — відповіді можуть прийти не в тому порядку; малюємо
+  // лише відповідь на останній запит цього блоку.
+  const seq = FINANCE_REQUEST_SEQ[chartId] = (FINANCE_REQUEST_SEQ[chartId] || 0) + 1;
+  fetchFinance({ ...scope, year, month }).then(data => {
+    if (seq !== FINANCE_REQUEST_SEQ[chartId]) return;
+    applyFinanceKpi(document.getElementById(rowId), 'dk', data);
+    if (onWaveRows) onWaveRows(financeWaveRows(data, financeKpiConfig(!!data?.money, true)));
+    const chartEl = document.getElementById(chartId);
+    if (!chartEl) return;
+    chartEl.classList.add('fin-chart');
+    const rows = financeBarRows(data);
+    if (!rows.length) {
+      chartEl.innerHTML = `<line class="bar-base" x1="0" x2="624" y1="${chartHeight - 18}" y2="${chartHeight - 18}"></line>`;
+      return;
+    }
+    const daily = year !== 'all' && month && month !== 'all';
+    const onPoint = r => {
+      if (year === 'all') {
+        const yearPill = [...document.querySelectorAll('.year-filter .ypill:not(.ypill-all)')].find(p => p.textContent.trim() === String(r.x));
+        if (yearPill) yearPill.click();
+        return;
+      }
+      if (!daily) {
+        const monthPill = document.querySelector(`.ypill-month[data-month="${r.x}"]`);
+        const monthFilterEl = document.querySelector('.month-filter');
+        if (monthPill && monthFilterEl) {
+          monthFilterEl.dataset.targetYear = year;
+          monthPill.click();
+        }
+        return;
+      }
+      if (onDay) onDay(Number(r.x));
+    };
+    chartEl.classList.toggle('chart-daily', daily);
+    // Та сама логічна ширина поля для денної гістограми, що в loadKpiChartBlock.
+    const FIELD_PAD = 22;
+    const realWidth = daily
+      ? BASE_LAYOUT_FIELDS.find(f => f.className === 'lf-right-top').width - 2 * FIELD_PAD
+      : 624;
+    chartEl.setAttribute('viewBox', `0 0 ${realWidth} ${chartHeight}`);
+    renderBarChart(chartEl, rows, year, null, onPoint, { animate: true, ...(data.money ? { fmt: fmtMoney } : {}) });
+  });
 }
 
 // "Перебуває у відділенні" — спільний список для head-cabinet.html (усе

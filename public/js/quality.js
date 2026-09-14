@@ -3,76 +3,8 @@
    нотатка для того, хто може його виправити (лікар, який веде/підписав, або
    завідувач, якщо лікаря немає). Первинна підказка — що не так і яке правило,
    вторинна — деталі з даних самого епізоду. Обсяг (головний — усе, завідувач —
-   відділення, лікар — свої) і сегмент визначає сервер (/api/lpz-case-quality). */
-
-const Q_FLAGS = {
-  discharge_not_registered: {
-    title: 'Виписку не передано в ЕСОЗ', short: 'виписку не передано', high: true,
-    rule: 'Дані про пролікований випадок мають бути внесені до ЕСОЗ не пізніше 10-го робочого дня після звітного періоду — незареєстрований випадок до оплати не потрапляє.',
-    why: 'Випадок без зареєстрованої в медичній карті виписки може не потрапити до звіту на оплату НСЗУ.',
-    check: 'Виписки немає, вона в чернетці, очікує реєстрації, скасована або не передана в медичну карту пацієнта.',
-  },
-  no_primary: {
-    title: 'Немає основного діагнозу', short: 'без основного діагнозу', high: true,
-    rule: 'Група оплати визначається за основним діагнозом — без нього випадок неможливо віднести до групи.',
-    why: 'Без основного діагнозу випадок неможливо віднести до групи оплати.',
-    check: 'Внести або позначити основний діагноз.',
-  },
-  overlap: {
-    title: 'Накладка з іншою госпіталізацією', short: 'накладка', high: true,
-    rule: 'Один випадок лікування не розділяється на кілька — за дроблення випадків НСЗУ перераховує оплату.',
-    why: 'Той самий пацієнт одночасно в двох епізодах: один із них може бути не оплачений, а дроблення — привід для перерахунку.',
-    check: 'Чи це перевід між відділеннями в межах одного випадку.',
-  },
-  no_doctor: {
-    title: 'Не вказано лікаря', short: 'без лікаря', high: true,
-    rule: 'Епізод веде й підписує відповідальний лікар — без нього запис неможливо коректно оформити.',
-    why: 'У епізоді немає ні лікуючого лікаря, ні підпису лікаря у виписці — відповідальність за запис ні на кому.',
-    check: 'Вказати лікуючого лікаря й перевірити, ким підписано виписку.',
-    warn: 'У відкритому епізоді не вказано лікуючого лікаря. Зауваження до запису нема кому адресувати.',
-  },
-  injury_no_external_cause: {
-    title: 'Травма без зовнішньої причини', short: 'травма без причини', high: true,
-    rule: 'Для травм (коди S/T) разом із кодом ушкодження кодується зовнішня причина (V01–Y98).',
-    why: 'Без коду зовнішньої причини запис травми неповний і може бути відхилений або перекваліфікований.',
-    check: 'Додати код обставин травми та місця події.',
-  },
-  symptom_primary: {
-    title: 'Симптом як основний діагноз', short: 'симптом як основний', high: true,
-    rule: 'Симптом (R) кодується як основний діагноз лише тоді, коли причину стану не встановлено.',
-    why: 'Код симптому замість встановленої хвороби зазвичай потрапляє в групу з нижчою вагою оплати.',
-    check: 'Чи встановлено причину стану.',
-    warn: 'Попередній діагноз-симптом у перші дні — норма. Якщо до виписки його не замінити на встановлений, випадок піде в групу з нижчою оплатою.',
-  },
-  death_single_diagnosis: {
-    title: 'Летальний випадок з одним діагнозом', short: 'летальний, 1 діагноз', high: true,
-    rule: 'НСЗУ вимагає кодувати всі наявні діагнози (НК 025:2021), включно з ускладненнями та причиною смерті.',
-    why: 'Для летального випадку єдиний діагноз майже завжди означає неповне кодування і привертає увагу під час перевірки.',
-    check: 'Внести ускладнення, безпосередню причину смерті та супутні стани.',
-  },
-  no_interventions: {
-    title: 'Жодного втручання в записі', short: 'без втручань', high: false,
-    rule: 'НСЗУ вимагає відображати всі проведені втручання кодами НК 026:2021.',
-    why: 'Група оплати залежить від втручань. Якщо введення ліків, обстеження чи операції не внесено, випадок оплачується як простіший.',
-    check: 'Внести проведені втручання кодами НК 026:2021.',
-    warn: 'Пацієнт у відділенні понад дві доби, а закодованих втручань у записі немає. Краще вносити в міру виконання, а не згадувати під час виписки.',
-  },
-  single_diagnosis: {
-    title: 'Лише один діагноз', short: 'один діагноз', high: false,
-    rule: 'НСЗУ вимагає кодувати всі наявні діагнози, у тому числі супутні (НК 025:2021).',
-    why: 'Супутні діагнози й ускладнення визначають складність випадку. Без них складний пацієнт оплачується як простий.',
-    check: 'Внести супутні стани й ускладнення, якщо вони є.',
-    warn: 'Поки що в записі лише один діагноз. Супутні стани краще вносити в міру встановлення.',
-  },
-  open_too_long: {
-    title: 'Відкритий понад 30 діб', short: 'відкритий > 30 діб', high: false,
-    rule: 'До оплати подається закритий випадок з оформленою випискою.',
-    why: 'Надто довго відкритий епізод часто означає незакриту в системі виписку — оплата затримується.',
-    check: 'Чи пацієнт ще у відділенні.',
-    warn: 'Епізод відкритий понад 30 діб. Якщо пацієнта вже виписано, а епізод не закрито, оплата не надійде.',
-  },
-};
-const Q_FLAG_ORDER = Object.keys(Q_FLAGS);
+   відділення, лікар — свої) і сегмент визначає сервер (/api/lpz-case-quality).
+   Типи зауважень, нотатки й картка епізоду — public/js/quality-notes.js. */
 
 const Q_SEGMENTS = {
   open: {
@@ -106,31 +38,13 @@ function qMoney(v) {
   if (v >= 1e3) return `${Math.round(v / 1e3)} тис`;
   return `${Math.round(v)}`;
 }
-const qGrn = v => `${fmt(Math.round(v))} грн`;
-
-const qEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-function qFmtDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
-}
 function qFmtTime(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return `${qFmtDate(iso).slice(0, 5)} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-function qDaysLeft(deadline) {
-  if (!deadline || !Q_STATE.today) return null;
-  return Math.round((new Date(deadline + 'T00:00:00Z') - new Date(Q_STATE.today + 'T00:00:00Z')) / 86400000);
-}
+function qDaysLeft(deadline) { return qDaysBetween(Q_STATE.today, deadline); }
 
-function qIssues(r) {
-  return [...(r.flags || []).map(code => ({ code, kind: 'error' })), ...(r.warnings || []).map(code => ({ code, kind: 'warning' }))]
-    .filter(i => Q_FLAGS[i.code]);
-}
-function qHas(r, code) { return (r.flags || []).includes(code) || (r.warnings || []).includes(code); }
-function qHasIssues(r) { return qIssues(r).length > 0; }
 function qSegmentRows(seg = Q_STATE.segment) { return Q_STATE.rows.filter(r => r.segment === seg && qHasIssues(r)); }
 
 function qVisibleRows() {
@@ -343,34 +257,6 @@ function renderQualityExplain() {
     </div>${source}`;
 }
 
-function qCaseState(r) {
-  if (r.segment === 'open') return `<span class="q-state-open">у відділенні</span> · ${Number(r.los_days).toFixed(1)} доби`;
-  const discharged = `виписано ${qFmtDate(r.discharge_at)}`;
-  if (r.segment === 'fixable') {
-    const left = qDaysLeft(r.fix_deadline);
-    const when = left === 0 ? 'сьогодні' : left === 1 ? 'завтра' : `${left} дн.`;
-    return `${discharged} · <span class="${left <= 3 ? 'q-deadline-urgent' : 'q-deadline'}">виправити до ${qFmtDate(r.fix_deadline)} (${when})</span>`;
-  }
-  return `${discharged} · <span class="q-deadline-lost">строк минув ${qFmtDate(r.fix_deadline)}</span>`;
-}
-
-function qNoteHtml(r) {
-  const to = r.addressee === 'doctor'
-    ? `<span class="q-note-to">Лікарю: ${qEsc(r.doctor_name || '—')}</span>`
-    : `<span class="q-note-to q-note-to-head">Завідувачу відділення · лікаря не визначено</span>`;
-  const items = qIssues(r).map(i => {
-    const f = Q_FLAGS[i.code];
-    const warn = i.kind === 'warning';
-    const secondary = (r.hints && r.hints[i.code]) || f.check;
-    return `
-      <div class="q-note-issue${warn ? ' q-note-warn' : ''}">
-        <div class="q-note-line"><span class="q-note-tag">первинна</span><span><b>${f.title}${warn ? ' · попередження' : ''}.</b> ${warn && f.warn ? f.warn : f.rule}</span></div>
-        <div class="q-note-line"><span class="q-note-tag q-note-tag-sec">вторинна</span><span>${qEsc(secondary)}</span></div>
-      </div>`;
-  }).join('');
-  return `<div class="q-note">${to}${items}</div>`;
-}
-
 function renderQualityCases() {
   const title = document.getElementById('qCasesTitle');
   const list = document.getElementById('qCases');
@@ -380,22 +266,7 @@ function renderQualityCases() {
   const reset = document.getElementById('qReset');
   if (reset) reset.addEventListener('click', () => { Q_STATE.flag = null; Q_STATE.dept = null; renderQualityAll(); });
 
-  list.innerHTML = rows.map(r => `
-    <div class="q-episode">
-      ${qNoteHtml(r)}
-      <div class="q-case">
-        <div class="q-case-main">
-          <div class="q-case-line1">
-            <span class="q-case-num">№ ${qEsc(r.card_number)}</span>
-            <span class="q-case-dx">${qEsc(r.primary_icd || '—')} ${qEsc(r.primary_name || '')}</span>
-          </div>
-          <div class="q-case-line2">${qEsc(r.department_name || '—')} · ${qCaseState(r)} · діагнозів: ${r.dx_codes.length} · втручань: ${r.procedures_count}${Q_STATE.money ? ` · <span class="q-money">вартість ≈ ${qGrn(r.est_price)} · під ризиком ≈ ${qGrn(r.est_risk)}</span>` : ''}</div>
-        </div>
-        <div class="q-case-side">
-          <a class="q-open-link" href="https://helsi.pro/hospital/cases/${encodeURIComponent(r.helsi_case_id)}" target="_blank" rel="noopener">відкрити в helsi ↗</a>
-        </div>
-      </div>
-    </div>`).join('') || '<div class="census-empty" style="position:static">Немає епізодів за цим фільтром</div>';
+  list.innerHTML = rows.map(r => qEpisodeHtml(r, Q_STATE.today)).join('') || '<div class="census-empty" style="position:static">Немає епізодів за цим фільтром</div>';
   list.scrollTop = 0;
   updateFadeMask(list, 'y');
 }
