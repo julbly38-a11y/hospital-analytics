@@ -197,7 +197,23 @@ function qInPeriod(r, today, year, month, day) {
 // відділенні, в кінці — вже втрачені (найсвіжіші зверху).
 const Q_CABINET_ORDER = { fixable: 0, open: 1, lost: 2 };
 
-function renderFinanceCases({ data, year, month, day = null, doctorId = null, doctorName = '', onResetDoctor }) {
+// Короткий рядок (кабінет завідувача): ПІБ пацієнта, ПІБ лікаря, кількість
+// зауважень. Без ПІБ пацієнта (канон ще не оновлено) — номер картки.
+function qCompactRowHtml(r) {
+  const n = (r.flags || []).length + (r.warnings || []).length;
+  const patient = r.patient_name ? qEsc(r.patient_name) : `картка № ${qEsc(r.card_number || '—')}`;
+  const doctor = r.doctor_full_name || r.doctor_name;
+  return `
+    <div class="census-row q-compact-row">
+      <div class="census-info">
+        <span class="census-name">${patient}</span>
+        <span class="census-meta">${doctor ? `Лікар: ${qEsc(doctor)}` : 'Лікаря не визначено — завідувачу'}</span>
+      </div>
+      <span class="q-compact-count${(r.flags || []).length ? ' q-compact-error' : ''}">⚠ ${n}</span>
+    </div>`;
+}
+
+function renderFinanceCases({ data, year, month, day = null, doctorId = null, doctorName = '', onResetDoctor, compact = false }) {
   const title = document.getElementById('finCasesTitle');
   const list = document.getElementById('finCases');
   if (!title || !list || !data) return;
@@ -213,7 +229,7 @@ function renderFinanceCases({ data, year, month, day = null, doctorId = null, do
     + (doctorId ? ` · ${qEsc(doctorName)}<span class="q-reset" id="finCasesReset">✕ усі лікарі</span>` : '');
   const reset = document.getElementById('finCasesReset');
   if (reset && onResetDoctor) reset.addEventListener('click', onResetDoctor);
-  list.innerHTML = rows.map(r => qEpisodeHtml(r, today)).join('')
+  list.innerHTML = rows.map(r => compact ? qCompactRowHtml(r) : qEpisodeHtml(r, today)).join('')
     || '<div class="census-empty" style="position:static">За цей період зауважень немає</div>';
   list.scrollTop = 0;
   const fieldMe = document.querySelector('.field-me');

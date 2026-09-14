@@ -383,6 +383,8 @@ function wireAdminDeptNav(root, org) {
     el._adminNavBound = true;
     el.addEventListener('click', () => {
       const params = new URLSearchParams({ org, dept: el.dataset.deptId, deptName: el.dataset.dept });
+      // Перехід у фінансовому режимі лишає режим у кабінеті відділення.
+      if (FIN_MODE) params.set('fin', '1');
       window.location.href = '/head-cabinet.html?' + params.toString();
     });
   });
@@ -450,7 +452,7 @@ function initEntry() {
     const finAllowed = !!me.is_owner || me.lpz_role === 'chief';
     if (finAllowed && isFinanceMode()) {
       FIN_MODE = { money: true };
-      WAVE_STATE.therap.activeKpi = WAVE_STATE.surg.activeKpi = 'ok';
+      WAVE_STATE.therap.activeKpi = WAVE_STATE.surg.activeKpi = financeKpiConfig(true, true)[0].key;
     }
     const root = document.getElementById('slideRoot');
     renderGeneralLayer(root, org);

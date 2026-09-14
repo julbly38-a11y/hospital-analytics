@@ -146,3 +146,12 @@
   color: var(--c-accent-blue); text-decoration: none;
 }
 .q-fix-link:hover { text-decoration: underline; }
+
+/* Короткий список у кабінеті завідувача (фінансовий режим): пацієнт · лікар · кількість зауважень */
+.q-compact-count {
+  flex-shrink: 0;
+  font-size: 14px; font-weight: 400;
+  color: var(--c-accent-amber);
+  font-variant-numeric: tabular-nums;
+}
+.q-compact-count.q-compact-error { color: var(--c-accent-red); }

@@ -17,7 +17,7 @@ const DEPT_CHART_HEIGHT = 80;
 // графік (не зараз), бо клік на лікаря в "Ординаторській" міняє його пізніше.
 // ── Фінансовий режим (клік на емблему, utils.js:isFinanceMode): КПІ-ряд,
 // хвиля й гістограма — контроль записів відділення за період; праве нижнє
-// поле — епізоди з зауваженнями й підказками (quality-notes.js). Завідувач
+// поле — список пацієнтів із зауваженнями й лікарів (quality-notes.js). Завідувач
 // бачить кількість, власник сайту — ще й суми (сервер вирішує сам). ──
 let FIN_MODE = null;     // null або { org, deptId }
 let finCases = null;     // відповідь /api/lpz-case-quality (усі епізоди відділення)
@@ -29,6 +29,9 @@ function refreshFinanceCases() {
     data: finCases, year: activeYear, month: activeMonth, day: finDay,
     doctorId: finDoctor?.id, doctorName: finDoctor?.name,
     onResetDoctor: () => { finDoctor = null; closeAllDoctorExpands(); refreshFinanceCases(); },
+    // Лише список пацієнтів із зауваженнями й лікарів; повні картки з
+    // підказками — у кабінеті лікаря (адмін переходить туди кліком на лікаря).
+    compact: true,
   });
 }
 
@@ -388,6 +391,9 @@ function wireAdminDoctorNav(docsList, org, deptId, deptName) {
   docsList.querySelectorAll('.doc-item[data-doctor]').forEach(el => {
     el.addEventListener('click', () => {
       const params = new URLSearchParams({ org, dept: deptId, deptName: deptName || '', doctor: el.dataset.doctor, doctorName: el.dataset.doctorName || '' });
+      // Перехід у фінансовому режимі лишає режим (кабінет лікаря одразу з
+      // його епізодами й підказками).
+      if (FIN_MODE) params.set('fin', '1');
       window.location.href = '/doctor-cabinet.html?' + params.toString();
     });
   });
@@ -418,8 +424,8 @@ function initHeadCabinet() {
     const finAllowed = !!me.is_owner || me.lpz_role === 'head';
     if (finAllowed && isFinanceMode()) {
       FIN_MODE = { org, deptId };
-      DEPT_WAVE_STATE.activeKpi = 'ok';
-      const params = new URLSearchParams({ org, dept: deptId });
+      DEPT_WAVE_STATE.activeKpi = financeKpiConfig(!!me.is_owner, true)[0].key;
+      const params = new URLSearchParams({ org, dept: deptId, names: '1' });
       fetch(`/api/lpz-case-quality?${params}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { finCases = data || { rows: [] }; refreshFinanceCases(); })

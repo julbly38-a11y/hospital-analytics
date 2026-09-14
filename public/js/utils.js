@@ -508,7 +508,9 @@ function fmtMoney(v) {
 function financeKpiConfig(money, six = false) {
   const cfg = money
     ? [
-        { key: 'ok', label: 'ПРАВИЛЬНІ, ГРН' },
+        // Зароблено — орієнтовна оплата виписаних епізодів за тарифами НСЗУ:
+        // правильні повністю + епізоди з помилками за вирахуванням втрати.
+        { key: 'earned', label: 'ЗАРОБЛЕНО, ГРН' },
         { key: 'fixable', label: 'ВРЯТУВАТИ, ГРН' },
         { key: 'lost', label: 'ВТРАЧЕНО, ГРН' },
         { key: 'err_pct', label: 'З ПОМИЛКАМИ' },
@@ -550,7 +552,10 @@ function applyFinanceKpi(scope, attr, data) {
     const k = el.dataset[attr];
     if (!kpi) { el.textContent = '—'; return; }
     if (k === 'err_pct') { el.textContent = kpi.err_pct == null ? '—' : `${String(kpi.err_pct).replace('.', ',')}%`; return; }
-    if (money && k === 'ok') { el.textContent = fmtMoney(kpi.ok_price); return; }
+    if (money && k === 'earned') {
+      el.textContent = fmtMoney(kpi.ok_price + (kpi.fixable_price - kpi.fixable_risk) + (kpi.lost_price - kpi.lost_risk));
+      return;
+    }
     if (money && (k === 'fixable' || k === 'lost')) { el.textContent = fmtMoney(kpi[`${k}_risk`]); return; }
     const v = kpi[k];
     if (v == null) { el.textContent = '—'; return; }

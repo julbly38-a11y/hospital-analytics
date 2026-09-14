@@ -167,6 +167,7 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
           if (el.dataset.doctor === ownDoctorId) return;
           el.addEventListener('click', () => {
             const params = new URLSearchParams({ org, dept: deptId, deptName: deptName || '', doctor: el.dataset.doctor, doctorName: el.dataset.doctorName || '' });
+            if (FIN_MODE) params.set('fin', '1');
             window.location.href = '/doctor-cabinet.html?' + params.toString();
           });
         });
@@ -206,7 +207,7 @@ function initDoctorCabinet() {
     const finAllowed = !!me.is_owner || me.lpz_role === 'doctor';
     if (finAllowed && isFinanceMode()) {
       FIN_MODE = { org, doctorId };
-      DOCTOR_WAVE_STATE.activeKpi = 'ok';
+      DOCTOR_WAVE_STATE.activeKpi = financeKpiConfig(!!me.is_owner, true)[0].key;
       fetch(`/api/lpz-case-quality?${new URLSearchParams({ org, doctor: doctorId })}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { finCases = data || { rows: [] }; refreshFinanceCases(); })
