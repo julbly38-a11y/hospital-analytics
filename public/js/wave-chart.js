@@ -52,7 +52,9 @@ function renderWaveCard(stack, suffix) {
 // більше), спільна шкала притискала б ургентну лінію до плаского низу.
 // Лише сама крива — підписи/наведення/стовпчик тепер окремо
 // (wireWaveDateLabels), поза координатною системою SVG.
-function renderWaveLines(svg, urgentVals, plannedVals) {
+// sharedScale — обидві лінії в одному масштабі від нуля (фінансовий режим:
+// епізоди з помилками / правильні — висоти мають порівнюватись між собою).
+function renderWaveLines(svg, urgentVals, plannedVals, sharedScale = false) {
   if (!svg || !urgentVals.length || !plannedVals.length) return;
   const vb = svg.viewBox.baseVal, w = vb.width, h = vb.height;
   const padX = 6, padTop = 10, padBot = 10;
@@ -72,8 +74,10 @@ function renderWaveLines(svg, urgentVals, plannedVals) {
     return d;
   }
 
+  const sharedMax = Math.max(...urgentVals, ...plannedVals, 1);
   function draw(vals, lineClass, areaClass) {
-    const min = Math.min(...vals), max = Math.max(...vals);
+    const min = sharedScale ? 0 : Math.min(...vals);
+    const max = sharedScale ? sharedMax : Math.max(...vals);
     const span = Math.max(max - min, 1);
     const yFor = v => padTop + drawH - ((v - min) / span) * drawH;
     const pts = vals.map((v, i) => ({ x: xFor(i), y: yFor(v) }));
@@ -180,7 +184,7 @@ function wireWaveDateLabels({ xlabelsEl, urgentVals, plannedVals, barUrgentEl, b
 // наведення/клік. Викликається сторінкою (entry.js/head-cabinet.js) після
 // кожного фетчу /api/lpz-trend-*-kpi і після кожного кліку на КПІ-плитку
 // (з уже закешованих rows, без повторного запиту).
-function updateWaveCard({ svg, xlabelsEl, barUrgentEl, barPlannedEl, tipUrgentEl, tipPlannedEl, rows, activeKpi, activeYear, activeMonth, onDayClick }) {
+function updateWaveCard({ svg, xlabelsEl, barUrgentEl, barPlannedEl, tipUrgentEl, tipPlannedEl, rows, activeKpi, activeYear, activeMonth, onDayClick, sharedScale = false }) {
   if (!svg) return;
   if (!rows || !rows.length) {
     // Порожній результат (напр. немає госпіталізацій за обраний рік) —
@@ -199,7 +203,7 @@ function updateWaveCard({ svg, xlabelsEl, barUrgentEl, barPlannedEl, tipUrgentEl
   // "голе" число для років, з нулем спереду для місяців/днів).
   const yearly = Number(rows[0].x) >= 1000;
   const xLabels = rows.map(r => yearly ? String(r.x) : String(Number(r.x)).padStart(2, '0'));
-  renderWaveLines(svg, urgentVals, plannedVals);
+  renderWaveLines(svg, urgentVals, plannedVals, sharedScale);
   if (xlabelsEl) {
     xlabelsEl.innerHTML = xLabels.map(l => `<span>${l}</span>`).join('');
     wireWaveDateLabels({ xlabelsEl, urgentVals, plannedVals, barUrgentEl, barPlannedEl, tipUrgentEl, tipPlannedEl, yearly, activeYear, activeMonth, onDayClick });

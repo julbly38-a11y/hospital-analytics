@@ -79,6 +79,8 @@ function updateWaveChart(key) {
     rows: state.rows,
     activeKpi: state.activeKpi,
     activeYear, activeMonth,
+    // Фінансовий режим: помилки й правильні — в одному масштабі.
+    sharedScale: !!FIN_MODE,
     // onDayClick не передаємо — entry.html не має "Перебуває у відділенні"
     // (те поле лише на head-cabinet.html), клік на день тут просто нічого
     // не робить (найдрібніший рівень, глибше дробити нема куди).
@@ -441,6 +443,10 @@ function renderGeneralLayer(root, org) {
   renderDutyBand(root, org, () => wireDutyHover(root));
 }
 
+// Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
+// нижче (utils.js:HOSPITAL_THEME_PENDING).
+window.HOSPITAL_THEME_PENDING = true;
+
 function initEntry() {
   fetch('/api/me').then(r => r.json()).then(me => {
     if (!me || !me.role) { window.location.href = '/layout.html'; return; }
@@ -468,6 +474,7 @@ function initEntry() {
 // лікарні — той самий тимчасовий перемикач, що на layout.html
 // (#devOrgSwitch), лише тут веде на /entry.html?org=<val>, а не /layout.html.
 function renderOwnerOrgSwitch() {
+  markThemeReady();
   document.body.insertAdjacentHTML('afterbegin', `
     <select id="devOrgSwitch" style="position:fixed; top:8px; left:8px; z-index:9999; font-family:sans-serif; font-size:13px; padding:3px 6px;">
       <option value="" disabled selected>Оберіть лікарню</option>

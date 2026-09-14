@@ -279,6 +279,10 @@ function renderQualityAll() {
   renderQualityCases();
 }
 
+// Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
+// нижче (utils.js:HOSPITAL_THEME_PENDING).
+window.HOSPITAL_THEME_PENDING = true;
+
 function initQuality() {
   fetch('/api/me').then(r => r.json()).then(me => {
     if (!me || !me.role) { window.location.href = '/layout.html'; return; }
@@ -286,7 +290,7 @@ function initQuality() {
     if (!org) { document.body.insertAdjacentHTML('afterbegin', '<p style="padding:20px">Оберіть лікарню: /quality.html?org=43342788</p>'); return; }
     window.HOSPITAL_ORG_EDRPOU = org;
 
-    fetch(`/api/lpz-case-quality?org=${encodeURIComponent(org)}`)
+    fetch(`/api/lpz-case-quality?org=${encodeURIComponent(org)}&names=1`)
       .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
       .then(data => {
         Q_STATE.rows = data.rows || [];

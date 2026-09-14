@@ -153,6 +153,7 @@ function qEpisodeHtml(r, today) {
       <div class="q-case">
         <div class="q-case-main">
           <div class="q-case-line1">
+            ${r.patient_name ? `<span class="q-case-patient">${qEsc(r.patient_name)}</span>` : ''}
             <span class="q-case-num">№ ${qEsc(r.card_number)}</span>
             <span class="q-case-dx">${qEsc(r.primary_icd || '—')} ${qEsc(r.primary_name || '')}</span>
           </div>

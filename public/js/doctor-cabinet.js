@@ -115,7 +115,7 @@ function updateDoctorWaveChart() {
     activeKpi: DOCTOR_WAVE_STATE.activeKpi,
     activeYear, activeMonth,
     // Лише у фінансовому режимі: там гістограма й хвиля дробляться до днів.
-    ...(FIN_MODE ? { onDayClick: selectFinanceDay } : {}),
+    ...(FIN_MODE ? { onDayClick: selectFinanceDay, sharedScale: true } : {}),
   });
 }
 
@@ -162,6 +162,14 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
       enableDragScroll(docsList, 'y');
       docsList.addEventListener('scroll', () => updateFadeMask(docsList, 'y'));
       updateFadeMask(docsList, 'y');
+      // Лікар, чий це кабінет, — одразу прокрутити до нього (посередині
+      // списку), щоб виділення було видно. Без анімації й у логічних px
+      // (offsetInSlide), бо слайд масштабується transform'ом.
+      const ownEl = docsList.querySelector('.doc-item.own');
+      if (ownEl) {
+        docsList.scrollTop = offsetInSlide(ownEl) - offsetInSlide(docsList) - docsList.clientHeight / 2 + ownEl.offsetHeight / 2;
+        updateFadeMask(docsList, 'y');
+      }
       if (isOwner) {
         docsList.querySelectorAll('.doc-item[data-doctor]').forEach(el => {
           if (el.dataset.doctor === ownDoctorId) return;
@@ -175,6 +183,10 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
     })
     .catch(() => {});
 }
+
+// Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
+// нижче (utils.js:HOSPITAL_THEME_PENDING).
+window.HOSPITAL_THEME_PENDING = true;
 
 function initDoctorCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {
@@ -208,7 +220,7 @@ function initDoctorCabinet() {
     if (finAllowed && isFinanceMode()) {
       FIN_MODE = { org, doctorId };
       DOCTOR_WAVE_STATE.activeKpi = financeKpiConfig(!!me.is_owner, true)[0].key;
-      fetch(`/api/lpz-case-quality?${new URLSearchParams({ org, doctor: doctorId })}`)
+      fetch(`/api/lpz-case-quality?${new URLSearchParams({ org, doctor: doctorId, names: '1' })}`)
         .then(r => r.ok ? r.json() : null)
         .then(data => { finCases = data || { rows: [] }; refreshFinanceCases(); })
         .catch(() => {});

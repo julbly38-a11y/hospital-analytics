@@ -16,6 +16,10 @@ html, body {
   width: 1920px; height: 1080px;
   transform-origin: top left;
 }
+/* Поки не застосовано кольори лікарні (utils.js:applyHospitalTheme) — слайд
+   прихований, щоб не блимала дефолтна Хотинська схема; далі плавна поява. */
+.slide-wrapper { transition: opacity .25s ease; }
+html:not(.theme-ready) .slide-wrapper { opacity: 0; }
 
 .slide {
   width: 1920px; height: 1080px;
@@ -132,6 +136,49 @@ html, body {
 }
 /* Емблема — перемикач фінансового режиму (utils.js:wireFinanceEmblem). */
 .logo.logo-toggle { cursor: pointer; }
+/* Фінансовий режим — "негатив": темна графітова тема (не чорна), світлий,
+   але не білий текст, щоб не втомлювати очі. Перевизначаються лише кольорові
+   змінні в межах .slide.fin-mode (theme.css) і кілька жорстко заданих світлих
+   фонів; акцентні кольори графіків лишаються. --c-white не чіпаємо — ним
+   підписано текст на кольорових плашках. */
+body.fin-mode { background: #1e2227; }
+.slide.fin-mode {
+  --c-cream: #1e2227;
+  --c-ink-1: #ecebe8;
+  --c-ink-2: #e1dfdb;
+  --c-ink-3: #d2cec9;
+  --c-ink-4: #b7b1aa;
+  --c-taupe: #a59f97;
+  --c-taupe-light: #928c85;
+  background: #1e2227;
+}
+.slide.fin-mode .bg,
+.slide.fin-mode .bg2 { filter: blur(40px) grayscale(0.55) brightness(0.3); }
+.slide.fin-mode .layout-field { background: rgba(255, 255, 255, 0.05); }
+.slide.fin-mode .wave-card { background: rgba(255, 255, 255, 0.05); }
+.slide.fin-mode .bar-col { fill: #8b9a8a; }
+.slide.fin-mode .ypill.active { background: var(--c-ink-1); color: #1e2227; border-color: var(--c-ink-1); }
+.slide.fin-mode .census-row,
+.slide.fin-mode .q-episode,
+.slide.fin-mode .q-case { border-top-color: rgba(255, 255, 255, 0.08); }
+.slide.fin-mode .q-note { background: rgba(255, 255, 255, 0.05); border-color: rgba(178, 124, 139, 0.45); }
+.slide.fin-mode .q-note-issue { border-top-color: rgba(255, 255, 255, 0.08); }
+html.fin-mode { background: #1e2227; }
+/* Жорстко задані темні кольори: чергові лікарі (utils.js:injectDutyStyles) і
+   підписи кільця "Структура діагнозів" (dept-pie.js — атрибути fill; заголовок
+   лише в звичайному стані, щоб підсвітка при наведенні лишалась). */
+.slide.fin-mode .duty-docs span { color: var(--c-ink-3); -webkit-text-stroke-color: var(--c-ink-3); }
+.slide.fin-mode #dpCenterV { fill: var(--c-ink-1); }
+.slide.fin-mode #dpCenterL { fill: var(--c-taupe); }
+.slide.fin-mode #dpTitle[fill="#3a3a3a"] { fill: var(--c-ink-3); }
+.fin-mode-tag {
+  position: absolute;
+  left: 221px; top: 24px;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--c-accent-berry);
+  pointer-events: none;
+}
 .logo.fin-active { filter: drop-shadow(0 0 10px rgba(156, 84, 104, 0.6)) drop-shadow(0 0 24px rgba(156, 84, 104, 0.35)); }
 
 .name-block {

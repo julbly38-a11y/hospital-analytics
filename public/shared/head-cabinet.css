@@ -69,6 +69,19 @@
   text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
 }
 .doc-item.doc-active, .doc-item.hl { color: var(--c-accent-pink); }
+/* Обраний лікар (клік в Ординаторській кабінету відділення) і сам лікар у
+   своєму кабінеті (.own, doctor-cabinet.js) — чітко видно, про кого йдеться:
+   смужка праворуч (список вирівняний праворуч), фон і колір акценту. Розмір
+   рядка не змінюється (inset-тінь, padding усередині border-box). */
+.doc-item.doc-active,
+.doc-item.own {
+  color: var(--c-accent-berry);
+  box-shadow: inset -3px 0 0 var(--c-accent-berry);
+  background: linear-gradient(270deg, rgba(178, 124, 139, 0.16), transparent 85%);
+  padding-right: 10px;
+}
+.doc-item.doc-active .doc-position,
+.doc-item.own .doc-position { color: var(--c-accent-pink); }
 
 /* Інлайн-розгортка пацієнтів лікаря (head-cabinet.js:openDoctorExpand) —
    вставляється ПІСЛЯ клікнутого .doc-item, ВСЕРЕДИНІ docsList (росте й

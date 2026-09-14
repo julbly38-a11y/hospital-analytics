@@ -86,6 +86,7 @@
 .q-case:first-child { border-top: none; }
 .q-case-main { min-width: 0; }
 .q-case-line1 { display: flex; gap: 12px; align-items: baseline; white-space: nowrap; overflow: hidden; }
+.q-case-patient { font-size: 16.5px; color: var(--c-ink-2); flex-shrink: 0; }
 .q-case-num { font-size: 16.5px; color: var(--c-ink-3); flex-shrink: 0; }
 .q-case-dx { font-size: 15px; color: var(--c-ink-4); overflow: hidden; text-overflow: ellipsis; }
 .q-case-line2 { font-size: 13.5px; color: var(--c-taupe-light); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

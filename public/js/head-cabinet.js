@@ -131,6 +131,8 @@ function updateDeptWaveChart() {
     activeKpi: DEPT_WAVE_STATE.activeKpi,
     activeYear, activeMonth,
     onDayClick: onWaveDayClick,
+    // Фінансовий режим: помилки й правильні — в одному масштабі.
+    sharedScale: !!FIN_MODE,
   });
 }
 
@@ -398,6 +400,10 @@ function wireAdminDoctorNav(docsList, org, deptId, deptName) {
     });
   });
 }
+
+// Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
+// нижче (utils.js:HOSPITAL_THEME_PENDING).
+window.HOSPITAL_THEME_PENDING = true;
 
 function initHeadCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {

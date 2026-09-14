@@ -487,6 +487,14 @@ function wireFinanceEmblem(root, allowed) {
   if (!logo || !allowed) return;
   logo.classList.add('logo-toggle');
   logo.classList.toggle('fin-active', isFinanceMode());
+  // Щоб не сплутати режими: темна тема (.slide.fin-mode, layout.css) і
+  // напис над назвою лікарні.
+  if (isFinanceMode()) {
+    root.classList.add('fin-mode');
+    document.body.classList.add('fin-mode');
+    document.documentElement.classList.add('fin-mode');
+    root.insertAdjacentHTML('beforeend', '<div class="fin-mode-tag">Фінансовий режим</div>');
+  }
   logo.title = isFinanceMode() ? 'Повернутись до звичайних показників' : 'Контроль записів і фінанси';
   logo.addEventListener('click', () => {
     const url = new URL(location.href);
@@ -1172,29 +1180,60 @@ document.addEventListener('DOMContentLoaded', initCrossHighlight);
 // Кольорова схема per-лікарня (lib/hospital-themes.js, отримана через
 // /api/hospital-info) — накладає CSS-змінні на :root. theme=null (немає
 // власної схеми) — нічого не робить, лишається дефолт Хотина з theme.css.
-function applyHospitalTheme(theme) {
-  if (!theme) return;
-  const root = document.documentElement.style;
-  Object.entries(theme).forEach(([k, v]) => root.setProperty(k, v));
+// ── Кольори лікарні без "розового спалаху" при завантаженні: дефолтна
+// схема в theme.css — Хотинська (розові плями й акценти), а схема лікарні
+// (lib/hospital-themes.js) приходить лише з /api/hospital-info. Тому слайд
+// прихований (layout.css: html:not(.theme-ready) .slide-wrapper), доки схему
+// не застосовано, і плавно проявляється. Остання схема запам'ятовується в
+// браузері — з другого відкриття вона ставиться одразу, ще до запитів.
+// Сторінки, що дізнаються лікарню лише після /api/me, виставляють
+// window.HOSPITAL_THEME_PENDING = true — тоді ранній виклик initHospitalName
+// без org не проявляє слайд передчасно. Запобіжник — проявити через 3 с. ──
+const HOSPITAL_THEME_CACHE_KEY = 'lpzHospitalTheme';
+let appliedThemeKeys = [];
+
+function markThemeReady() {
+  document.documentElement.classList.add('theme-ready');
 }
+
+function applyHospitalTheme(theme) {
+  const root = document.documentElement.style;
+  appliedThemeKeys.forEach(k => root.removeProperty(k));
+  appliedThemeKeys = Object.keys(theme || {});
+  Object.entries(theme || {}).forEach(([k, v]) => root.setProperty(k, v));
+  markThemeReady();
+}
+
+(function applyCachedHospitalTheme() {
+  let cached = null;
+  try { cached = localStorage.getItem(HOSPITAL_THEME_CACHE_KEY); } catch {}
+  if (cached !== null) {
+    try { applyHospitalTheme(JSON.parse(cached)); } catch { markThemeReady(); }
+  }
+  setTimeout(markThemeReady, 3000);
+})();
 
 function initHospitalName() {
   const title   = document.querySelector('.name-block .title');
   const tagline = document.querySelector('.name-block .tagline');
   const logo    = document.querySelector('.logo');
   const org = window.HOSPITAL_ORG_EDRPOU;
-  if (!org || (!title && !tagline && !logo)) return;
+  if (!org || (!title && !tagline && !logo)) {
+    if (!window.HOSPITAL_THEME_PENDING) markThemeReady();
+    return;
+  }
   fetch(`/api/hospital-info?org=${encodeURIComponent(org)}`)
     .then(r => r.ok ? r.json() : null)
     .then(info => {
-      if (!info) return;
+      if (!info) { markThemeReady(); return; }
       if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
       if (tagline) tagline.textContent = info.tagline || '';
       if (logo && info.logo_url) logo.src = info.logo_url;
       if (info.display_name) document.title = info.display_name + ' — слайд';
       applyHospitalTheme(info.theme);
+      try { localStorage.setItem(HOSPITAL_THEME_CACHE_KEY, JSON.stringify(info.theme || null)); } catch {}
     })
-    .catch(() => {});
+    .catch(markThemeReady);
 }
 
 // Поля розмітки (.layout-field) — постійні орієнтовні зони канви 1920x1080,
