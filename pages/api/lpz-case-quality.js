@@ -1,9 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { estimatePrice, estimateRisk, PRICING_SOURCE } from '../../lib/quality-pricing'
 
-// Контроль записів (public/quality.html) — випадки з ознаками помилок, що
-// впливають на оплату НСЗУ. Обсяг — лише з сесії: chief/deputy — уся лікарня,
-// head — своє відділення, doctor — свої випадки. Власник сайту (is_owner, без
+// Контроль записів (public/quality.html) — епізоди з ознаками помилок, що
+// впливають на оплату НСЗУ. Обсяг — лише з сесії: chief — уся лікарня, head —
+// своє відділення (включно з епізодами без лікаря, адресованими йому), doctor —
+// епізоди, які він веде або підписав. Начмедів (deputy) поки не підключено:
+// немає прив'язки заступника до напрямку. Власник сайту (is_owner, без
 // lpz_empl) — org з параметра, як в інших lpz-ендпоінтах.
 export default async function handler(req, res) {
   try {
@@ -46,7 +49,7 @@ export default async function handler(req, res) {
     if (appUser?.is_owner && queryOrg) {
       query = query.eq('org_edrpou', queryOrg)
       scope = 'hospital'
-    } else if (lpzEmpl && (lpzEmpl.role === 'chief' || lpzEmpl.role === 'deputy')) {
+    } else if (lpzEmpl?.role === 'chief') {
       query = query.eq('org_edrpou', lpzEmpl.org_edrpou)
       scope = 'hospital'
     } else if (lpzEmpl?.role === 'head' && lpzEmpl.department_structure_id) {
@@ -56,7 +59,7 @@ export default async function handler(req, res) {
       query = query.eq('org_edrpou', lpzEmpl.org_edrpou).eq('doctor_resource_id', lpzEmpl.resource_id)
       scope = 'doctor'
     } else {
-      return res.status(403).json({ error: 'доступ лише для керівництва, завідувачів і лікарів' })
+      return res.status(403).json({ error: 'доступ лише для головного лікаря, завідувачів і лікарів' })
     }
 
     // PostgREST віддає не більше 1000 рядків за запит — догружаємо сторінками.
@@ -68,12 +71,21 @@ export default async function handler(req, res) {
       if (!data || data.length < 1000) break
     }
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv' }).format(new Date())
+    // Гроші бачить лише головний лікар (і власник сайту) — лікарям і
+    // завідувачам достатньо зауважень і підказок.
+    const showMoney = scope === 'hospital'
     rows.forEach(r => {
       r.segment = r.is_open ? 'open' : (r.fix_deadline && r.fix_deadline >= today ? 'fixable' : 'lost')
+      r.addressee = r.doctor_resource_id ? 'doctor' : 'head'
+      if (showMoney) {
+        r.est_price = estimatePrice(r)
+        r.est_risk = estimateRisk(r, r.est_price)
+      }
     })
     res.status(200).json({
       scope,
       today,
+      pricing_source: showMoney ? PRICING_SOURCE : null,
       checked_at: rows.reduce((m, r) => ((r.checked_at || '') > m ? r.checked_at : m), ''),
       rows,
     })

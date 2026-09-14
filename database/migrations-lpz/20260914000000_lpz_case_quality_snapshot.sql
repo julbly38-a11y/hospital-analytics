@@ -40,5 +40,12 @@ create table lpz.lpz_case_quality_snapshot (
 create index lpz_case_quality_snapshot_org_dept on lpz.lpz_case_quality_snapshot (org_edrpou, department_structure_id);
 alter table lpz.lpz_case_quality_snapshot enable row level security;
 
+-- hints — вторинні підказки з даних самого випадку: { код_зауваження: текст }.
+alter table lpz.lpz_case_quality_snapshot add column if not exists hints jsonb not null default '{}'::jsonb;
+-- Вхідні дані для орієнтовної вартості випадку (lib/quality-pricing.js).
+alter table lpz.lpz_case_quality_snapshot
+  add column if not exists operations_count int not null default 0,
+  add column if not exists admission_priority text;
+
 grant select, insert, update, delete on lpz.lpz_case_quality_snapshot to service_role;
 grant usage, select on sequence lpz.lpz_case_quality_snapshot_id_seq to service_role;

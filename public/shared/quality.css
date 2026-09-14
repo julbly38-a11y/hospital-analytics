@@ -109,3 +109,33 @@
 }
 .q-open-link:hover { text-decoration: underline; }
 .q-case:hover .q-case-num { color: #6d93d8; }
+
+.q-money { color: var(--c-accent-berry); }
+.q-source { margin-top: 10px; font-size: 11.5px; color: var(--c-taupe-light); font-weight: 300; }
+
+/* Нотатка над некоректним епізодом — адресат + первинна/вторинна підказки */
+.q-episode { padding: 10px 0 4px; border-top: 1px solid rgba(0,0,0,0.06); }
+.q-episode:first-child { border-top: none; }
+.q-episode .q-case { border-top: none; padding-top: 6px; }
+.q-note {
+  background: rgba(240,236,232,0.92);
+  border: 1px dashed rgba(178,124,139,0.45);
+  border-radius: 8px;
+  padding: 8px 12px 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.q-note-to {
+  font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--c-accent-blue);
+}
+.q-note-to-head { color: var(--c-accent-berry); }
+.q-note-issue { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; border-top: 1px dashed rgba(0,0,0,0.07); }
+.q-note-issue:first-of-type { border-top: none; padding-top: 0; }
+.q-note-line { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-weight: 300; font-size: 14px; line-height: 1.35; color: var(--c-ink-3); }
+.q-note-line b { font-weight: 500; color: var(--c-ink-2); }
+.q-note-tag {
+  font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c-accent-berry); padding-top: 2px;
+}
+.q-note-tag-sec { color: var(--c-accent-blue); }
+.q-note-warn .q-note-line b { color: var(--c-accent-blue); }

@@ -52,6 +52,18 @@ export default async function handler(req, res) {
     return deptList.find(d => d.key === k)?.id || deptList.find(d => k.startsWith(d.key))?.id || null
   }
   const emplByName = new Map((empl || []).map(e => [norm([e.last_name, e.first_name, e.middle_name].join(' ')), e.resource_id]))
+  // Підпис виписки в helsi — скорочено ("Прізвище І. П."); однофамільців з
+  // тими самими ініціалами не зіставляємо — адресатом тоді стає завідувач.
+  const shortKey = (last, first, middle) => norm(`${last} ${(first || '')[0] || ''} ${(middle || '')[0] || ''}`)
+  const emplByShort = new Map()
+  ;(empl || []).forEach(e => {
+    const k = shortKey(e.last_name, e.first_name, e.middle_name)
+    emplByShort.set(k, emplByShort.has(k) ? null : e.resource_id)
+  })
+  const signerId = s => {
+    const m = String(s || '').match(/^\s*(\S+)\s+(\S)\S*\.?\s*(\S)?/)
+    return m ? emplByShort.get(shortKey(m[1], m[2], m[3])) || null : null
+  }
 
   const existing = new Map()
   const ids = rows.map(r => r.case_id)
@@ -83,8 +95,8 @@ export default async function handler(req, res) {
       los_days: r.los_days,
       department_name: r.dept,
       department_structure_id: deptId(r.dept),
-      doctor_name: r.doctor_short,
-      doctor_resource_id: emplByName.get(norm(r.doctor_full)) || null,
+      doctor_name: r.doctor_short || r.signer_short || null,
+      doctor_resource_id: (r.doctor_full && emplByName.get(norm(r.doctor_full))) || signerId(r.signer_short),
       doctor_position: r.position,
       primary_icd: r.primary,
       primary_name: r.primary_name,
@@ -94,6 +106,9 @@ export default async function handler(req, res) {
       discharge_ehealth_status: r.discharge_status,
       flags: r.flags,
       warnings: r.warnings,
+      hints: r.hints || {},
+      operations_count: r.operations_count || 0,
+      admission_priority: r.priority || null,
       fix_deadline: r.is_open ? null : fixDeadline(r.end),
       snapshot_at: now,
       checked_at: now,
@@ -121,5 +136,7 @@ export default async function handler(req, res) {
     resolved,
     removed_stale_open: removed || 0,
     dept_unmatched: [...new Set(out.filter(o => !o.department_structure_id).map(o => o.department_name))],
+    addressed_to_doctor: out.filter(o => o.doctor_resource_id && o.flags.length + o.warnings.length).length,
+    addressed_to_head: out.filter(o => !o.doctor_resource_id && o.flags.length + o.warnings.length).length,
   })
 }
