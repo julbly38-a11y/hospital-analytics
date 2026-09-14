@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     const money = access.showMoney
     const today = kyivDate(new Date())
 
-    let rows = await fetchSnapshotRows(access, { wholeHospital })
+    let rows = await fetchSnapshotRows(access, { wholeHospital, light: true })
     if (direction) {
       const { data: depts, error } = await access.sb.schema('lpz').from('lpz_departments')
         .select('structure_id').eq('org_edrpou', access.org).eq('direction', direction)
