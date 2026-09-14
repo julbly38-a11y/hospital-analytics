@@ -139,3 +139,10 @@
 }
 .q-note-tag-sec { color: var(--c-accent-blue); }
 .q-note-warn .q-note-line b { color: var(--c-accent-blue); }
+/* Посилання в розділ епізоду helsi, де виправляється саме це зауваження */
+.q-fix-link {
+  margin-left: 6px; white-space: nowrap;
+  font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--c-accent-blue); text-decoration: none;
+}
+.q-fix-link:hover { text-decoration: underline; }

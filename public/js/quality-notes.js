@@ -104,6 +104,22 @@ function qCaseStateHtml(r, today) {
   return `${discharged} · <span class="q-deadline-lost">строк минув ${qFmtDate(r.fix_deadline)}</span>`;
 }
 
+// Розділ епізоду в helsi, де виправляється зауваження (перевірено на живих
+// епізодах ЛШМД 14.09.2026): "Головна" — блоки діагнозів, наданих послуг,
+// процедур і лікуючий лікар; "Хронологія" з фільтром виписки; "Розміщення" —
+// переміщення між відділеннями. Глибше за розділ адреса helsi не веде.
+const Q_HELSI_SECTION = {
+  discharge_not_registered: 'tabName=CHRONOLOGY&type=discharge',
+  overlap: 'tabName=LIST_TRANSFERS',
+};
+const Q_HELSI_WINDOW = 'helsi';
+
+// target=Q_HELSI_WINDOW — усі посилання відкриваються в одній вкладці helsi:
+// перший клік створює її, наступні перезавантажують ту саму.
+function qHelsiUrl(r, code) {
+  return `https://helsi.pro/hospital/cases/${encodeURIComponent(r.helsi_case_id)}?${Q_HELSI_SECTION[code] || 'tabName=MAIN'}`;
+}
+
 function qNoteHtml(r) {
   const to = r.addressee === 'doctor'
     ? `<span class="q-note-to">Лікарю: ${qEsc(r.doctor_name || '—')}</span>`
@@ -114,7 +130,7 @@ function qNoteHtml(r) {
     const secondary = (r.hints && r.hints[i.code]) || f.check;
     return `
       <div class="q-note-issue${warn ? ' q-note-warn' : ''}">
-        <div class="q-note-line"><span class="q-note-tag">первинна</span><span><b>${f.title}${warn ? ' · попередження' : ''}.</b> ${warn && f.warn ? f.warn : f.rule}</span></div>
+        <div class="q-note-line"><span class="q-note-tag">первинна</span><span><b>${f.title}${warn ? ' · попередження' : ''}.</b> ${warn && f.warn ? f.warn : f.rule} <a class="q-fix-link" href="${qHelsiUrl(r, i.code)}" target="${Q_HELSI_WINDOW}">виправити в helsi ↗</a></span></div>
         <div class="q-note-line"><span class="q-note-tag q-note-tag-sec">вторинна</span><span>${qEsc(secondary)}</span></div>
       </div>`;
   }).join('');
@@ -144,7 +160,7 @@ function qEpisodeHtml(r, today) {
           ${qMoneyHtml(r)}
         </div>
         <div class="q-case-side">
-          <a class="q-open-link" href="https://helsi.pro/hospital/cases/${encodeURIComponent(r.helsi_case_id)}" target="_blank" rel="noopener">відкрити в helsi ↗</a>
+          <a class="q-open-link" href="${qHelsiUrl(r, null)}" target="${Q_HELSI_WINDOW}">відкрити в helsi ↗</a>
         </div>
       </div>
     </div>`;
