@@ -130,7 +130,7 @@ function renderQualityKpi() {
   const fixable = qSegmentRows('fixable');
   const urgent = fixable.filter(r => (qDaysLeft(r.fix_deadline) ?? 99) <= 3);
   const lost = qSegmentRows('lost');
-  set('checked', fmt(Q_STATE.rows.length));
+  set('checked', fmt(Q_STATE.totalChecked));
   if (Q_STATE.money) {
     set('open', qMoney(qSum(open)), 'ризик, грн');
     set('fixable', qMoney(qSum(fixable)), 'врятувати, грн');
@@ -294,6 +294,7 @@ function initQuality() {
       .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(e)))
       .then(data => {
         Q_STATE.rows = data.rows || [];
+        Q_STATE.totalChecked = data.total_checked ?? Q_STATE.rows.length;
         Q_STATE.scope = data.scope;
         Q_STATE.today = data.today;
         Q_STATE.money = Q_STATE.rows.some(r => r.est_price != null);

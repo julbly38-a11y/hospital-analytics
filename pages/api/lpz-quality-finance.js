@@ -12,7 +12,6 @@ import { resolveQualityAccess, fetchSnapshotRows, segmentOf, kyivDate } from '..
 // kpi, лише коли період містить сьогоднішній день. direction — терапевтичний/
 // хірургічний (блоки напрямків на entry.html), у межах дозволеного обсягу.
 
-const COLUMNS = 'is_open, discharge_at, fix_deadline, flags, warnings, department_structure_id, primary_icd, operations_count, admission_priority, checked_at'
 const SEGMENTS = ['ok', 'fixable', 'lost']
 
 function emptyBucket(money) {
@@ -53,7 +52,7 @@ export default async function handler(req, res) {
     const money = access.showMoney
     const today = kyivDate(new Date())
 
-    let rows = await fetchSnapshotRows(access, COLUMNS, { wholeHospital })
+    let rows = await fetchSnapshotRows(access, { wholeHospital })
     if (direction) {
       const { data: depts, error } = await access.sb.schema('lpz').from('lpz_departments')
         .select('structure_id').eq('org_edrpou', access.org).eq('direction', direction)

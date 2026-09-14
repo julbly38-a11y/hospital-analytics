@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { invalidateSnapshotCache } from '../../lib/quality-access'
 
 // Щоденне перенесення перевірки випадків із вкладки helsi.pro у
 // lpz_case_quality_snapshot (scripts/helsi_quality_daily.js). Лише для
@@ -128,6 +129,8 @@ export default async function handler(req, res) {
     .delete({ count: 'exact' })
     .eq('org_edrpou', org).eq('is_open', true).lt('checked_at', runStartedAt)
 
+  // Нові дані перевірки — скинути кеш кабінетів (lib/quality-access.js).
+  invalidateSnapshotCache(org)
   res.status(200).json({
     upserted: out.length,
     open: out.filter(o => o.is_open).length,

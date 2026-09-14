@@ -63,14 +63,17 @@ export default async function handler(req, res) {
         r.est_risk = estimateRisk(r, r.est_price)
       }
     })
-    // Лише епізоди із зауваженнями — список показує тільки їх.
-    if (req.query.names === '1') await attachNames(access, rows.filter(hasIssues))
+    // Віддаємо лише епізоди із зауваженнями (сторінки показують тільки їх);
+    // правильні — лише загальною кількістю перевірених (total_checked).
+    const withIssues = rows.filter(hasIssues)
+    if (req.query.names === '1') await attachNames(access, withIssues)
     res.status(200).json({
       scope: access.scope,
       today,
       pricing_source: access.showMoney ? PRICING_SOURCE : null,
       checked_at: rows.reduce((m, r) => ((r.checked_at || '') > m ? r.checked_at : m), ''),
-      rows,
+      total_checked: rows.length,
+      rows: withIssues,
     })
   } catch (e) {
     res.status(500).json({ error: e.message })
