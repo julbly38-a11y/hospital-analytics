@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Слайд</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&subset=cyrillic&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/shared/theme.css">
+<link rel="stylesheet" href="/shared/layout.css">
+<script>
+  // без ?org=<едрпоу> лікарня не обрана — сторінка чекає вибору в devOrgSwitch
+  // нижче, щоб не показувати чужі дані за замовчуванням (раніше тут мовчки
+  // підставлявся Хотин).
+  window.HOSPITAL_ORG_EDRPOU = new URLSearchParams(location.search).get('org') || '';
+</script>
+<script src="/js/utils.js"></script>
+<script src="/js/page-shell.js"></script>
+<script src="/js/staff-login.js"></script>
+<script src="/js/scale-slide.js"></script>
+</head>
+<body>
+<!-- dev-перемикач лікарень: тимчасовий, поки немає зручного адмін-доступу під час налаштування -->
+<select id="devOrgSwitch" style="position:fixed; top:8px; left:8px; z-index:9999; font-family:sans-serif; font-size:13px; padding:3px 6px;">
+  <option value="" disabled selected>Оберіть лікарню</option>
+  <option value="02005875">Хотинська</option>
+  <option value="43342788">ЛШМД</option>
+</select>
+<script>
+  (function () {
+    const sel = document.getElementById('devOrgSwitch');
+    if (window.HOSPITAL_ORG_EDRPOU) sel.value = window.HOSPITAL_ORG_EDRPOU;
+    sel.addEventListener('change', () => { location.href = '/layout.html?org=' + sel.value; });
+  })();
+</script>
+<div class="slide-wrapper">
+  <div class="slide" id="slideRoot"></div>
+</div>
+<script>
+  renderShell(document.getElementById('slideRoot'));
+  // initHospitalName() і initStaffFields() вже викликає utils.js на
+  // DOMContentLoaded — до цього моменту DOM з renderShell() вже готовий,
+  // тож повторний виклик тут лише подвоїв би обробники (баг з подвійним toggle).
+  initStaffLogin('/entry.html');
+</script>
+</body>
+</html>

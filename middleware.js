@@ -23,7 +23,7 @@ export async function middleware(request) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const publicPaths = ['/', '/login', '/auth', '/_next', '/favicon.ico', '/api', '/title-test', '/khotyn_slide.html']
+  const publicPaths = ['/', '/login', '/auth', '/_next', '/favicon.ico', '/api', '/title-test', '/layout.html']
   const isPublic = publicPaths.some(p => request.nextUrl.pathname === p || (p !== '/' && request.nextUrl.pathname.startsWith(p)))
 
   if (!user && !isPublic) {
@@ -36,6 +36,6 @@ export async function middleware(request) {
 
 export const config = {
   // ВАЖЛИВО: не вписувати сюди статичні .html з public/ — на Vercel такий файл
-  // не віддається статичним шаром і дає 404. Захист kabinet.html — на клієнті (fetch /api/me).
+  // не віддається статичним шаром і дає 404. Захист entry.html — на клієнті (fetch /api/me).
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.).*)'],
 }
