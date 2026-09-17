@@ -1,37 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
+import { SANS, MONO, BLOCK_CFG, fetchStats, fmt, initials } from '../components/shared'
 
-const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
-const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
-
-const BLOCK_CFG = {
-  'приймально_діагностичний': { color: '#c0392b', label: 'Приймально-діагностичний' },
-  'клінічний':                { color: '#4a9870', label: 'Клінічні відділення' },
-  'анестезіологія_іт':        { color: '#2563eb', label: 'Анестезіологія та ІТ' },
-  'параклінічний':            { color: '#6b7280', label: 'Параклінічні' },
-  'адміністративний':         { color: '#7c3aed', label: 'Адміністративний' },
-}
 const BLOCK_ORDER = ['приймально_діагностичний', 'клінічний', 'анестезіологія_іт', 'параклінічний', 'адміністративний']
-
-async function fetchStats(key, param) {
-  const r = await fetch('/api/stats', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(param !== undefined ? { key, param } : { key }),
-  })
-  const d = await r.json()
-  return d.rows || []
-}
-
-function fmt(v, suffix = '') {
-  if (v == null || v === '') return '—'
-  const n = Number(v)
-  return isNaN(n) ? '—' : n.toLocaleString('uk') + suffix
-}
-
-function initials(name = '') {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
-}
 
 /* ── Stat number (same as index.js) ─────────────────── */
 function Stat({ value, label, large }) {
@@ -190,7 +162,6 @@ export default function OrgPage() {
       <Head>
         <title>ЛСМД · Структура лікарні</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: '#eeeae4', ...SANS }}>

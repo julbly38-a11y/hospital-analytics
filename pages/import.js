@@ -2,29 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
 import { IMPORT_TABLES, IMPORT_TABLE_KEYS } from '../lib/import-config'
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px 12px',
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '6px',
-  color: 'var(--text)',
-  fontSize: '14px',
-  fontFamily: 'var(--mono)',
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const labelStyle = {
-  display: 'block',
-  marginBottom: '6px',
-  fontSize: '11px',
-  color: 'var(--text3)',
-  fontFamily: 'var(--mono)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.08em',
-}
+import { formInputStyle as inputStyle, formLabelStyle as labelStyle } from '../components/shared'
 
 const cardStyle = {
   background: 'var(--surface)',

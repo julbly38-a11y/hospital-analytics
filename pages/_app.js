@@ -4,7 +4,7 @@ import '../styles/globals.css'
 import { createClient } from '../lib/supabase'
 
 /* Сторінки без авторизації */
-const PUBLIC = ['/', '/login', '/auth/reset-password']
+const PUBLIC = ['/', '/login', '/auth/reset-password', '/charts']
 
 /* Сторінки тільки для адміна */
 const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics']

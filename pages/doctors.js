@@ -2,14 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 import Link from 'next/link'
+import { BLOCK_CFG, fetchStats } from '../components/shared'
 
-const BLOCK_CFG = {
-  'приймально_діагностичний': { color: '#c0392b' },
-  'клінічний':                { color: '#4a9870' },
-  'анестезіологія_іт':        { color: '#2563eb' },
-  'параклінічний':            { color: '#6b6760' },
-  'адміністративний':         { color: '#7c3aed' },
-}
 const DEFAULT_COLOR = '#2563eb'
 const MONO = { fontFamily: 'var(--mono)' }
 const lbl  = { fontSize: 9, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', ...MONO }
@@ -44,16 +38,6 @@ function HierStatsBar({ stats, loading, accent = '#cfae5a', label = '' }) {
       ))}
     </div>
   )
-}
-
-async function fetchStats(key, param) {
-  const body = param !== undefined ? { key, param } : { key }
-  const r = await fetch('/api/stats', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  const d = await r.json()
-  return d.rows || []
 }
 
 async function fetchHier(scope, id, from, to) {
@@ -121,7 +105,6 @@ export default function DoctorPage() {
       <Head>
         <title>ЛСМД · {name || 'Лікар'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 32px', maxWidth: 960, margin: '0 auto' }}>

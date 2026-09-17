@@ -2,30 +2,7 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-
-const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
-const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
-
-const PIE_COLORS = ['#4e9af1', '#6dd5c0', '#f7c948', '#e86a4e', '#a78bfa']
-
-async function fetchStats(key, param) {
-  const r = await fetch('/api/stats', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(param !== undefined ? { key, param } : { key }),
-  })
-  const d = await r.json()
-  return d.rows || []
-}
-
-function fmt(v, suffix = '') {
-  if (v == null || v === '') return '—'
-  const n = Number(v)
-  return isNaN(n) ? '—' : n.toLocaleString('uk') + suffix
-}
-
-function initials(name = '') {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
-}
+import { SANS, MONO, PIE_COLORS, fetchStats, fmt, initials } from '../components/shared'
 
 /* ── Same Stat as index.js ───────────────────────────── */
 function Stat({ value, label, large }) {
@@ -157,7 +134,6 @@ export default function DeptPage() {
       <Head>
         <title>ЛСМД · Кабінет відділення</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
       </Head>
 
       <div style={{ minHeight: '100vh', background: '#eeeae4', ...SANS }}>
