@@ -480,6 +480,7 @@ function renderOwnerOrgSwitch() {
       <option value="" disabled selected>Оберіть лікарню</option>
       <option value="02005875">Хотинська</option>
       <option value="43342788">ЛШМД</option>
+      <option value="43343870">Онкоцентр</option>
     </select>
   `);
   document.getElementById('devOrgSwitch').addEventListener('change', (e) => {
