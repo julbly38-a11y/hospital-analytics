@@ -170,9 +170,65 @@ function qFmtDateTime(iso) {
   return `${qFmtDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// Людські назви полів журналу змін (r.activity.events) — ключі з
+// pages/api/local-quality-ingest.js:fieldsOf.
+const Q_ACTIVITY_FIELDS = {
+  primary: 'основний діагноз',
+  dx_codes: 'діагнози',
+  procs_count: 'втручань',
+  operations_count: 'операцій',
+  doctor: 'лікуючий лікар',
+  disposition: 'результат лікування',
+  discharge_status: 'статус виписки в ЕСОЗ',
+  is_open: 'стан епізоду',
+  flags: 'помилки',
+  warnings: 'попередження',
+};
+// Значення поля «було/стало» у читабельний рядок: стан → відкритий/закритий,
+// статус виписки — з довідника, помилки/попередження — назвами Q_FLAGS,
+// списки — через кому. Дані користувача екрануємо (qEsc), назви з констант — ні.
+function qActivityVal(field, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (field === 'is_open') return v ? 'відкритий' : 'закритий';
+  if (field === 'discharge_status') return Q_DISCHARGE_STATUS[v] || qEsc(String(v));
+  if (Array.isArray(v)) {
+    if (!v.length) return 'немає';
+    if (field === 'flags' || field === 'warnings') return v.map(c => (Q_FLAGS[c] && Q_FLAGS[c].title) || qEsc(c)).join(', ');
+    return qEsc(v.join(', '));
+  }
+  return qEsc(String(v));
+}
+// Журнал активності епізоду з r.activity (pages/api/lpz-case-quality.js):
+// коли востаннє змінювався запис, перелік змін значущих полів (наповнюється
+// з 2-го прогону) і виправлені зауваження з датами. Порожній — нічого не
+// показуємо.
+function qActivityHtml(r) {
+  const a = r.activity;
+  if (!a) return '';
+  const rows = [];
+  if (a.last_change_at) rows.push(`<div class="q-detail-row"><span class="q-detail-k">останні зміни</span><span>${qFmtDateTime(a.last_change_at)}</span></div>`);
+  (a.events || []).slice().reverse().forEach(ev => {
+    const changes = (ev.changes || []).map(c =>
+      `${Q_ACTIVITY_FIELDS[c.field] || qEsc(c.field)}: ${qActivityVal(c.field, c.from)} → ${qActivityVal(c.field, c.to)}`
+    ).join('; ');
+    if (changes) rows.push(`<div class="q-detail-row"><span class="q-detail-k">${qFmtDateTime(ev.at)}</span><span>${changes}</span></div>`);
+  });
+  (a.fixed || []).forEach(fx => {
+    const title = (Q_FLAGS[fx.code] && Q_FLAGS[fx.code].title) || qEsc(fx.code);
+    rows.push(`<div class="q-detail-row"><span class="q-detail-k">виправлено ${qFmtDate(fx.fixed_at)}</span><span>${title}</span></div>`);
+  });
+  if (!rows.length) return '';
+  return `
+    <div class="q-detail-issue">
+      <div class="q-detail-issue-title">Активність <span class="q-detail-kind">журнал</span></div>
+      ${rows.join('')}
+    </div>`;
+}
+
 // Розгортка епізоду по кліку: по кожному зауваженню — чому це важливо й що
 // перевірити (у нотатці над епізодом лише правило й деталі з даних), далі всі
-// факти запису, з яких зроблено висновок, і — для головного лікаря — розбір суми.
+// факти запису, з яких зроблено висновок, журнал активності і — для головного
+// лікаря — розбір суми.
 function qDetailHtml(r) {
   const issues = qIssues(r).map(i => {
     const f = Q_FLAGS[i.code];
@@ -213,6 +269,7 @@ function qDetailHtml(r) {
     <div class="q-detail">
       ${issues}
       <div class="q-detail-facts">${facts}</div>
+      ${qActivityHtml(r)}
       ${money}
     </div>`;
 }
