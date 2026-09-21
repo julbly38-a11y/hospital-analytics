@@ -96,6 +96,22 @@ window.runQualityDaily = async function ({
           getJson(`${API}/case-dashboard/${id}/procedures/?page=1`),
           getJson(`${API}/case-dashboard/${id}/services/?page=1`),
         ])
+        // Сторінка case-dashboard — лише 5 записів. Якщо на першій сторінці немає
+        // жодного коду втручання, вони можуть бути далі (на вибірці 22.09.2026:
+        // 2 із 40 «no_interventions» мали коди на пізніших сторінках — 28 і 15
+        // послуг). Дочитуємо, поки код не знайдено або сторінки не скінчились;
+        // перевірка потребує лише «чи є хоч один код», тож епізоди з кодом на
+        // першій сторінці нічого зайвого не запитують.
+        const hasCode = list => (list?.results || []).some(x => x.service?.code && INTERVENTION_CODE.test(x.service.code))
+        const readMore = async (kind, first) => {
+          for (let page = 2; first.next && !hasCode(pr) && !hasCode(sv); page++) {
+            const j = await getJson(`${API}/case-dashboard/${id}/${kind}/?page=${page}`)
+            first.results.push(...(j.results || []))
+            first.next = j.next
+          }
+        }
+        await readMore('procedures', pr)
+        await readMore('services', sv)
         details[i] = { d, pr, sv }
         state.detailed++
       }
