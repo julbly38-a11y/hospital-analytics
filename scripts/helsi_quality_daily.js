@@ -28,6 +28,8 @@ window.runQualityDaily = async function ({
   }
   const API = '/api/hospital/api/v1'
   const INTERVENTION_CODE = /^\d{5}-\d{2}$/
+  const OPEN_STATUSES = ['open', 'on_discharge']
+  const CLOSED_STATUSES = ['closed', 'pending_registration', 'registered']
   const nowMs = Date.now()
   const sinceMs = new Date(closedSince + 'T00:00:00+03:00').getTime()
   const stopMs = sinceMs - 60 * 86400000
@@ -47,15 +49,18 @@ window.runQualityDaily = async function ({
 
   try {
     const picked = resume ? prev.picked : []
-    if (!resume) for (let skip = 0; ; skip += 100) {
-      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=open`)
+    // У helsi статусів епізоду п'ять: open, on_discharge (виписку розпочато) —
+    // пацієнт ще у відділенні; closed, pending_registration (виписаний, очікує
+    // реєстрації в ЕСОЗ), registered (виписка зареєстрована) — виписаний.
+    if (!resume) for (const status of OPEN_STATUSES) for (let skip = 0; ; skip += 100) {
+      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=${status}`)
       j.results.forEach(c => picked.push({ id: c.id }))
       state.listed = picked.length
       if (!j.has_next) break
     }
     state.stage = 'list-closed'
-    if (!resume) listing: for (let skip = 0; ; skip += 100) {
-      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=closed`)
+    if (!resume) for (const status of CLOSED_STATUSES) listing: for (let skip = 0; ; skip += 100) {
+      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=${status}`)
       for (const c of j.results) {
         const start = new Date(c.start_datetime).getTime()
         const end = c.end_datetime ? new Date(c.end_datetime).getTime() : null
@@ -100,7 +105,7 @@ window.runQualityDaily = async function ({
 
     state.stage = 'rules'
     const episodes = details.map(({ d, pr, sv }) => {
-      const open = d.status === 'open'
+      const open = OPEN_STATUSES.includes(d.status)
       const s = new Date(d.start_datetime).getTime()
       const e = d.end_datetime ? new Date(d.end_datetime).getTime() : nowMs
       const dx = (d.case_diagnosis || [])
@@ -148,7 +153,7 @@ window.runQualityDaily = async function ({
         ).join(' ') + ' Якщо це перевід між відділеннями — має бути один випадок.')
       }
       if (!cm && (open || !signer)) {
-        add(open ? warnings : flags, 'no_doctor', open
+        add(warnings, 'no_doctor', open
           ? 'Лікуючого лікаря не вказано — призначте лікаря, який веде пацієнта.'
           : 'Лікуючого лікаря не вказано, виписку ніхто не підписав.')
       }
@@ -169,6 +174,9 @@ window.runQualityDaily = async function ({
       }
       const interventionHint = 'У розділах «процедури» і «послуги» немає жодного коду втручання НК 026:2021.'
 
+      // Попередження, а не помилка, і для закритих: no_doctor, single_diagnosis,
+      // injury_no_external_cause оплату не блокують (перевірено package-validation,
+      // 18.09.2026), але правила НСЗУ можуть змінитись — тож фіксуємо їх.
       if (open) {
         if (/^R/.test(primary || '') && los >= 2) add(warnings, 'symptom_primary', symptomHint())
         if (/^[ST]/.test(primary || '') && d.injury_type == null) add(warnings, 'injury_no_external_cause', injuryHint())
@@ -177,9 +185,9 @@ window.runQualityDaily = async function ({
         if (los > 30) add(warnings, 'open_too_long', `Епізод відкрито ${dmy(d.start_datetime)}, ${Math.floor(los)} діб. Якщо пацієнта виписано — закрийте епізод і оформіть виписку.`)
       } else {
         if (/^R/.test(primary || '')) add(flags, 'symptom_primary', symptomHint())
-        if (/^[ST]/.test(primary || '') && d.injury_type == null) add(flags, 'injury_no_external_cause', injuryHint())
+        if (/^[ST]/.test(primary || '') && d.injury_type == null) add(warnings, 'injury_no_external_cause', injuryHint())
         if (!ep.interventionCodes.length) add(flags, 'no_interventions', interventionHint)
-        if (dx.length <= 1) add(flags, death ? 'death_single_diagnosis' : 'single_diagnosis', singleHint())
+        if (dx.length <= 1) add(death ? flags : warnings, death ? 'death_single_diagnosis' : 'single_diagnosis', singleHint())
         const st = d.discharge?.helsi_status
         if (st !== 'registered') {
           const by = signer ? ` (автор: ${signer})` : ''

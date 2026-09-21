@@ -27,12 +27,14 @@ function emptyBucket(money) {
 // *_price — повна вартість епізодів сегмента; *_risk — яку частину з неї
 // орієнтовно втрачено (lost) або ще можна врятувати (fixable). У правильних
 // епізодів ризику немає.
+// warned (закриті лише з попередженнями) — не помилка, рахується як правильний.
 function addTo(b, r, money) {
+  const seg = r.segment === 'warned' ? 'ok' : r.segment
   b.cases += 1
-  b[r.segment] += 1
+  b[seg] += 1
   if (money) {
-    b[`${r.segment}_price`] += r.est_price
-    if (r.segment !== 'ok') b[`${r.segment}_risk`] += r.est_risk
+    b[`${seg}_price`] += r.est_price
+    if (seg !== 'ok') b[`${seg}_risk`] += r.est_risk
   }
 }
 
@@ -53,6 +55,12 @@ export default async function handler(req, res) {
     const today = kyivDate(new Date())
 
     let rows = await fetchSnapshotRows(access, { wholeHospital, light: true })
+    // basis=nszu — лише епізоди з розрахунком НСЗУ (реальна ціна package-validation);
+    // за замовчуванням — усі (точні + орієнтовні).
+    // Покриття (до фільтра бази) — для підписів перемикача: усього епізодів і
+    // скільки з них мають розрахунок НСЗУ.
+    const coverage = { total: rows.length, nszu: rows.filter(r => r.real_price).length }
+    if (req.query.basis === 'nszu') rows = rows.filter(r => r.real_price)
     if (direction) {
       const { data: depts, error } = await access.sb.schema('lpz').from('lpz_departments')
         .select('structure_id').eq('org_edrpou', access.org).eq('direction', direction)
@@ -113,6 +121,7 @@ export default async function handler(req, res) {
       data_from: dataFrom,
       checked_at: rows.reduce((m, r) => ((r.checked_at || '') > m ? r.checked_at : m), ''),
       pricing_source: money ? PRICING_SOURCE : null,
+      coverage,
       kpi,
       trend: [...trend.entries()].sort((a, b) => a[0] - b[0]).map(([x, b]) => ({ x, ...b })),
     })

@@ -23,6 +23,7 @@ window.collectPackageValidation = async function ({
   closedSince,
   limit = 25,
   concurrency = 3,
+  statuses = ['closed', 'pending_registration', 'registered'], // виписані епізоди (документ виписки є лише в них)
   ids = null, // масив helsi_case_id — для точкової перевірки конкретних епізодів
   cardNumbers = null, // масив номерів карток (напр. [15645, 15547, 12559, 15649]) — резолвиться в id пошуком по відкритих+закритих за весь період збору (04.05-...)
 } = {}) {
@@ -42,8 +43,10 @@ window.collectPackageValidation = async function ({
   const stopMs = sinceMs - 60 * 86400000
 
   const getJson = async (url, opts) => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const r = await fetch(url, { credentials: 'include', ...opts })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      // Збій мережі (fetch кидає TypeError "Failed to fetch") — теж повторюємо
+      const r = await fetch(url, { credentials: 'include', ...opts }).catch(() => null)
+      if (!r) { await new Promise(ok => setTimeout(ok, 1500 * (attempt + 1))); continue }
       if (r.status === 401) throw new Error('Сесія helsi завершилась — увійдіть знову й викличте collectPackageValidation з тими самими параметрами')
       if (r.status >= 200 && r.status < 500) return r // 4xx повертаємо як є — це дані про помилку валідації, не збій мережі
       await new Promise(ok => setTimeout(ok, 800))
@@ -141,8 +144,8 @@ window.collectPackageValidation = async function ({
     } else {
       state.stage = 'list-closed'
       const cases = []
-      listing: for (let skip = 0; ; skip += 100) {
-        const j = await (await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=closed`)).json()
+      for (const status of statuses) listing: for (let skip = 0; ; skip += 100) {
+        const j = await (await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=${status}`)).json()
         for (const c of j.results) {
           const end = c.end_datetime ? new Date(c.end_datetime).getTime() : null
           const start = new Date(c.start_datetime).getTime()

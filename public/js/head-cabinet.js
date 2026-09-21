@@ -395,7 +395,7 @@ function wireAdminDoctorNav(docsList, org, deptId, deptName) {
       const params = new URLSearchParams({ org, dept: deptId, deptName: deptName || '', doctor: el.dataset.doctor, doctorName: el.dataset.doctorName || '' });
       // Перехід у фінансовому режимі лишає режим (кабінет лікаря одразу з
       // його епізодами й підказками).
-      if (FIN_MODE) params.set('fin', '1');
+      if (FIN_MODE) { params.set('fin', '1'); if (finBasis() === 'nszu') params.set('basis', 'nszu'); }
       window.location.href = '/doctor-cabinet.html?' + params.toString();
     });
   });

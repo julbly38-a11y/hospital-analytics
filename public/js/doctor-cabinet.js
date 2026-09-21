@@ -175,7 +175,7 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
           if (el.dataset.doctor === ownDoctorId) return;
           el.addEventListener('click', () => {
             const params = new URLSearchParams({ org, dept: deptId, deptName: deptName || '', doctor: el.dataset.doctor, doctorName: el.dataset.doctorName || '' });
-            if (FIN_MODE) params.set('fin', '1');
+            if (FIN_MODE) { params.set('fin', '1'); if (finBasis() === 'nszu') params.set('basis', 'nszu'); }
             window.location.href = '/doctor-cabinet.html?' + params.toString();
           });
         });
@@ -187,6 +187,93 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
 // Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
 // нижче (utils.js:HOSPITAL_THEME_PENDING).
 window.HOSPITAL_THEME_PENDING = true;
+
+// ── Нагадування лікарю по його відкритих пацієнтах — вкладка «Нагадування · N»
+// в полі «Перебуває у відділенні» (те саме поле й розмір, список підміняється).
+// Правило й дані — /api/lpz-case-quality?reminders=1 (lib/quality-access.js:
+// buildReminder): від 3-ї доби перебування, поки в записі є що дооформити;
+// історія проблем і «запис не змінювався» — з hints.__track (щоденний прогін). ──
+let remindMode = false;
+
+function reminderItemHtml(r) {
+  const rem = r.reminder;
+  const patient = r.patient_name ? qEsc(r.patient_name) : `картка № ${qEsc(r.card_number || '—')}`;
+  const norm = rem.norm ? ` · норма ≈ ${rem.norm.median} діб` : '';
+  const lines = rem.items.filter(i => Q_FLAGS[i.code]).map(i => {
+    const f = Q_FLAGS[i.code];
+    const hint = (r.hints && r.hints[i.code]) || f.check;
+    const since = i.since_days != null ? ` · триває ${i.since_days} дн.` : '';
+    return `
+      <div class="remind-line ${i.soft ? 'remind-soft' : i.error ? 'remind-err' : 'remind-warn'}">
+        <b>${qEsc(f.title)}</b><span class="remind-since">${since}</span>
+        <a class="q-fix-link" href="${qHelsiUrl(r, i.code)}" target="${Q_HELSI_WINDOW}">виправити в helsi ↗</a>
+        <div class="remind-hint">${qEsc(hint)}</div>
+      </div>`;
+  }).join('');
+  const foot = [
+    rem.unchanged_days != null ? `запис не змінювався ${rem.unchanged_days} дн.` : null,
+    rem.escalate ? 'передано завідувачу' : null,
+  ].filter(Boolean).join(' · ');
+  return `
+    <div class="remind-item${rem.escalate ? ' remind-escalated' : ''}${rem.important ? '' : ' remind-item-soft'}">
+      <div class="remind-head"><span class="remind-patient">${patient}</span><span class="remind-day">доба ${rem.day}${norm}</span></div>
+      <div class="remind-dx">${qEsc(r.primary_icd || '—')} ${qEsc(r.primary_name || '')}</div>
+      ${lines}
+      ${foot ? `<div class="remind-foot">${foot}</div>` : ''}
+    </div>`;
+}
+
+function applyRemindMode() {
+  const census = document.getElementById('censusList');
+  const remind = document.getElementById('remindList');
+  const pill = document.getElementById('censusRemind');
+  if (!census || !remind || !pill) return;
+  census.style.display = remindMode ? 'none' : '';
+  remind.style.display = remindMode ? '' : 'none';
+  pill.classList.toggle('active', remindMode);
+  const fieldMe = document.querySelector('.field-me');
+  if (remindMode && fieldMe) fitHeightTo(remind, offsetInSlide(fieldMe), 20);
+  updateFadeMask(remindMode ? remind : census, 'y');
+}
+
+function loadReminders(org, doctorId) {
+  const title = document.querySelector('.census-title');
+  const census = document.getElementById('censusList');
+  if (!title || !census) return;
+  const q = new URLSearchParams({ org, doctor: doctorId, reminders: '1', names: '1' });
+  fetch(`/api/lpz-case-quality?${q}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      const rows = ((data && data.rows) || []).filter(r => r.reminder)
+        .sort((a, b) => (b.reminder.important - a.reminder.important) || (b.reminder.escalate - a.reminder.escalate) || (b.reminder.day - a.reminder.day));
+      // У лічильнику — лише епізоди з важливими пунктами; «м'які» (оплату не
+      // блокують) — нижче, окремим підзаголовком.
+      const important = rows.filter(r => r.reminder.important);
+      const soft = rows.filter(r => !r.reminder.important);
+      if (!document.getElementById('censusRemind')) {
+        title.insertAdjacentHTML('beforeend', `<span class="census-remind" id="censusRemind"></span>`);
+        census.insertAdjacentHTML('afterend', `<div class="census-list remind-list" id="remindList" style="display:none"></div>`);
+        const remind = document.getElementById('remindList');
+        enableDragScroll(remind, 'y');
+        remind.addEventListener('scroll', () => updateFadeMask(remind, 'y'));
+        // Вкладка вмикається кліком на неї; будь-який власний елемент заголовка
+        // (Перебуває у відділенні, поступило/виписано, скинути дату) — назад до списку.
+        title.addEventListener('click', e => {
+          if (e.target.closest('#censusRemind')) remindMode = !remindMode;
+          else if (e.target.closest('#censusActive, .census-flow-item, .census-reset-date')) remindMode = false;
+          else return;
+          applyRemindMode();
+        });
+      }
+      document.getElementById('censusRemind').textContent = `Нагадування · ${important.length}`;
+      document.getElementById('remindList').innerHTML =
+        (important.map(reminderItemHtml).join('')
+          || '<div class="census-empty" style="position:static">Важливих нагадувань немає</div>')
+        + (soft.length ? `<div class="remind-soft-title">Менш важливе — оплату не блокує · ${soft.length}</div>${soft.map(reminderItemHtml).join('')}` : '');
+      applyRemindMode();
+    })
+    .catch(() => {});
+}
 
 function initDoctorCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {
@@ -247,7 +334,10 @@ function initDoctorCabinet() {
     }
     initHospitalName();
 
-    if (!FIN_MODE) loadCensus(adminOverride ? doctorId : null, { emptyMessage: 'Наразі немає ваших пацієнтів у відділенні' });
+    if (!FIN_MODE) {
+      loadCensus(adminOverride ? doctorId : null, { emptyMessage: 'Наразі немає ваших пацієнтів у відділенні' });
+      loadReminders(org, doctorId);
+    }
   });
 }
 

@@ -19,6 +19,7 @@ window.collectEpisodeFacts = async function ({
   department = 'травматолог', // підрядок для last_department.name, регістр не важливий
   closedSince,
   concurrency = 5,
+  statuses = null, // напр. ['on_discharge','pending_registration','registered'] — лише ці статуси (докомплект); за замовчуванням усі 5
 } = {}) {
   if (!closedSince) {
     const n = new Date()
@@ -35,8 +36,10 @@ window.collectEpisodeFacts = async function ({
   const stopMs = sinceMs - 60 * 86400000
 
   const getJson = async url => {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const r = await fetch(url, { credentials: 'include' })
+    for (let attempt = 0; attempt < 5; attempt++) {
+      // Збій мережі (fetch кидає TypeError "Failed to fetch") — теж повторюємо
+      const r = await fetch(url, { credentials: 'include' }).catch(() => null)
+      if (!r) { await new Promise(ok => setTimeout(ok, 1500 * (attempt + 1))); continue }
       if (r.status === 401) throw new Error('Сесія helsi завершилась — увійдіть знову й викличте collectEpisodeFacts з тими самими параметрами')
       if (r.ok) return r.json()
       await new Promise(ok => setTimeout(ok, 800))
@@ -47,16 +50,19 @@ window.collectEpisodeFacts = async function ({
   try {
     // 1. список випадків обраного профілю — і відкриті, і закриті
     //    (department — підрядок назви last_department.name)
+    // У helsi 5 статусів епізоду: open, on_discharge — ще у відділенні;
+    // closed, pending_registration, registered — виписані.
+    const wanted = s => !statuses || statuses.includes(s)
     const cases = []
-    for (let skip = 0; ; skip += 100) {
-      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=open`)
+    for (const status of ['open', 'on_discharge'].filter(wanted)) for (let skip = 0; ; skip += 100) {
+      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=${status}`)
       for (const c of j.results) {
         if ((c.last_department?.name || '').toLowerCase().includes(department.toLowerCase())) cases.push({ id: c.id })
       }
       if (!j.has_next) break
     }
-    listing: for (let skip = 0; ; skip += 100) {
-      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=closed`)
+    for (const status of ['closed', 'pending_registration', 'registered'].filter(wanted)) listing: for (let skip = 0; ; skip += 100) {
+      const j = await getJson(`${API}/encounter_cases/?limit=100&skip=${skip}&page_size=100&status=${status}`)
       for (const c of j.results) {
         const end = c.end_datetime ? new Date(c.end_datetime).getTime() : null
         const start = new Date(c.start_datetime).getTime()

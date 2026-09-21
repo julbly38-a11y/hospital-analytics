@@ -25,11 +25,19 @@ const Q_SEGMENTS = {
     what: 'Закриті епізоди з помилками, які вже подані й не можуть бути виправлені.',
     why: 'Фактичні втрати. Показують, які помилки повторюються і в яких відділеннях, щоб не допускати їх надалі.',
   },
+  warned: {
+    pill: 'ПОПЕРЕДЖЕННЯ',
+    title: 'Закриті епізоди лише з попередженнями',
+    what: 'Виписані пацієнти, в записах яких немає помилок, а є лише зауваження, що за перевіркою на розрахунку НСЗУ оплату не блокують: немає лікаря, один діагноз, не вказано «Вид травми».',
+    why: 'Не рахуються помилками й не мають грошового ризику, але правила НСЗУ можуть змінитись — тому зауваження зберігаються, щоб було видно, що варто виправляти.',
+  },
 };
 
 const Q_SCOPE_LABEL = { hospital: 'уся лікарня', department: 'моє відділення', doctor: 'мої епізоди' };
 
-const Q_STATE = { rows: [], flag: null, dept: null, segment: 'open', scope: null, today: null, money: false, pricingSource: null };
+// basis: 'all' — усі епізоди (точні за розрахунком НСЗУ + орієнтовні);
+// 'nszu' — лише епізоди, для яких є розрахунок НСЗУ (package-validation).
+const Q_STATE = { rows: [], flag: null, dept: null, segment: 'open', scope: null, today: null, money: false, pricingSource: null, basis: 'all' };
 
 // Гроші (est_price/est_risk) сервер віддає лише головному лікарю.
 const qSum = rows => rows.reduce((s, r) => s + (r.est_risk || 0), 0);
@@ -45,7 +53,7 @@ function qFmtTime(iso) {
 }
 function qDaysLeft(deadline) { return qDaysBetween(Q_STATE.today, deadline); }
 
-function qSegmentRows(seg = Q_STATE.segment) { return Q_STATE.rows.filter(r => r.segment === seg && qHasIssues(r)); }
+function qSegmentRows(seg = Q_STATE.segment) { return Q_STATE.rows.filter(r => r.segment === seg && qHasIssues(r) && (Q_STATE.basis === 'all' || r.nszu_priced)); }
 
 function qVisibleRows() {
   let rows = qSegmentRows();
@@ -130,7 +138,7 @@ function renderQualityKpi() {
   const fixable = qSegmentRows('fixable');
   const urgent = fixable.filter(r => (qDaysLeft(r.fix_deadline) ?? 99) <= 3);
   const lost = qSegmentRows('lost');
-  set('checked', fmt(Q_STATE.totalChecked));
+  set('checked', fmt(Q_STATE.basis === 'nszu' ? Q_STATE.nszuPricedTotal : Q_STATE.totalChecked));
   if (Q_STATE.money) {
     set('open', qMoney(qSum(open)), 'ризик, грн');
     set('fixable', qMoney(qSum(fixable)), 'врятувати, грн');
@@ -152,6 +160,7 @@ function renderQualityFlagList() {
   const el = document.getElementById('qFlagList');
   const base = qSegmentRows().filter(r => !Q_STATE.dept || (r.department_name || '—') === Q_STATE.dept);
   const isOpen = Q_STATE.segment === 'open';
+  const isWarned = Q_STATE.segment === 'warned';
   const items = Q_FLAG_ORDER.map(code => {
     const errors = base.filter(r => (r.flags || []).includes(code)).length;
     const warnings = base.filter(r => (r.warnings || []).includes(code)).length;
@@ -161,9 +170,10 @@ function renderQualityFlagList() {
     const f = Q_FLAGS[i.code];
     const base0 = isOpen
       ? [i.errors && `помилка вже є: ${i.errors}`, i.warnings && `попередження: ${i.warnings}`].filter(Boolean).join(' · ')
+      : isWarned ? 'попередження, оплату не блокує'
       : (f.high ? 'високий ризик для оплати' : 'перевірити');
-    const sub = Q_STATE.money ? `${base0} · ≈ ${qMoney(qSum(base.filter(r => qHas(r, i.code))))} грн` : base0;
-    const high = isOpen ? i.errors > 0 : f.high;
+    const sub = Q_STATE.money && !isWarned ? `${base0} · ≈ ${qMoney(qSum(base.filter(r => qHas(r, i.code))))} грн` : base0;
+    const high = isWarned ? false : isOpen ? i.errors > 0 : f.high;
     return `
       <div class="q-item${Q_STATE.flag === i.code ? ' active' : ''}${high ? ' q-high' : ''}" data-flag="${i.code}">
         ${f.title}<span class="q-count">${i.n}</span>
@@ -210,19 +220,27 @@ function renderQualityDeptList() {
   updateFadeMask(el, 'y');
 }
 
+// Перемикач бази: усі епізоди чи лише ті, що мають розрахунок НСЗУ (точні).
+function qBasisSwitchHtml() {
+  const b = (k, label) => `<span class="q-basis-opt${Q_STATE.basis === k ? ' active' : ''}" data-basis="${k}">${label}</span>`;
+  return `<div class="q-basis">${b('all', `усі епізоди · ${fmt(Q_STATE.totalChecked)}`)}${b('nszu', `реальні дані НСЗУ · ${fmt(Q_STATE.nszuPricedTotal)}`)}</div>`;
+}
+
 function renderQualityExplain() {
   const el = document.getElementById('qExplain');
   const seg = Q_SEGMENTS[Q_STATE.segment];
   const visible = qVisibleRows();
   const deptN = new Set(visible.map(r => r.department_name)).size;
   const headN = visible.filter(r => r.addressee === 'head').length;
-  const moneyLabel = { open: 'під ризиком, грн (оцінка)', fixable: 'можна врятувати, грн (оцінка)', lost: 'втрачено, грн (оцінка)' }[Q_STATE.segment];
+  const moneyLabel = { open: 'під ризиком, грн (оцінка)', fixable: 'можна врятувати, грн (оцінка)', lost: 'втрачено, грн (оцінка)', warned: 'під ризиком, грн (оцінка)' }[Q_STATE.segment];
   const second = Q_STATE.money
     ? { v: qMoney(qSum(visible)), l: moneyLabel }
     : Q_STATE.segment === 'fixable'
       ? { v: visible.filter(r => (qDaysLeft(r.fix_deadline) ?? 99) <= 3).length, l: 'строк спливає за 3 дні' }
       : { v: headN, l: 'адресовано завідувачам (без лікаря)' };
-  const source = Q_STATE.money && Q_STATE.pricingSource ? `<div class="q-source">${qEsc(Q_STATE.pricingSource)}</div>` : '';
+  const share = Q_STATE.nszuMoneyShare != null ? ` (≈ ${Math.round(Q_STATE.nszuMoneyShare * 100)}% суми)` : '';
+  const coverage = `<div class="q-source"><b>Реальні дані НСЗУ (розрахунок package-validation):</b> ${fmt(Q_STATE.nszuPricedTotal)} з ${fmt(Q_STATE.totalChecked)} епізодів${share} — точна ціна; решта — орієнтовна оцінка.</div>`;
+  const source = (Q_STATE.money && Q_STATE.pricingSource ? `<div class="q-source">${qEsc(Q_STATE.pricingSource)}</div>` : '') + coverage;
   const stats = `
     <div class="q-explain-stats">
       <div class="q-stat"><div class="q-stat-v">${visible.length}</div><div class="q-stat-l">епізодів</div></div>
@@ -235,6 +253,7 @@ function renderQualityExplain() {
       <div class="q-explain-head">
         <div class="q-explain-title">${seg.title}</div>
         <div class="q-explain-level">${Q_STATE.dept ? qEsc(Q_STATE.dept) : Q_SCOPE_LABEL[Q_STATE.scope] || ''}</div>
+        ${qBasisSwitchHtml()}
       </div>
       <div class="q-explain-cols">
         <div><div class="q-explain-label">що тут</div><div class="q-explain-text">${seg.what}</div></div>
@@ -244,11 +263,12 @@ function renderQualityExplain() {
     return;
   }
   const f = Q_FLAGS[Q_STATE.flag];
-  const warningOnly = Q_STATE.segment === 'open' && f.warn && !visible.some(r => (r.flags || []).includes(Q_STATE.flag));
+  const warningOnly = (Q_STATE.segment === 'open' || Q_STATE.segment === 'warned') && f.warn && !visible.some(r => (r.flags || []).includes(Q_STATE.flag));
   el.innerHTML = `
     <div class="q-explain-head">
       <div class="q-explain-title">${f.title}</div>
       <div class="q-explain-level${f.high && !warningOnly ? ' q-high' : ''}">${warningOnly ? 'попередження' : (f.high ? 'високий ризик для оплати' : 'потребує перевірки')}</div>
+      ${qBasisSwitchHtml()}
     </div>
     <div class="q-explain-cols">
       <div><div class="q-explain-label">правило</div><div class="q-explain-text">${f.rule}</div></div>
@@ -277,6 +297,13 @@ function renderQualityAll() {
   renderQualityDeptList();
   renderQualityExplain();
   renderQualityCases();
+  document.querySelectorAll('.q-basis-opt').forEach(o => o.addEventListener('click', () => {
+    if (Q_STATE.basis === o.dataset.basis) return;
+    Q_STATE.basis = o.dataset.basis;
+    Q_STATE.flag = null;
+    Q_STATE.dept = null;
+    renderQualityAll();
+  }));
 }
 
 // Лікарня відома лише після /api/me — кольори лікарні застосує initHospitalName
@@ -295,6 +322,8 @@ function initQuality() {
       .then(data => {
         Q_STATE.rows = data.rows || [];
         Q_STATE.totalChecked = data.total_checked ?? Q_STATE.rows.length;
+        Q_STATE.nszuPricedTotal = data.nszu_priced_total ?? 0;
+        Q_STATE.nszuMoneyShare = data.nszu_money_share ?? null;
         Q_STATE.scope = data.scope;
         Q_STATE.today = data.today;
         Q_STATE.money = Q_STATE.rows.some(r => r.est_price != null);

@@ -386,7 +386,7 @@ function wireAdminDeptNav(root, org) {
     el.addEventListener('click', () => {
       const params = new URLSearchParams({ org, dept: el.dataset.deptId, deptName: el.dataset.dept });
       // Перехід у фінансовому режимі лишає режим у кабінеті відділення.
-      if (FIN_MODE) params.set('fin', '1');
+      if (FIN_MODE) { params.set('fin', '1'); if (finBasis() === 'nszu') params.set('basis', 'nszu'); }
       window.location.href = '/head-cabinet.html?' + params.toString();
     });
   });

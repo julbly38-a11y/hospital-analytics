@@ -70,12 +70,44 @@ export default async function handler(req, res) {
   const ids = rows.map(r => r.case_id)
   for (let i = 0; i < ids.length; i += 150) {
     const { data } = await lpz.from('lpz_case_quality_snapshot')
-      .select('helsi_case_id, flags, warnings, first_flagged_at, resolved_at')
+      .select('helsi_case_id, flags, warnings, first_flagged_at, resolved_at, hints')
       .eq('org_edrpou', org).in('helsi_case_id', ids.slice(i, i + 150))
     ;(data || []).forEach(e => existing.set(e.helsi_case_id, e))
   }
 
   const now = new Date().toISOString()
+
+  // Відстеження змін між прогонами — у наявному полі hints (ключ __track), без
+  // зміни структури таблиці. fp — відбиток суттєвих полів запису: якщо він
+  // змінився, лікар щось дооформив (діагноз, втручання, лікар, виписка), тож
+  // changed_at оновлюється. first_seen — коли вперше побачили кожну проблему
+  // (поки вона є; зникла проблема переходить у fixed з датою виправлення).
+  // Для епізодів без історії first_seen береться з first_flagged_at.
+  const fingerprint = r => JSON.stringify([
+    r.primary || null, [...(r.dx_codes || [])].sort(), r.procs_count || 0, r.operations_count || 0,
+    r.doctor_full || r.doctor_short || null, r.disposition || null, r.discharge_status || null,
+    r.is_open, [...r.flags].sort(), [...r.warnings].sort(),
+  ])
+  const track = (r, prev) => {
+    const old = prev?.hints?.__track || null
+    const fp = fingerprint(r)
+    const codes = [...r.flags, ...r.warnings]
+    const baseline = prev?.first_flagged_at || now
+    const first_seen = {}
+    codes.forEach(c => { first_seen[c] = old?.first_seen?.[c] || baseline })
+    const fixed = { ...(old?.fixed || {}) }
+    Object.keys(old?.first_seen || {}).forEach(c => {
+      if (!codes.includes(c)) fixed[c] = { first_seen: old.first_seen[c], fixed_at: now }
+    })
+    codes.forEach(c => { delete fixed[c] })
+    return {
+      fp,
+      changed_at: !old || old.fp !== fp ? now : old.changed_at || now,
+      first_seen,
+      fixed,
+    }
+  }
+
   let resolved = 0, newlyFlagged = 0
   const out = rows.map(r => {
     const prev = existing.get(r.case_id)
@@ -107,7 +139,7 @@ export default async function handler(req, res) {
       discharge_ehealth_status: r.discharge_status,
       flags: r.flags,
       warnings: r.warnings,
-      hints: r.hints || {},
+      hints: { ...(r.hints || {}), __track: track(r, prev) },
       operations_count: r.operations_count || 0,
       admission_priority: r.priority || null,
       fix_deadline: r.is_open ? null : fixDeadline(r.end),

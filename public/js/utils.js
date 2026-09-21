@@ -478,6 +478,13 @@ function isFinanceMode() {
   return new URLSearchParams(location.search).get('fin') === '1';
 }
 
+// База фінансового режиму: 'all' — усі епізоди (точні за розрахунком НСЗУ +
+// орієнтовні), 'nszu' — лише епізоди з розрахунком НСЗУ (?basis=nszu, як і
+// ?fin=1 — перемикання перезавантажує сторінку).
+function finBasis() {
+  return new URLSearchParams(location.search).get('basis') === 'nszu' ? 'nszu' : 'all';
+}
+
 // Емблема (.logo з renderHeaderBlock) — перемикач режиму для тих, кому він
 // доступний на цій сторінці (allowed). Перемикання перезавантажує сторінку з
 // ?fin=1 або без нього: кожна сторінка будує свої блоки один раз на старті,
@@ -494,6 +501,21 @@ function wireFinanceEmblem(root, allowed) {
     document.body.classList.add('fin-mode');
     document.documentElement.classList.add('fin-mode');
     root.insertAdjacentHTML('beforeend', '<div class="fin-mode-tag">Фінансовий режим</div>');
+    // Перехід на сторінку контролю записів (quality.html) — сама вона на ці
+    // сторінки не посилається; сервер сам обмежує обсяг за роллю.
+    const org = window.HOSPITAL_ORG_EDRPOU || new URLSearchParams(location.search).get('org');
+    root.insertAdjacentHTML('beforeend',
+      `<a class="fin-quality-link" href="/quality.html${org ? `?org=${encodeURIComponent(org)}` : ''}">Контроль записів →</a>`);
+    // Перемикач бази: усі епізоди / лише розрахунок НСЗУ (точні).
+    const opt = (k, label) => `<span class="fin-basis-opt${finBasis() === k ? ' active' : ''}" data-basis="${k}">${label}</span>`;
+    root.insertAdjacentHTML('beforeend', `<div class="fin-basis">${opt('all', 'усі епізоди')}${opt('nszu', 'реальні дані НСЗУ')}</div>`);
+    root.querySelectorAll('.fin-basis-opt').forEach(o => o.addEventListener('click', () => {
+      if (finBasis() === o.dataset.basis) return;
+      const url = new URL(location.href);
+      if (o.dataset.basis === 'nszu') url.searchParams.set('basis', 'nszu');
+      else url.searchParams.delete('basis');
+      location.href = url.toString();
+    }));
   }
   logo.title = isFinanceMode() ? 'Повернутись до звичайних показників' : 'Контроль записів і фінанси';
   logo.addEventListener('click', () => {
@@ -539,12 +561,22 @@ function financeKpiConfig(money, six = false) {
 function loadFinanceHeaderKpi(params) {
   const seq = FINANCE_REQUEST_SEQ.header = (FINANCE_REQUEST_SEQ.header || 0) + 1;
   fetchFinance(params).then(data => {
-    if (seq === FINANCE_REQUEST_SEQ.header) applyFinanceKpi(document, 'k', data);
+    if (seq === FINANCE_REQUEST_SEQ.header) { applyFinanceKpi(document, 'k', data); applyFinanceCoverage(data); }
   });
+}
+
+// Кількість епізодів у підписах перемикача бази (шапка = обсяг запиту шапки).
+function applyFinanceCoverage(data) {
+  const c = data?.coverage;
+  if (!c) return;
+  const set = (k, text) => document.querySelectorAll(`.fin-basis-opt[data-basis="${k}"]`).forEach(el => { el.textContent = text; });
+  set('all', `усі епізоди · ${fmt(c.total)}`);
+  set('nszu', `реальні дані НСЗУ · ${fmt(c.nszu)}`);
 }
 
 function fetchFinance(params) {
   const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== ''));
+  if (finBasis() === 'nszu') q.set('basis', 'nszu');
   return fetch(`/api/lpz-quality-finance?${q}`)
     .then(r => r.ok ? r.json() : null)
     .catch(() => null);

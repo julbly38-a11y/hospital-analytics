@@ -148,6 +148,45 @@
 }
 .q-fix-link:hover { text-decoration: underline; }
 
+/* Перемикач бази: усі епізоди / лише розрахунок НСЗУ */
+.q-basis { display: inline-flex; gap: 6px; margin-left: 12px; vertical-align: middle; }
+.q-basis-opt {
+  font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 9px; border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.15); color: var(--c-ink-3); white-space: nowrap;
+}
+.q-basis-opt.active { background: var(--c-accent-blue); border-color: var(--c-accent-blue); color: #fff; }
+/* Позначка точності ціни біля суми епізоду */
+.q-price-tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 10px; margin-right: 6px; white-space: nowrap; }
+.q-price-exact { background: rgba(70,120,90,0.15); color: #3f7a55; }
+.q-price-est { background: rgba(178,124,139,0.16); color: var(--c-accent-berry); }
+
+/* Розгортка епізоду по кліку (quality-notes.js: qDetailHtml) */
+.q-episode { cursor: pointer; }
+.q-more { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-ink-3); white-space: nowrap; }
+.q-more::after { content: 'деталі ▾'; }
+.q-episode.q-expanded .q-more::after { content: 'згорнути ▴'; }
+.q-detail {
+  display: none;
+  margin-top: 6px; padding: 10px 12px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 8px;
+  cursor: default;
+}
+.q-episode.q-expanded .q-detail { display: flex; flex-direction: column; gap: 8px; }
+.q-detail-issue { display: flex; flex-direction: column; gap: 2px; padding-bottom: 7px; border-bottom: 1px dashed rgba(0,0,0,0.09); }
+.q-detail-issue-title { font-size: 14px; font-weight: 500; color: var(--c-ink-2); }
+.q-detail-kind {
+  margin-left: 6px; font-size: 10.5px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c-accent-berry);
+}
+.q-detail-kind-warn { color: var(--c-accent-blue); }
+.q-detail-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-weight: 300; font-size: 14px; line-height: 1.35; color: var(--c-ink-3); }
+.q-detail-k { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-ink-3); padding-top: 2px; }
+.q-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.q-detail-fact { display: grid; grid-template-columns: 96px 1fr; gap: 8px; font-weight: 300; font-size: 13.5px; line-height: 1.3; color: var(--c-ink-2); }
+
 /* Короткий список у кабінеті завідувача (фінансовий режим): пацієнт · лікар · кількість зауважень */
 .q-compact-count {
   flex-shrink: 0;
@@ -156,3 +195,27 @@
   font-variant-numeric: tabular-nums;
 }
 .q-compact-count.q-compact-error { color: var(--c-accent-red); }
+
+/* Нагадування лікарю — вкладка в полі «Перебуває у відділенні» (doctor-cabinet.js) */
+.census-title .census-remind { margin-left: 14px; cursor: pointer; color: var(--c-accent-berry); transition: color .2s ease, text-shadow .2s ease; }
+.census-title .census-remind:hover { color: #6d93d8; }
+.census-title .census-remind.active { color: #6d93d8; font-weight: 600; text-shadow: 0 0 5px rgba(109,147,216,0.35); }
+.remind-item { padding: 9px 0 7px; border-top: 1px solid rgba(0,0,0,0.06); font-weight: 300; }
+.remind-item:first-child { border-top: none; }
+.remind-item.remind-escalated { box-shadow: inset 3px 0 0 var(--c-accent-berry); padding-left: 10px; }
+.remind-head { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+.remind-patient { font-size: 16px; color: var(--c-ink-2); }
+.remind-day { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-taupe-light); white-space: nowrap; }
+.remind-dx { font-size: 13.5px; color: var(--c-ink-4); margin-bottom: 4px; }
+.remind-line { font-size: 14px; line-height: 1.35; color: var(--c-ink-3); padding-top: 3px; }
+.remind-line b { font-weight: 500; }
+.remind-err b { color: var(--c-accent-berry); }
+.remind-warn b { color: var(--c-accent-blue); }
+.remind-since { color: var(--c-taupe-light); font-size: 12.5px; }
+.remind-hint { font-size: 13px; color: var(--c-taupe-light); }
+.remind-foot { font-size: 12px; letter-spacing: 0.04em; color: var(--c-taupe-light); margin-top: 4px; }
+.slide.fin-mode .remind-item { border-top-color: rgba(255,255,255,0.08); }
+
+.remind-soft b { color: var(--c-taupe); font-weight: 400; }
+.remind-item-soft .remind-patient { color: var(--c-ink-3); font-size: 14.5px; }
+.remind-soft-title { margin: 12px 0 2px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.12); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-taupe-light); }

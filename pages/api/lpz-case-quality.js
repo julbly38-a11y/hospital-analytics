@@ -1,5 +1,5 @@
 import { estimatePrice, estimateRisk, PRICING_SOURCE } from '../../lib/quality-pricing'
-import { resolveQualityAccess, fetchSnapshotRows, segmentOf, kyivDate, hasIssues } from '../../lib/quality-access'
+import { resolveQualityAccess, fetchSnapshotRows, segmentOf, kyivDate, hasIssues, getLosNorms, buildReminder } from '../../lib/quality-access'
 
 // Контроль записів (public/quality.html, кабінети у фінансовому режимі) —
 // епізоди з ознаками помилок, що впливають на оплату НСЗУ. Хто що бачить —
@@ -55,17 +55,33 @@ export default async function handler(req, res) {
 
     const rows = await fetchSnapshotRows(access)
     const today = kyivDate(new Date())
+    // Покриття точною ціною: скільки епізодів мають розрахунок НСЗУ (real_price)
+    // і — лише для showMoney — яку частку суми вони становлять.
+    let nszuPriced = 0, priceAll = 0, priceNszu = 0
     rows.forEach(r => {
       r.segment = segmentOf(r, today)
       r.addressee = r.doctor_resource_id ? 'doctor' : 'head'
+      r.nszu_priced = Boolean(r.real_price)
+      if (r.nszu_priced) nszuPriced += 1
       if (access.showMoney) {
         r.est_price = estimatePrice(r)
         r.est_risk = estimateRisk(r, r.est_price)
+        r.est_from_nszu = r.nszu_priced
+        priceAll += r.est_price
+        if (r.nszu_priced) priceNszu += r.est_price
       }
+      // Ціна — лише в est_price (тільки для тих, кому showMoney).
+      delete r.real_price
     })
     // Віддаємо лише епізоди із зауваженнями (сторінки показують тільки їх);
     // правильні — лише загальною кількістю перевірених (total_checked).
     const withIssues = rows.filter(hasIssues)
+    // reminders=1 — нагадування по відкритих епізодах (lib/quality-access.js:
+    // buildReminder): від 3-ї доби, з нормою перебування по діагнозу.
+    if (req.query.reminders === '1') {
+      const norms = await getLosNorms(access.sb, access.org)
+      withIssues.forEach(r => { r.reminder = buildReminder(r, norms) })
+    }
     if (req.query.names === '1') await attachNames(access, withIssues)
     res.status(200).json({
       scope: access.scope,
@@ -73,6 +89,8 @@ export default async function handler(req, res) {
       pricing_source: access.showMoney ? PRICING_SOURCE : null,
       checked_at: rows.reduce((m, r) => ((r.checked_at || '') > m ? r.checked_at : m), ''),
       total_checked: rows.length,
+      nszu_priced_total: nszuPriced,
+      nszu_money_share: access.showMoney && priceAll ? priceNszu / priceAll : null,
       rows: withIssues,
     })
   } catch (e) {
