@@ -88,9 +88,34 @@ export default async function handler(req, res) {
     r.doctor_full || r.doctor_short || null, r.disposition || null, r.discharge_status || null,
     r.is_open, [...r.flags].sort(), [...r.warnings].sort(),
   ])
+  // Значущі поля епізоду для журналу змін — ті самі, що входять у відбиток.
+  // Зберігаємо структуровано (на відміну від fp — рядка), щоб між прогонами
+  // порахувати діф по полях. Мітки полів навмисно НЕ тут — це чисті дані,
+  // людські назви лишаємо рендеру (кабінет/сторінка).
+  const fieldsOf = r => ({
+    primary: r.primary || null,
+    dx_codes: [...(r.dx_codes || [])].sort(),
+    procs_count: r.procs_count || 0,
+    operations_count: r.operations_count || 0,
+    doctor: r.doctor_full || r.doctor_short || null,
+    disposition: r.disposition || null,
+    discharge_status: r.discharge_status || null,
+    is_open: r.is_open,
+    flags: [...r.flags].sort(),
+    warnings: [...r.warnings].sort(),
+  })
+  const sameVal = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  const diffFields = (oldF, newF) => {
+    const out = []
+    for (const k of Object.keys(newF)) {
+      if (!sameVal(oldF[k], newF[k])) out.push({ field: k, from: oldF[k] ?? null, to: newF[k] })
+    }
+    return out
+  }
   const track = (r, prev) => {
     const old = prev?.hints?.__track || null
     const fp = fingerprint(r)
+    const fields = fieldsOf(r)
     const codes = [...r.flags, ...r.warnings]
     const baseline = prev?.first_flagged_at || now
     const first_seen = {}
@@ -100,11 +125,23 @@ export default async function handler(req, res) {
       if (!codes.includes(c)) fixed[c] = { first_seen: old.first_seen[c], fixed_at: now }
     })
     codes.forEach(c => { delete fixed[c] })
+    // Журнал усіх змін епізоду. Наповнюється лише ВПЕРЕД: подія додається,
+    // коли відбиток змінився І є з чим порівнювати (old.fields — тобто з
+    // другого прогону після впровадження; старі записи мали тільки fp).
+    // Обмежуємо довжину, щоб JSON не ріс безмежно на епізодах, які довго
+    // редагують (лишаємо останні 100 подій).
+    const history = Array.isArray(old?.history) ? [...old.history] : []
+    if (old && old.fp !== fp && old.fields) {
+      const changes = diffFields(old.fields, fields)
+      if (changes.length) history.push({ at: now, changes })
+    }
     return {
       fp,
+      fields,
       changed_at: !old || old.fp !== fp ? now : old.changed_at || now,
       first_seen,
       fixed,
+      history: history.slice(-100),
     }
   }
 
