@@ -28,12 +28,6 @@ window.runQualityDaily = async function ({
   }
   const API = '/api/hospital/api/v1'
   const INTERVENTION_CODE = /^\d{5}-\d{2}$/
-  // Обстеження, які пакет НСЗУ вимагає вносити як «Діагностичний звіт», а не в «Надані
-  // послуги» (реєстр із текстів відмов package-validation ЛШМД, 22.09.2026; плюс за
-  // назвою — на випадок нових кодів). Перевірено: 40 із 40 відхилених знайдено, у
-  // 2 із 80 прийнятих (інфаркт зі стентуванням, колектомія) спрацювало хибно.
-  const IMAGING_CODES = new Set(['58500-00', '55036-00', '55113-00', '55038-00', '56001-00', '55274-00', '56807-00', '55032-00', '57518-01', '55244-01', '56301-00', '56619-00', '57350-00', '57715-00', '57506-00', '57700-00', '57901-00', '55812-00', '58900-00', '58921-00', '57518-00'])
-  const IMAGING_NAME = /рентгенографі|ультразвуков|комп.?ютерна томограф|томографічна ангіограф|магнітно-резонанс|дуплексн/i
   const OPEN_STATUSES = ['open', 'on_discharge']
   const CLOSED_STATUSES = ['closed', 'pending_registration', 'registered']
   const nowMs = Date.now()
@@ -118,19 +112,7 @@ window.runQualityDaily = async function ({
         }
         await readMore('procedures', pr)
         await readMore('services', sv)
-        // Повний перелік послуг — ЛИШЕ для перевірки diagnostic_in_services (окремий
-        // масив svExtra: сторінки, яких ще не прочитано; sv/procs_count лишаються як
-        // були, щоб не міняти відбиток епізоду й не плодити події в журналі). Сторінок
-        // стільки, скільки дає count (по 5), тож решту читаємо паралельно.
-        const pagesHave = Math.ceil((sv.results || []).length / 5)
-        const pagesAll = Math.ceil((sv.count || 0) / 5)
-        const svExtra = []
-        if (pagesAll > pagesHave) {
-          const rest = await Promise.all(Array.from({ length: pagesAll - pagesHave }, (_, k) =>
-            getJson(`${API}/case-dashboard/${id}/services/?page=${pagesHave + k + 1}`)))
-          rest.forEach(j => svExtra.push(...(j.results || [])))
-        }
-        details[i] = { d, pr, sv, svExtra }
+        details[i] = { d, pr, sv }
         state.detailed++
       }
     }
@@ -138,7 +120,7 @@ window.runQualityDaily = async function ({
     state.details = details
 
     state.stage = 'rules'
-    const episodes = details.map(({ d, pr, sv, svExtra }) => {
+    const episodes = details.map(({ d, pr, sv }) => {
       const open = OPEN_STATUSES.includes(d.status)
       const s = new Date(d.start_datetime).getTime()
       const e = d.end_datetime ? new Date(d.end_datetime).getTime() : nowMs
@@ -149,11 +131,7 @@ window.runQualityDaily = async function ({
         ...(pr.results || []).map(p => p.service?.code),
         ...(sv.results || []).map(x => x.service?.code),
       ].filter(c => c && INTERVENTION_CODE.test(c))
-      // Візуалізаційні обстеження, внесені в «Надані послуги» (повний список, усі сторінки).
-      const imagingInServices = [...(sv.results || []), ...(svExtra || [])]
-        .filter(x => IMAGING_CODES.has(x.service?.code) || IMAGING_NAME.test(x.service?.name || ''))
-        .map(x => `${x.service.code} ${(x.service.name || '').slice(0, 60)}`)
-      return { d, open, s, e, los: Math.round((e - s) / 86400000 * 10) / 10, dx, operations: pr.count ?? (pr.results || []).length, interventionCodes, imagingInServices: [...new Set(imagingInServices)] }
+      return { d, open, s, e, los: Math.round((e - s) / 86400000 * 10) / 10, dx, operations: pr.count ?? (pr.results || []).length, interventionCodes }
     })
 
     const byPatient = new Map()
@@ -228,16 +206,6 @@ window.runQualityDaily = async function ({
       // Попередження, а не помилка, і для закритих: no_doctor, single_diagnosis,
       // injury_no_external_cause оплату не блокують (перевірено package-validation,
       // 18.09.2026), але правила НСЗУ можуть змінитись — тож фіксуємо їх.
-      // Обстеження в «Наданих послугах» замість «Діагностичного звіту»: розрахунок НСЗУ
-      // відхиляє випадок (147 епізодів ЛШМД; найчастіше рентген ОГК 65, УЗД черевної
-      // порожнини 50, ехокардіографія 21). Не для всіх пакетів (інфаркт зі стентуванням
-      // приймається), тому лише попередження «перевірити»; пряму відмову по вже
-      // розрахованих ставить nszu_refused.
-      if (ep.imagingInServices.length && !/^I2[12]/.test(primary || '')) {
-        add(warnings, 'diagnostic_in_services',
-          `У «Наданих послугах» внесено обстеження: ${ep.imagingInServices.slice(0, 4).join('; ')}. Обстеження мають бути «Діагностичним звітом»; якщо звіт уже є — видаліть дублювання з блоку послуг.`)
-      }
-
       // Ішемічний інсульт (I63): пакет НСЗУ «Медична допомога при гострому
       // мозковому інсульті» РЕКОМЕНДУЄ (info у відповіді package-validation, ціна
       // від цього не міняється — тарифи фіксовані): (1) додатковий діагноз групи G —
