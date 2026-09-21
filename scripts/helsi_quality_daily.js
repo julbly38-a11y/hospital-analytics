@@ -27,7 +27,6 @@ window.runQualityDaily = async function ({
     org, closedSince, runStartedAt, resumed: !!resume,
   }
   const API = '/api/hospital/api/v1'
-  const EXT = c => c && /^[VWXY]/.test(c)
   const INTERVENTION_CODE = /^\d{5}-\d{2}$/
   const nowMs = Date.now()
   const sinceMs = new Date(closedSince + 'T00:00:00+03:00').getTime()
@@ -161,7 +160,7 @@ window.runQualityDaily = async function ({
           : `Основний ${primary} ${primaryName || ''}, інших діагнозів немає — вкажіть встановлену причину стану.`
       }
       const injuryHint = () =>
-        `Основний ${primary} ${primaryName || ''}; серед ${dx.length} діагнозів немає коду зовнішньої причини — додайте обставини травми (V01–Y98) і місце події.`
+        `Основний ${primary} ${primaryName || ''} — не вказано «Вид травми» (виробнича/невиробнича тощо) у виписці; без цього поля ДСГ-групування травми може бути некоректним.`
       const singleHint = () => {
         const history = [...new Set(others.filter(o => o.d.id !== d.id).flatMap(o => o.dx.map(x => x.code)))].filter(c => c !== primary).slice(0, 5)
         return `У записі лише ${primary ? `${primary} ${primaryName || ''}` : 'один діагноз'}.`
@@ -172,13 +171,13 @@ window.runQualityDaily = async function ({
 
       if (open) {
         if (/^R/.test(primary || '') && los >= 2) add(warnings, 'symptom_primary', symptomHint())
-        if (/^[ST]/.test(primary || '') && !dx.some(x => EXT(x.code))) add(warnings, 'injury_no_external_cause', injuryHint())
+        if (/^[ST]/.test(primary || '') && d.injury_type == null) add(warnings, 'injury_no_external_cause', injuryHint())
         if (!ep.interventionCodes.length && los >= 2) add(warnings, 'no_interventions', interventionHint)
         if (dx.length <= 1 && los >= 2) add(warnings, 'single_diagnosis', singleHint())
         if (los > 30) add(warnings, 'open_too_long', `Епізод відкрито ${dmy(d.start_datetime)}, ${Math.floor(los)} діб. Якщо пацієнта виписано — закрийте епізод і оформіть виписку.`)
       } else {
         if (/^R/.test(primary || '')) add(flags, 'symptom_primary', symptomHint())
-        if (/^[ST]/.test(primary || '') && !dx.some(x => EXT(x.code))) add(flags, 'injury_no_external_cause', injuryHint())
+        if (/^[ST]/.test(primary || '') && d.injury_type == null) add(flags, 'injury_no_external_cause', injuryHint())
         if (!ep.interventionCodes.length) add(flags, 'no_interventions', interventionHint)
         if (dx.length <= 1) add(flags, death ? 'death_single_diagnosis' : 'single_diagnosis', singleHint())
         const st = d.discharge?.helsi_status
