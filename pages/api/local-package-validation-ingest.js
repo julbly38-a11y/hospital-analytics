@@ -44,7 +44,12 @@ export default async function handler(req, res) {
         dsg_code: r.dsg_code ?? null,
         dsg_name: r.dsg_name ?? null,
         validation_success: r.validation_success ?? null,
-        validation_messages: r.fin_messages ? { messages: r.fin_messages, error: r.error || null, skipped: r.skipped || null } : (r.error ? { error: r.error } : (r.skipped ? { skipped: r.skipped } : null)),
+        // info — рекомендації пакета (з collect_package_validation.js: info_messages);
+        // лежить у тому самому jsonb, без зміни схеми. Якщо збирач його не передав —
+        // ключа немає (не затираємо нулем).
+        validation_messages: r.fin_messages
+          ? { messages: r.fin_messages, error: r.error || null, skipped: r.skipped || null, ...(r.info_messages ? { info: r.info_messages } : {}) }
+          : (r.error ? { error: r.error } : (r.skipped ? { skipped: r.skipped } : null)),
         dsg_coefficient: r.dsg_coefficient ?? null,
         price: r.price ?? null,
         adjustment_coefficient: r.adjustment_coefficient ?? null,

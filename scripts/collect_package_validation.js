@@ -112,6 +112,9 @@ window.collectPackageValidation = async function ({
       dsg_name: body?.name ?? null,
       validation_success: vRes.ok,
       validation_messages: body?.fin ?? body ?? null,
+      // info — рекомендації пакета (діагноз групи G, додаткові діагнози, послуги,
+      // «закрийте епізод»…): success лишається true, ціна є. Раніше не зберігались.
+      info_messages: Array.isArray(body?.info) ? body.info.map(m => ({ message: String(m.message || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), grouping: m.grouping_type || null })) : null,
       dsg_coefficient: body?.coefficient != null ? Number(body.coefficient) : null,
       price: body?.price ?? null,
       adjustment_coefficient: body?.adjustment_coefficient != null ? Number(body.adjustment_coefficient) : null,
