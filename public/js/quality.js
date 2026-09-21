@@ -85,7 +85,7 @@ function renderQualityHeader(root, checkedAt) {
     </div>
     <div class="year-filter q-pills" id="qPills">
       ${Object.entries(Q_SEGMENTS).map(([k, s]) => `<div class="ypill${k === Q_STATE.segment ? ' active' : ''}" data-seg="${k}">${s.pill} <span class="q-pill-n" data-seg-n="${k}"></span></div>`).join('')}
-      <div class="ypill" data-href="/entry.html">← КАБІНЕТ</div>
+      <div class="ypill" data-href="/entry.html?${new URLSearchParams({ ...(window.HOSPITAL_ORG_EDRPOU ? { org: window.HOSPITAL_ORG_EDRPOU } : {}), fin: '1' })}">← КАБІНЕТ</div>
     </div>
     <div class="year-badge">
       <span class="year-num small">КОНТРОЛЬ</span>

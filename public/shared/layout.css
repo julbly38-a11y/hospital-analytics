@@ -193,6 +193,21 @@ html.fin-mode { background: #1e2227; }
   cursor: pointer;
 }
 .fin-quality-link:hover { background: var(--c-accent-berry); color: #fff; }
+/* «← Назад» у фінансовій шапці: перший рядок, праворуч від напису режиму. */
+.fin-back-link {
+  position: absolute;
+  left: 412px; top: 21px;
+  z-index: 5;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--c-accent-berry);
+  text-decoration: none;
+  padding: 2px 10px;
+  border: 1px solid var(--c-accent-berry);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.fin-back-link:hover { background: var(--c-accent-berry); color: #fff; }
 .fin-basis {
   position: absolute; left: 412px; top: 44px; z-index: 5;
   display: flex; gap: 6px;

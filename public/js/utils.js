@@ -485,6 +485,25 @@ function finBasis() {
   return new URLSearchParams(location.search).get('basis') === 'nszu' ? 'nszu' : 'all';
 }
 
+// Куди веде «← Назад» у фінансовому режимі: кабінет лікаря → кабінет
+// відділення (якщо власник сайту прийшов через нього, dept/deptName у адресі),
+// інакше → entry.html; кабінет відділення → entry.html; entry.html — верхній
+// рівень, тож null. Параметри фінансового режиму (fin, basis) зберігаються.
+function finBackHref() {
+  const p = new URLSearchParams(location.search);
+  const org = window.HOSPITAL_ORG_EDRPOU || p.get('org');
+  const keep = { fin: '1' };
+  if (finBasis() === 'nszu') keep.basis = 'nszu';
+  const page = location.pathname;
+  if (page.endsWith('/doctor-cabinet.html') && p.get('dept')) {
+    return '/head-cabinet.html?' + new URLSearchParams({ org, dept: p.get('dept'), deptName: p.get('deptName') || '', ...keep });
+  }
+  if (page.endsWith('/doctor-cabinet.html') || page.endsWith('/head-cabinet.html')) {
+    return '/entry.html?' + new URLSearchParams({ ...(org ? { org } : {}), ...keep });
+  }
+  return null;
+}
+
 // Емблема (.logo з renderHeaderBlock) — перемикач режиму для тих, кому він
 // доступний на цій сторінці (allowed). Перемикання перезавантажує сторінку з
 // ?fin=1 або без нього: кожна сторінка будує свої блоки один раз на старті,
@@ -501,6 +520,10 @@ function wireFinanceEmblem(root, allowed) {
     document.body.classList.add('fin-mode');
     document.documentElement.classList.add('fin-mode');
     root.insertAdjacentHTML('beforeend', '<div class="fin-mode-tag">Фінансовий режим</div>');
+    // «← Назад» — на рівень вище тієї ж фінансової схеми (режим і база
+    // лишаються). На entry.html (верхній рівень) кнопки немає.
+    const backHref = finBackHref();
+    if (backHref) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link" href="${backHref}">← Назад</a>`);
     // Перехід на сторінку контролю записів (quality.html) — сама вона на ці
     // сторінки не посилається; сервер сам обмежує обсяг за роллю.
     const org = window.HOSPITAL_ORG_EDRPOU || new URLSearchParams(location.search).get('org');
