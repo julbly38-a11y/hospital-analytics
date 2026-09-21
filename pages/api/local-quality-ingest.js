@@ -138,7 +138,10 @@ export default async function handler(req, res) {
     // редагують (лишаємо останні 100 подій).
     const history = Array.isArray(old?.history) ? [...old.history] : []
     if (old && old.fp !== fp && old.fields) {
-      const changes = diffFields(old.fields, fields)
+      // flags/warnings — похідні від даних епізоду за правилами перевірки, а не дії
+      // лікаря: нове правило або поріг за часом міняли б їх у сотнях епізодів і
+      // засмічували журнал хибними «змінами». Порівнюємо лише самі дані.
+      const changes = diffFields(old.fields, fields).filter(c => c.field !== 'flags' && c.field !== 'warnings')
       // after_close — зміна внесена в епізод, що на попередньому знімку вже був
       // закритий (виправлення після виписки); перехід відкритий→закритий сюди
       // не входить (там old.fields.is_open === true).
