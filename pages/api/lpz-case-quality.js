@@ -48,6 +48,29 @@ async function attachNames(access, rows) {
   })
 }
 
+// Активність по епізоду — чистий блок для клієнта з hints.__track
+// (pages/api/local-quality-ingest.js): last_change_at — коли востаннє
+// змінився «відбиток» запису; events — журнал змін значущих полів
+// {at, changes:[{field, from, to}]} (наповнюється з 2-го прогону, до того — []);
+// fixed — зауваження, що зникли між прогонами, з датами. Внутрішні поля
+// __track (fp/fields) клієнту не потрібні — прибираємо їх із hints.
+function attachActivity(rows) {
+  rows.forEach(r => {
+    const t = (r.hints && r.hints.__track) || null
+    r.activity = {
+      last_change_at: t?.changed_at || null,
+      events: Array.isArray(t?.history) ? t.history : [],
+      fixed: t?.fixed
+        ? Object.entries(t.fixed).map(([code, v]) => ({ code, first_seen: v.first_seen, fixed_at: v.fixed_at }))
+        : [],
+    }
+    if (r.hints && r.hints.__track) {
+      const { __track, ...rest } = r.hints
+      r.hints = rest
+    }
+  })
+}
+
 export default async function handler(req, res) {
   try {
     const access = await resolveQualityAccess(req)
@@ -83,6 +106,9 @@ export default async function handler(req, res) {
       withIssues.forEach(r => { r.reminder = buildReminder(r, norms) })
     }
     if (req.query.names === '1') await attachNames(access, withIssues)
+    // Після reminders (вони читають hints.__track) — чистий блок activity,
+    // що заразом прибирає внутрішній __track із payload.
+    attachActivity(withIssues)
     res.status(200).json({
       scope: access.scope,
       today,
