@@ -188,6 +188,13 @@ window.runQualityDaily = async function ({
         if (/^[ST]/.test(primary || '') && d.injury_type == null) add(warnings, 'injury_no_external_cause', injuryHint())
         if (!ep.interventionCodes.length) add(flags, 'no_interventions', interventionHint)
         if (dx.length <= 1) add(death ? flags : warnings, death ? 'death_single_diagnosis' : 'single_diagnosis', singleHint())
+        // Виписка є, а результату лікування нема — package-validation НСЗУ
+        // відмовляє («discharge_disposition: поле не може бути null»; 54
+        // відмови на 21.09.2026, 39 з них із випискою). Без виписки цю помилку
+        // не ставимо — там уже є discharge_not_registered («виписки немає»).
+        if (d.discharge && !d.discharge_disposition?.code) {
+          add(flags, 'no_disposition', 'Виписку оформлено, але не вказано результат лікування (поле «Результат лікування») — НСЗУ не розрахує оплату без нього.')
+        }
         const st = d.discharge?.helsi_status
         if (st !== 'registered') {
           const by = signer ? ` (автор: ${signer})` : ''
