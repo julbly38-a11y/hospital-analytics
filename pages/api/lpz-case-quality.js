@@ -61,7 +61,7 @@ function attachActivity(rows) {
       last_change_at: t?.changed_at || null,
       events: Array.isArray(t?.history) ? t.history : [],
       fixed: t?.fixed
-        ? Object.entries(t.fixed).map(([code, v]) => ({ code, first_seen: v.first_seen, fixed_at: v.fixed_at }))
+        ? Object.entries(t.fixed).map(([code, v]) => ({ code, first_seen: v.first_seen, fixed_at: v.fixed_at, deadline: v.deadline ?? null, on_time: v.on_time ?? null }))
         : [],
     }
     if (r.hints && r.hints.__track) {
@@ -69,6 +69,28 @@ function attachActivity(rows) {
       r.hints = rest
     }
   })
+}
+
+// Підсумок реакції на зауваження по ВСІХ рядках обсягу (не лише тих, що ще мають
+// зауваження: виправлений до кінця епізод зі списку зникає, а факт виправлення
+// лишається). fixed_on_time / fixed_late — виправлення закритих епізодів до /
+// після строку подачі змін; fixed_open — виправлення у відкритих (строку нема);
+// events_after_close — зміни, внесені вже після закриття епізоду.
+function summarizeActivity(rows) {
+  const s = { fixed_on_time: 0, fixed_late: 0, fixed_open: 0, events_after_close: 0, episodes_with_events: 0 }
+  rows.forEach(r => {
+    const t = r.hints && r.hints.__track
+    if (!t) return
+    Object.values(t.fixed || {}).forEach(v => {
+      if (v.on_time === true) s.fixed_on_time++
+      else if (v.on_time === false) s.fixed_late++
+      else s.fixed_open++
+    })
+    const ev = Array.isArray(t.history) ? t.history : []
+    if (ev.length) s.episodes_with_events++
+    s.events_after_close += ev.filter(e => e.after_close).length
+  })
+  return s
 }
 
 export default async function handler(req, res) {
@@ -108,8 +130,10 @@ export default async function handler(req, res) {
     if (req.query.names === '1') await attachNames(access, withIssues)
     // Після reminders (вони читають hints.__track) — чистий блок activity,
     // що заразом прибирає внутрішній __track із payload.
+    const activitySummary = summarizeActivity(rows)
     attachActivity(withIssues)
     res.status(200).json({
+      activity_summary: activitySummary,
       scope: access.scope,
       today,
       pricing_source: access.showMoney ? PRICING_SOURCE : null,

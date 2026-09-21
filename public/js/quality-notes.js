@@ -193,9 +193,17 @@ const Q_ACTIVITY_FIELDS = {
 // Значення поля «було/стало» у читабельний рядок: стан → відкритий/закритий,
 // статус виписки — з довідника, помилки/попередження — назвами Q_FLAGS,
 // списки — через кому. Дані користувача екрануємо (qEsc), назви з констант — ні.
+// Результат лікування (discharge_disposition.code helsi) → назва; коди 1–9 з
+// довідника (README, «Довідково»).
+const Q_DISPOSITION = {
+  death: 'помер', discharge_better: 'з поліпшенням', discharge_healthy: 'здоровий',
+  discharge_no_change: 'без змін', discharge_recovery: 'з одужанням', discharge_worse: 'з погіршенням',
+  left_by_patient: 'самовільно пішов', statistic_discharge: 'статистична виписка', transfer_general: 'переведено в інший ЗОЗ',
+};
 function qActivityVal(field, v) {
   if (v === null || v === undefined || v === '') return '—';
   if (field === 'is_open') return v ? 'відкритий' : 'закритий';
+  if (field === 'disposition') return Q_DISPOSITION[v] || qEsc(String(v));
   if (field === 'discharge_status') return Q_DISCHARGE_STATUS[v] || qEsc(String(v));
   if (Array.isArray(v)) {
     if (!v.length) return 'немає';
@@ -217,11 +225,16 @@ function qActivityHtml(r) {
     const changes = (ev.changes || []).map(c =>
       `${Q_ACTIVITY_FIELDS[c.field] || qEsc(c.field)}: ${qActivityVal(c.field, c.from)} → ${qActivityVal(c.field, c.to)}`
     ).join('; ');
-    if (changes) rows.push(`<div class="q-detail-row"><span class="q-detail-k">${qFmtDateTime(ev.at)}</span><span>${changes}</span></div>`);
+    // after_close — зміна внесена вже після закриття епізоду (виправлення після виписки).
+    const tag = ev.after_close ? ` <span class="q-detail-kind">після закриття</span>` : '';
+    if (changes) rows.push(`<div class="q-detail-row"><span class="q-detail-k">${qFmtDateTime(ev.at)}</span><span>${changes}${tag}</span></div>`);
   });
   (a.fixed || []).forEach(fx => {
     const title = (Q_FLAGS[fx.code] && Q_FLAGS[fx.code].title) || qEsc(fx.code);
-    rows.push(`<div class="q-detail-row"><span class="q-detail-k">виправлено ${qFmtDate(fx.fixed_at)}</span><span>${title}</span></div>`);
+    // on_time — лише для закритих: виправлено не пізніше строку подачі змін до НСЗУ.
+    const timing = fx.on_time === true ? ` <span class="q-deadline">· до строку (${qFmtDate(fx.deadline)})</span>`
+      : fx.on_time === false ? ` <span class="q-deadline-urgent">· після строку (${qFmtDate(fx.deadline)})</span>` : '';
+    rows.push(`<div class="q-detail-row"><span class="q-detail-k">виправлено ${qFmtDate(fx.fixed_at)}</span><span>${title}${timing}</span></div>`);
   });
   if (!rows.length) return '';
   return `

@@ -27,6 +27,9 @@ function fixDeadline(dischargeIso) {
   return null
 }
 
+// Календарна дата за київським часом (YYYY-MM-DD) — для порівняння зі строком.
+const kyivDay = iso => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Kyiv' }).format(new Date(iso))
+
 export default async function handler(req, res) {
   if (process.env.NODE_ENV === 'production') return res.status(404).end()
   res.setHeader('Access-Control-Allow-Origin', 'https://helsi.pro')
@@ -121,8 +124,11 @@ export default async function handler(req, res) {
     const first_seen = {}
     codes.forEach(c => { first_seen[c] = old?.first_seen?.[c] || baseline })
     const fixed = { ...(old?.fixed || {}) }
+    // Для закритого епізоду — строк подачі змін (fixDeadline) і чи встигли: on_time
+    // = виправлено не пізніше строку. Для відкритого строку ще нема — null.
+    const deadline = r.is_open ? null : fixDeadline(r.end)
     Object.keys(old?.first_seen || {}).forEach(c => {
-      if (!codes.includes(c)) fixed[c] = { first_seen: old.first_seen[c], fixed_at: now }
+      if (!codes.includes(c)) fixed[c] = { first_seen: old.first_seen[c], fixed_at: now, deadline, on_time: deadline ? kyivDay(now) <= deadline : null }
     })
     codes.forEach(c => { delete fixed[c] })
     // Журнал усіх змін епізоду. Наповнюється лише ВПЕРЕД: подія додається,
@@ -133,7 +139,10 @@ export default async function handler(req, res) {
     const history = Array.isArray(old?.history) ? [...old.history] : []
     if (old && old.fp !== fp && old.fields) {
       const changes = diffFields(old.fields, fields)
-      if (changes.length) history.push({ at: now, changes })
+      // after_close — зміна внесена в епізод, що на попередньому знімку вже був
+      // закритий (виправлення після виписки); перехід відкритий→закритий сюди
+      // не входить (там old.fields.is_open === true).
+      if (changes.length) history.push({ at: now, after_close: old.fields.is_open === false, changes })
     }
     return {
       fp,
