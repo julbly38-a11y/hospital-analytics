@@ -216,6 +216,13 @@
 .remind-foot { font-size: 12px; letter-spacing: 0.04em; color: var(--c-taupe-light); margin-top: 4px; }
 .slide.fin-mode .remind-item { border-top-color: rgba(255,255,255,0.08); }
 
+/* Темна тема (фінансовий режим, layout.css): жорстко задані світлі фони й
+   рамки, які не йдуть через змінні. */
+.slide.fin-mode .q-detail { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+.slide.fin-mode .q-detail-issue { border-bottom-color: rgba(255,255,255,0.12); }
+.slide.fin-mode .q-basis-opt { border-color: rgba(255,255,255,0.2); }
+.slide.fin-mode .remind-soft-title { border-top-color: rgba(255,255,255,0.15); }
+
 .remind-soft b { color: var(--c-taupe); font-weight: 400; }
 .remind-item-soft .remind-patient { color: var(--c-ink-3); font-size: 14.5px; }
 .remind-soft-title { margin: 12px 0 2px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.12); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-taupe-light); }

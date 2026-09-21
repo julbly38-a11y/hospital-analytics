@@ -311,6 +311,13 @@ function renderQualityAll() {
 window.HOSPITAL_THEME_PENDING = true;
 
 function initQuality() {
+  // Сторінка контролю записів — частина фінансового режиму (на неї ведуть з
+  // ?fin=1), тож завжди в тій самій темній темі (.slide.fin-mode, layout.css),
+  // як у wireFinanceEmblem (utils.js). Клас — до запиту, щоб не було світлого
+  // спалаху.
+  document.getElementById('slideRoot').classList.add('fin-mode');
+  document.body.classList.add('fin-mode');
+  document.documentElement.classList.add('fin-mode');
   fetch('/api/me').then(r => r.json()).then(me => {
     if (!me || !me.role) { window.location.href = '/layout.html'; return; }
     const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
