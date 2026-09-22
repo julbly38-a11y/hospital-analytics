@@ -104,10 +104,20 @@ export default async function handler(req, res) {
     if (!org_edrpou && lpzEmpl) org_edrpou = lpzEmpl.org_edrpou
 
     return res.status(200).json({
-      role: appUser?.role || 'viewer',
+      // role — пріоритет lpz_role (актуальний канон, doctor/head/deputy/nurse),
+      // app_users.role лишається фолбеком для тих, кого ще нема в lpz_empl
+      // (напр. лише старий кабінет). На клієнті role перевіряється лише як
+      // "чи взагалі є доступ" (entry.js/head-cabinet.js/doctor-cabinet.js/
+      // quality.js: `if (!me.role) → редірект`), не звіряється з конкретним
+      // значенням, тож пріоритет lpz нічого не ламає, лише прибирає
+      // застарілу назву ролі там, де вже є точніша з lpz.
+      role: lpz_role || appUser?.role || 'viewer',
       // is_owner — окремо від role: role='admin' видають і директорам/заступникам
       // окремих лікарень (з lpz_empl.role), а сторінки, що бачать усі ЛПУ одразу
       // (admin-hospitals, admin-status), мають бути доступні лише власнику сайту.
+      // Умисно й надалі з app_users — власник сайту НЕ має власного lpz_empl-
+      // запису (не співробітник жодної конкретної лікарні), тож перенести
+      // нема куди: це не дублювання, а по-справжньому окрема річ.
       is_owner: appUser?.is_owner || false,
       email: user.email,
       full_name, emp_name, position, specialization, department, doc_name, org_edrpou,
