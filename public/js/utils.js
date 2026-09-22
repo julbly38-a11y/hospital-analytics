@@ -525,10 +525,15 @@ function wireFinanceEmblem(root, allowed) {
     const backHref = finBackHref();
     if (backHref) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link" href="${backHref}">← Назад</a>`);
     // Перехід на сторінку контролю записів (quality.html) — сама вона на ці
-    // сторінки не посилається; сервер сам обмежує обсяг за роллю.
+    // сторінки не посилається; сервер сам обмежує обсяг за роллю. next=
+    // поточна сторінка (кабінет конкретного лікаря/відділення з усіма
+    // параметрами) — щоб "← КАБІНЕТ" на quality.html повертав туди, звідки
+    // прийшли, а не завжди на голий entry.html (quality.js:renderQualityHeader).
     const org = window.HOSPITAL_ORG_EDRPOU || new URLSearchParams(location.search).get('org');
+    const qParams = new URLSearchParams(org ? { org } : {});
+    qParams.set('next', location.pathname + location.search);
     root.insertAdjacentHTML('beforeend',
-      `<a class="fin-quality-link" href="/quality.html${org ? `?org=${encodeURIComponent(org)}` : ''}">Контроль записів →</a>`);
+      `<a class="fin-quality-link" href="/quality.html?${qParams}">Контроль записів →</a>`);
     // Перемикач бази: усі епізоди / лише розрахунок НСЗУ (точні).
     const opt = (k, label) => `<span class="fin-basis-opt${finBasis() === k ? ' active' : ''}" data-basis="${k}">${label}</span>`;
     root.insertAdjacentHTML('beforeend', `<div class="fin-basis">${opt('all', 'усі епізоди')}${opt('nszu', 'реальні дані НСЗУ')}</div>`);

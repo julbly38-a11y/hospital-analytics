@@ -41,7 +41,12 @@
   // initHospitalName() і initStaffFields() вже викликає utils.js на
   // DOMContentLoaded — до цього моменту DOM з renderShell() вже готовий,
   // тож повторний виклик тут лише подвоїв би обробники (баг з подвійним toggle).
-  initStaffLogin('/entry.html');
+  // ?next=<шлях+query> — куди повернутись після входу (наприклад, назад у
+  // фінансовий режим із ?fin=1, а не завжди на голий /entry.html). Пишуть
+  // самі сторінки при редиректі сюди через відсутню роль/сесію (utils.js
+  // не чіпаємо — редірект живе в кожній *.js сторінки окремо).
+  const nextUrl = new URLSearchParams(location.search).get('next');
+  initStaffLogin(nextUrl || '/entry.html');
 </script>
 </body>
 </html>

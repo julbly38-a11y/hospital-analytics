@@ -277,7 +277,7 @@ function loadReminders(org, doctorId) {
 
 function initDoctorCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {
-    if (!me || !me.role) { window.location.href = '/layout.html'; return; }
+    if (!me || !me.role) { window.location.href = '/layout.html?next=' + encodeURIComponent(location.pathname + location.search); return; }
 
     // Власник сайту (is_owner) — вхід у кабінет БУДЬ-ЯКОГО лікаря з
     // head-cabinet.js:wireAdminDoctorNav передає org/doctor/doctorName у

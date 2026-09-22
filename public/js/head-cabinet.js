@@ -407,7 +407,7 @@ window.HOSPITAL_THEME_PENDING = true;
 
 function initHeadCabinet() {
   fetch('/api/me').then(r => r.json()).then(me => {
-    if (!me || !me.role) { window.location.href = '/layout.html'; return; }
+    if (!me || !me.role) { window.location.href = '/layout.html?next=' + encodeURIComponent(location.pathname + location.search); return; }
 
     // Власник сайту (is_owner) — вхід у БУДЬ-ЯКЕ відділення з entry.js:
     // wireAdminDeptNav передає org/dept/deptName у URL. Довіряємо цим

@@ -449,7 +449,7 @@ window.HOSPITAL_THEME_PENDING = true;
 
 function initEntry() {
   fetch('/api/me').then(r => r.json()).then(me => {
-    if (!me || !me.role) { window.location.href = '/layout.html'; return; }
+    if (!me || !me.role) { window.location.href = '/layout.html?next=' + encodeURIComponent(location.pathname + location.search); return; }
     const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
     if (!org) { renderOwnerOrgSwitch(); return; }
     window.HOSPITAL_ORG_EDRPOU = org;

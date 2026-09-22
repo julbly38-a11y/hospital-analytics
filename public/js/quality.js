@@ -39,6 +39,16 @@ const Q_SCOPE_LABEL = { hospital: 'уся лікарня', department: 'моє �
 // 'nszu' — лише епізоди, для яких є розрахунок НСЗУ (package-validation).
 const Q_STATE = { rows: [], flag: null, dept: null, segment: 'open', scope: null, today: null, money: false, pricingSource: null, basis: 'all', view: 'cases' };
 
+// "← КАБІНЕТ" — next= (utils.js:wireFinanceEmblem передає його у посиланні
+// "Контроль записів →" з кабінету лікаря/відділення) повертає туди, звідки
+// саме прийшли; без next (прямий перехід на quality.html) — старий фолбек
+// на entry.html?org=&fin=1.
+function qBackHref() {
+  const next = new URLSearchParams(location.search).get('next');
+  if (next) return next;
+  return `/entry.html?${new URLSearchParams({ ...(window.HOSPITAL_ORG_EDRPOU ? { org: window.HOSPITAL_ORG_EDRPOU } : {}), fin: '1' })}`;
+}
+
 // Гроші (est_price/est_risk) сервер віддає лише головному лікарю.
 const qSum = rows => rows.reduce((s, r) => s + (r.est_risk || 0), 0);
 function qMoney(v) {
@@ -85,7 +95,7 @@ function renderQualityHeader(root, checkedAt) {
     </div>
     <div class="year-filter q-pills" id="qPills">
       ${Object.entries(Q_SEGMENTS).map(([k, s]) => `<div class="ypill${k === Q_STATE.segment ? ' active' : ''}" data-seg="${k}">${s.pill} <span class="q-pill-n" data-seg-n="${k}"></span></div>`).join('')}
-      <div class="ypill" data-href="/entry.html?${new URLSearchParams({ ...(window.HOSPITAL_ORG_EDRPOU ? { org: window.HOSPITAL_ORG_EDRPOU } : {}), fin: '1' })}">← КАБІНЕТ</div>
+      <div class="ypill" data-href="${qBackHref()}">← КАБІНЕТ</div>
     </div>
     <div class="year-badge">
       <span class="year-num small">КОНТРОЛЬ</span>
@@ -380,7 +390,7 @@ function initQuality() {
   document.body.classList.add('fin-mode');
   document.documentElement.classList.add('fin-mode');
   fetch('/api/me').then(r => r.json()).then(me => {
-    if (!me || !me.role) { window.location.href = '/layout.html'; return; }
+    if (!me || !me.role) { window.location.href = '/layout.html?next=' + encodeURIComponent(location.pathname + location.search); return; }
     const org = me.org_edrpou || new URLSearchParams(location.search).get('org');
     if (!org) { document.body.insertAdjacentHTML('afterbegin', '<p style="padding:20px">Оберіть лікарню: /quality.html?org=43342788</p>'); return; }
     window.HOSPITAL_ORG_EDRPOU = org;
