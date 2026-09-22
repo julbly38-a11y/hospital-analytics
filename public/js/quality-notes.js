@@ -378,16 +378,20 @@ function qInPeriod(r, today, year, month, day) {
 const Q_CABINET_ORDER = { fixable: 0, open: 1, lost: 2, warned: 3 };
 
 // Короткий рядок (кабінет завідувача): ПІБ пацієнта, ПІБ лікаря, кількість
-// зауважень. Без ПІБ пацієнта (канон ще не оновлено) — номер картки.
+// зауважень і коротко що саме треба зробити (Q_FLAGS[code].short — той самий
+// словник, що й у фільтрі типів зауважень на quality.html), щоб не відкривати
+// картку, аби зрозуміти суть. Без ПІБ пацієнта (канон ще не оновлено) — номер картки.
 function qCompactRowHtml(r) {
-  const n = (r.flags || []).length + (r.warnings || []).length;
+  const codes = [...(r.flags || []), ...(r.warnings || [])];
+  const n = codes.length;
   const patient = r.patient_name ? qEsc(r.patient_name) : `картка № ${qEsc(r.card_number || '—')}`;
   const doctor = r.doctor_full_name || r.doctor_name;
+  const issues = codes.map(c => Q_FLAGS[c]?.short || c).join(', ');
   return `
-    <div class="census-row q-compact-row">
+    <div class="census-row q-compact-row" data-doctor="${r.doctor_resource_id || ''}">
       <div class="census-info">
         <span class="census-name">${patient}</span>
-        <span class="census-meta">${doctor ? `Лікар: ${qEsc(doctor)}` : 'Лікаря не визначено — завідувачу'}</span>
+        <span class="census-meta">${doctor ? `Лікар: ${qEsc(doctor)}` : 'Лікаря не визначено — завідувачу'}${issues ? ` · ${qEsc(issues)}` : ''}</span>
       </div>
       <span class="q-compact-count${(r.flags || []).length ? ' q-compact-error' : ''}">⚠ ${n}</span>
     </div>`;
@@ -415,4 +419,26 @@ function renderFinanceCases({ data, year, month, day = null, doctorId = null, do
   const fieldMe = document.querySelector('.field-me');
   if (fieldMe) fitHeightTo(list, offsetInSlide(fieldMe), 20);
   updateFadeMask(list, 'y');
+  // Клік на рядок → підсвітити лікаря в ординаторській (той самий патерн,
+  // що й "Перебуває у відділенні" — utils.js:loadCensus). Тут окремо, бо
+  // #finCases рендериться цією функцією, не loadCensus.
+  if (compact) {
+    list.querySelectorAll('.q-compact-row[data-doctor]').forEach(row => {
+      const doc = row.getAttribute('data-doctor');
+      if (!doc) return;
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', () => {
+        document.querySelectorAll('.doc-item.hl, .doc-item.doc-active').forEach(d => {
+          d.classList.remove('hl'); d.classList.remove('doc-active');
+        });
+        document.querySelectorAll('.doc-item').forEach(d => {
+          if (d.getAttribute('data-doctor') === doc) {
+            d.classList.add('hl');
+            const dl = d.closest('.docs-list');
+            if (dl) inertialScrollToCenter(dl, d);
+          }
+        });
+      });
+    });
+  }
 }
