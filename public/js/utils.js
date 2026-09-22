@@ -978,6 +978,11 @@ function loadCensus(doctorId, options = {}) {
         // ще перебуває — по вказану дату включно. Тож смужка показує весь
         // ліжко-день пацієнта, а не тільки "скільки минуло на цей момент".
         const days = Math.max(0, Number(r.days) || 0);
+        // Рисочок фізично не влазить більше ~60 у рядок — але число поруч
+        // раніше показувало нескорочене days, тоді як рисочок було завжди
+        // рівно 60 для будь-кого з довшим перебуванням (виглядало як
+        // розбіжність/помилка). Тепер число теж "60+" у цьому випадку —
+        // точна цифра лишається в title (${days} діб) при наведенні.
         const segCount = Math.min(days, 60);
         const admDate = r.admission_date ? new Date(r.admission_date + 'T00:00:00') : null;
         const admStr = admDate
@@ -1002,7 +1007,7 @@ function loadCensus(doctorId, options = {}) {
           </div>
           <div class="census-stay" title="${days} діб">
             <span class="census-bar">${segs}</span>
-            <span class="census-days">${days}</span>
+            <span class="census-days">${days > segCount ? `${segCount}+` : days}</span>
           </div>
         </div>`;
       }).join('');
