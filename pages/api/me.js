@@ -62,12 +62,22 @@ export default async function handler(req, res) {
       process.env.SUPABASE_SERVICE_KEY,
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
-    const { data: lpzEmpl } = await sbService
+    // .maybeSingle() тут не підходить: у частини людей (напр. лікар, який
+    // водночас завідувач того самого відділення — kholodenko.tetiana@...,
+    // 9 таких на ЛШМД) email однаковий на ОБОХ рядках lpz_empl (на відміну
+    // від Дирда-Кугут, де для кожної посади свій email). maybeSingle() при
+    // 2+ збігах віддає data:null і МОВЧКИ ламає весь блок нижче (full_name/
+    // lpz_role/department зникали, .field-me-name падав аж до email — саме
+    // так це й виявили 2026-09-22). Тому явний пріоритет ролі + limit(1):
+    // старша адміністративна роль перемагає рядову.
+    const ROLE_PRIORITY = { chief: 0, deputy: 1, head: 2, doctor: 3, nurse: 4 }
+    const { data: lpzEmplRows } = await sbService
       .schema('lpz')
       .from('lpz_empl')
       .select('resource_id, role, department_structure_id, org_edrpou, last_name, first_name, middle_name, position_name')
       .ilike('email', user.email)
-      .maybeSingle()
+    const lpzEmpl = (lpzEmplRows || []).sort((a, b) =>
+      (ROLE_PRIORITY[a.role] ?? 9) - (ROLE_PRIORITY[b.role] ?? 9))[0] || null
     if (lpzEmpl) {
       lpz_role = lpzEmpl.role
       lpz_resource_id = lpzEmpl.resource_id
