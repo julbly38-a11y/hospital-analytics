@@ -37,7 +37,7 @@ const Q_SCOPE_LABEL = { hospital: 'уся лікарня', department: 'моє �
 
 // basis: 'all' — усі епізоди (точні за розрахунком НСЗУ + орієнтовні);
 // 'nszu' — лише епізоди, для яких є розрахунок НСЗУ (package-validation).
-const Q_STATE = { rows: [], flag: null, dept: null, segment: 'open', scope: null, today: null, money: false, pricingSource: null, basis: 'all' };
+const Q_STATE = { rows: [], flag: null, dept: null, segment: 'open', scope: null, today: null, money: false, pricingSource: null, basis: 'all', view: 'cases' };
 
 // Гроші (est_price/est_risk) сервер віддає лише головному лікарю.
 const qSum = rows => rows.reduce((s, r) => s + (r.est_risk || 0), 0);
@@ -277,14 +277,75 @@ function renderQualityExplain() {
     </div>${source}`;
 }
 
+// Журнал змін по епізодах (для перемикача «журнал змін →» у списку справ):
+// збирає activity.events/fixed з УСІХ завантажених рядків (не лише тих, що
+// зараз мають зауваження — виправлений епізод зі списку справ зникає, але в
+// журналі лишається), фільтрує тільки по відділенню (як і решта сторінки),
+// сортує найновіші зверху. Що саме змінилось — не показуємо (лікар веде
+// зауваження прямо в helsi); тут лише факт події + поточна шкала коректності.
+function qFlattenChanges() {
+  const rows = Q_STATE.rows.filter(r => !Q_STATE.dept || (r.department_name || '—') === Q_STATE.dept);
+  const out = [];
+  rows.forEach(r => {
+    const a = r.activity;
+    if (!a) return;
+    (a.events || []).forEach(ev => {
+      if (!(ev.changes || []).length) return;
+      // Закриття епізоду (is_open: true → false) — найпомітніша подія в
+      // журналі, підсвічуємо окремо від звичайних правок полів.
+      const closed = ev.changes.some(c => c.field === 'is_open' && c.from === true && c.to === false);
+      out.push({ at: ev.at, r, afterClose: !!ev.after_close, closed });
+    });
+    (a.fixed || []).forEach(fx => {
+      if (fx.fixed_at) out.push({ at: fx.fixed_at, r, afterClose: false, closed: false });
+    });
+  });
+  out.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+  return out.slice(0, 300);
+}
+
+// Візуальна шкала «коректності ведення епізода» станом на зараз: помилки
+// (flags) — вдвічі вагоміші за попередження (warnings). Повна зелена — без
+// жодного зауваження, порожня червона — багато помилок. Це не сумарна оцінка
+// «за весь час», а поточний стан запису (r.flags/r.warnings з /api/lpz-case-quality).
+function qScaleHtml(r) {
+  const errs = (r.flags || []).length;
+  const warns = (r.warnings || []).length;
+  const score = Math.max(0, 1 - (errs * 2 + warns) / 6);
+  const color = score >= 0.7 ? 'var(--c-sage)' : score >= 0.4 ? 'var(--c-accent-amber)' : 'var(--c-accent-red)';
+  return `<span class="q-scale" title="${qEsc(`помилок: ${errs} · попереджень: ${warns}`)}"><span class="q-scale-fill" style="width:${Math.round(score * 100)}%;background:${color}"></span></span>`;
+}
+
+function renderQualityChangesList() {
+  const title = document.getElementById('qCasesTitle');
+  const list = document.getElementById('qCases');
+  const items = qFlattenChanges();
+  const filters = [Q_STATE.dept].filter(Boolean);
+  title.innerHTML = `ЖУРНАЛ ЗМІН · ${items.length}${filters.length ? ` · ${qEsc(filters.join(' · '))}` : ''}<span class="q-reset" id="qChangesToggle">← до епізодів</span>`;
+  list.innerHTML = items.map(it => {
+    const dxCodes = it.r.dx_codes && it.r.dx_codes.length ? it.r.dx_codes : [it.r.primary_icd].filter(Boolean);
+    const dxLabel = qEsc(dxCodes.length ? dxCodes.join(', ') : '—');
+    return `
+    <div class="q-detail-row${it.closed ? ' q-detail-row-closed' : ''}">
+      <span class="q-detail-k">${qFmtDateTime(it.at)}</span>
+      <span>№ ${qEsc(it.r.card_number)} · ${qEsc(it.r.department_name || '—')} · ${dxLabel} ${qScaleHtml(it.r)}${it.closed ? ' <span class="q-detail-kind q-detail-kind-closed">закрито</span>' : ''}${it.afterClose ? ' <span class="q-detail-kind">після закриття</span>' : ''}</span>
+    </div>`;
+  }).join('') || '<div class="census-empty" style="position:static">Змін ще немає</div>';
+  list.scrollTop = 0;
+  updateFadeMask(list, 'y');
+  document.getElementById('qChangesToggle').addEventListener('click', () => { Q_STATE.view = 'cases'; renderQualityCases(); });
+}
+
 function renderQualityCases() {
+  if (Q_STATE.view === 'changes') { renderQualityChangesList(); return; }
   const title = document.getElementById('qCasesTitle');
   const list = document.getElementById('qCases');
   const rows = qVisibleRows();
   const filters = [Q_STATE.flag && Q_FLAGS[Q_STATE.flag].short, Q_STATE.dept].filter(Boolean);
-  title.innerHTML = `${Q_SEGMENTS[Q_STATE.segment].pill} · ${rows.length}${filters.length ? ` · ${qEsc(filters.join(' · '))}<span class="q-reset" id="qReset">✕ скинути</span>` : ''}`;
+  title.innerHTML = `${Q_SEGMENTS[Q_STATE.segment].pill} · ${rows.length}${filters.length ? ` · ${qEsc(filters.join(' · '))}<span class="q-reset" id="qReset">✕ скинути</span>` : ''}<span class="q-reset" id="qChangesToggle" style="margin-left:10px">журнал змін →</span>`;
   const reset = document.getElementById('qReset');
   if (reset) reset.addEventListener('click', () => { Q_STATE.flag = null; Q_STATE.dept = null; renderQualityAll(); });
+  document.getElementById('qChangesToggle').addEventListener('click', () => { Q_STATE.view = 'changes'; renderQualityCases(); });
 
   list.innerHTML = rows.map(r => qEpisodeHtml(r, Q_STATE.today)).join('') || '<div class="census-empty" style="position:static">Немає епізодів за цим фільтром</div>';
   list.scrollTop = 0;

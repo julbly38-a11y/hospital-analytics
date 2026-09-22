@@ -182,7 +182,16 @@
   color: var(--c-accent-berry);
 }
 .q-detail-kind-warn { color: var(--c-accent-blue); }
+.q-detail-kind-closed { color: var(--c-sage); }
 .q-detail-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-weight: 300; font-size: 14px; line-height: 1.35; color: var(--c-ink-3); }
+/* Журнал змін (quality.js:renderQualityChangesList) — рядок із закриттям
+   епізоду підсвічено м'яким тлом, щоб виділятись серед правок окремих полів. */
+.q-detail-row-closed { background: rgba(95,110,94,0.09); border-radius: 4px; padding: 2px 6px; margin: 0 -6px; }
+/* Шкала коректності ведення епізода (quality.js:qScaleHtml) — вузька смужка,
+   заповнена пропорційно до відсутності помилок/попереджень. */
+.q-scale { display: inline-block; width: 48px; height: 6px; border-radius: 3px; background: rgba(0,0,0,0.08); vertical-align: middle; margin-left: 6px; overflow: hidden; }
+.q-scale-fill { display: block; height: 100%; border-radius: 3px; }
+.slide.fin-mode .q-scale { background: rgba(255,255,255,0.15); }
 .q-detail-k { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-ink-3); padding-top: 2px; }
 .q-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
 .q-detail-fact { display: grid; grid-template-columns: 96px 1fr; gap: 8px; font-weight: 300; font-size: 13.5px; line-height: 1.3; color: var(--c-ink-2); }
