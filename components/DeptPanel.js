@@ -1,8 +1,6 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { SANS, MONO, fmt, initials, glass } from './shared'
+import { SANS, MONO, fmt, initials, glass, PIE_COLORS } from './shared'
 import { SplitBar } from './SplitBar'
-
-const PIE_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2']
 
 export function DeptPanel({ dept, deptProfile, deptHead, deptDocs, deptIcd, deptToday, headCabinet, loading }) {
   const headDoc = deptDocs.find(d => d.посада?.toLowerCase().includes('завідувач'))

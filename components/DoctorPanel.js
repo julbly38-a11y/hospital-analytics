@@ -1,10 +1,5 @@
-import { SANS, MONO, fmt } from './shared'
+import { SANS, MONO, fmt, STATUS_COLORS } from './shared'
 import { SplitBar } from './SplitBar'
-
-const STATUS_COLORS = {
-  'Лікується': '#5ab0ff', 'З поліпшенням': '#7fd99a', 'Без змін': '#cfae5a',
-  'З погіршенням': '#e0a060', 'Помер': '#e08080', 'Переведений в інший заклад': '#a08ae0',
-}
 
 function StatusBadge({ status }) {
   const c = STATUS_COLORS[status] || '#999'

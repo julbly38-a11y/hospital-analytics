@@ -1,0 +1,54 @@
+/* Shared card styles for preview/ */
+@import url('../colors_and_type.css');
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+}
+
+body.card {
+  padding: 24px;
+  min-height: 150px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  flex: 1 1 0;
+  min-width: 80px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.swatch .fill {
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+}
+.swatch .meta {
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.swatch .meta .name { color: var(--text); font-weight: 500; }
+.swatch .meta .hex { color: var(--text3); }
+
+.label {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text3);
+  margin-bottom: 12px;
+}

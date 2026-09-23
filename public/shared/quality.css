@@ -1,0 +1,237 @@
+/* Контроль записів (quality.html) — ті самі поля розмітки, шрифти й палітра,
+   що entry.html/head-cabinet.html; тут лише специфічне для цієї сторінки. */
+
+.q-pills { gap: 9px; }
+.q-pills .ypill { width: auto; padding: 0 16px; white-space: nowrap; }
+
+.q-kpi-row .kpi-num { font-size: 32.5px; }
+.q-kpi-row .kpi-num.q-alert { color: var(--c-accent-berry); }
+
+.q-list {
+  position: absolute;
+  left: var(--field-pad);
+  right: var(--field-pad);
+  top: calc(var(--field-pad) + 30px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.q-list::-webkit-scrollbar { display: none; }
+
+.q-item {
+  padding: 6px 0;
+  text-align: right;
+  font-weight: 300;
+  font-size: 19px;
+  line-height: 1.2;
+  color: var(--c-ink-3);
+  cursor: pointer;
+  transition: text-shadow .2s ease, color .2s ease;
+}
+.q-item .q-count {
+  display: inline-block;
+  min-width: 34px;
+  margin-left: 12px;
+  color: var(--c-accent-pink);
+  font-variant-numeric: tabular-nums;
+}
+.q-item .q-sub {
+  display: block;
+  font-size: 11px;
+  color: var(--c-taupe-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.q-item:hover, .q-item.active {
+  text-shadow: 0 0 6px rgba(178,124,139,.55), 0 0 16px rgba(178,124,139,.45), 0 0 30px rgba(178,124,139,.30);
+}
+.q-item.active { color: var(--c-accent-pink); }
+.q-item.q-high .q-sub { color: var(--c-accent-berry); }
+
+/* Праве верхнє поле — пояснення обраного типу зауваження */
+.q-explain { display: flex; flex-direction: column; gap: 14px; }
+.q-explain-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 24px;
+}
+.q-explain-title {
+  font-weight: 300; font-size: 30px; line-height: 1.1; color: var(--c-ink-2);
+}
+.q-explain-level {
+  font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--c-taupe); white-space: nowrap;
+}
+.q-explain-level.q-high { color: var(--c-accent-berry); }
+.q-explain-cols { display: grid; grid-template-columns: 1fr 1fr 300px; gap: 36px; }
+.q-explain-label {
+  font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--c-accent-pink); margin-bottom: 6px;
+}
+.q-explain-text { font-weight: 300; font-size: 17px; line-height: 1.4; color: var(--c-ink-3); }
+.q-explain-stats { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.q-stat { text-align: right; }
+.q-stat-v { font-weight: 300; font-size: 28px; line-height: 1; color: var(--c-ink-1); font-variant-numeric: tabular-nums; }
+.q-stat-l { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-taupe-light); margin-top: 3px; }
+
+/* Праве нижнє поле — список випадків (стиль .census-*) */
+.q-cases-title .q-reset { margin-left: 14px; cursor: pointer; color: var(--c-taupe); }
+.q-cases-title .q-reset:hover { color: #6d93d8; }
+.q-case {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: center;
+  padding: 9px 0;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  font-weight: 300;
+}
+.q-case:first-child { border-top: none; }
+.q-case-main { min-width: 0; }
+.q-case-line1 { display: flex; gap: 12px; align-items: baseline; white-space: nowrap; overflow: hidden; }
+.q-case-patient { font-size: 16.5px; color: var(--c-ink-2); flex-shrink: 0; }
+.q-case-num { font-size: 16.5px; color: var(--c-ink-3); flex-shrink: 0; }
+.q-case-dx { font-size: 15px; color: var(--c-ink-4); overflow: hidden; text-overflow: ellipsis; }
+.q-case-line2 { font-size: 13.5px; color: var(--c-taupe-light); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-state-open { color: var(--c-accent-blue); }
+.q-case-side { display: flex; gap: 14px; align-items: center; }
+.q-flags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 520px; }
+.q-flag {
+  font-size: 12px; padding: 2px 9px; border-radius: 10px;
+  border: 1px solid rgba(178,124,139,0.55); color: var(--c-accent-pink);
+  white-space: nowrap;
+}
+.q-flag.q-high { border-color: rgba(156,84,104,0.7); color: var(--c-accent-berry); background: rgba(156,84,104,0.07); }
+.q-flag.q-warn { border-style: dashed; border-color: rgba(77,122,145,0.6); color: var(--c-accent-blue); background: transparent; }
+.q-pill-n { margin-left: 4px; opacity: 0.75; }
+.q-deadline { color: var(--c-accent-blue); }
+.q-deadline-urgent { color: var(--c-accent-red); font-weight: 500; }
+.q-deadline-lost { color: var(--c-taupe); }
+.q-open-link {
+  font-size: 13px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--c-accent-blue); text-decoration: none; white-space: nowrap;
+}
+.q-open-link:hover { text-decoration: underline; }
+.q-case:hover .q-case-num { color: #6d93d8; }
+
+.q-money { color: var(--c-accent-berry); }
+.q-source { margin-top: 10px; font-size: 11.5px; color: var(--c-taupe-light); font-weight: 300; }
+
+/* Нотатка над некоректним епізодом — адресат + первинна/вторинна підказки */
+.q-episode { padding: 10px 0 4px; border-top: 1px solid rgba(0,0,0,0.06); }
+.q-episode:first-child { border-top: none; }
+.q-episode .q-case { border-top: none; padding-top: 6px; }
+.q-note {
+  background: rgba(240,236,232,0.92);
+  border: 1px dashed rgba(178,124,139,0.45);
+  border-radius: 8px;
+  padding: 8px 12px 6px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.q-note-to {
+  font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--c-accent-blue);
+}
+.q-note-to-head { color: var(--c-accent-berry); }
+.q-note-issue { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; border-top: 1px dashed rgba(0,0,0,0.07); }
+.q-note-issue:first-of-type { border-top: none; padding-top: 0; }
+.q-note-line { display: grid; grid-template-columns: 74px 1fr; gap: 10px; font-weight: 300; font-size: 14px; line-height: 1.35; color: var(--c-ink-3); }
+.q-note-line b { font-weight: 500; color: var(--c-ink-2); }
+.q-note-tag {
+  font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c-accent-berry); padding-top: 2px;
+}
+.q-note-tag-sec { color: var(--c-accent-blue); }
+.q-note-warn .q-note-line b { color: var(--c-accent-blue); }
+/* Посилання в розділ епізоду helsi, де виправляється саме це зауваження */
+.q-fix-link {
+  margin-left: 6px; white-space: nowrap;
+  font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--c-accent-blue); text-decoration: none;
+}
+.q-fix-link:hover { text-decoration: underline; }
+
+/* Перемикач бази: усі епізоди / лише розрахунок НСЗУ */
+.q-basis { display: inline-flex; gap: 6px; margin-left: 12px; vertical-align: middle; }
+.q-basis-opt {
+  font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 9px; border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(0,0,0,0.15); color: var(--c-ink-3); white-space: nowrap;
+}
+.q-basis-opt.active { background: var(--c-accent-blue); border-color: var(--c-accent-blue); color: #fff; }
+/* Позначка точності ціни біля суми епізоду */
+.q-price-tag { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 10px; margin-right: 6px; white-space: nowrap; }
+.q-price-exact { background: rgba(70,120,90,0.15); color: #3f7a55; }
+.q-price-est { background: rgba(178,124,139,0.16); color: var(--c-accent-berry); }
+
+/* Розгортка епізоду по кліку (quality-notes.js: qDetailHtml) */
+.q-episode { cursor: pointer; }
+.q-more { font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-ink-3); white-space: nowrap; }
+.q-more::after { content: 'деталі ▾'; }
+.q-episode.q-expanded .q-more::after { content: 'згорнути ▴'; }
+.q-detail {
+  display: none;
+  margin-top: 6px; padding: 10px 12px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 8px;
+  cursor: default;
+}
+.q-episode.q-expanded .q-detail { display: flex; flex-direction: column; gap: 8px; }
+.q-detail-issue { display: flex; flex-direction: column; gap: 2px; padding-bottom: 7px; border-bottom: 1px dashed rgba(0,0,0,0.09); }
+.q-detail-issue-title { font-size: 14px; font-weight: 500; color: var(--c-ink-2); }
+.q-detail-kind {
+  margin-left: 6px; font-size: 10.5px; font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--c-accent-berry);
+}
+.q-detail-kind-warn { color: var(--c-accent-blue); }
+.q-detail-kind-closed { color: var(--c-sage); }
+.q-detail-row { display: grid; grid-template-columns: 110px 1fr; gap: 10px; font-weight: 300; font-size: 14px; line-height: 1.35; color: var(--c-ink-3); }
+/* Журнал змін (quality.js:renderQualityChangesList) — рядок із закриттям
+   епізоду підсвічено м'яким тлом, щоб виділятись серед правок окремих полів. */
+.q-detail-row-closed { background: rgba(95,110,94,0.09); border-radius: 4px; padding: 2px 6px; margin: 0 -6px; }
+/* Шкала коректності ведення епізода (quality.js:qScaleHtml) — вузька смужка,
+   заповнена пропорційно до відсутності помилок/попереджень. */
+.q-scale { display: inline-block; width: 48px; height: 6px; border-radius: 3px; background: rgba(0,0,0,0.08); vertical-align: middle; margin-left: 6px; overflow: hidden; }
+.q-scale-fill { display: block; height: 100%; border-radius: 3px; }
+.slide.fin-mode .q-scale { background: rgba(255,255,255,0.15); }
+.q-detail-k { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-ink-3); padding-top: 2px; }
+.q-detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 18px; }
+.q-detail-fact { display: grid; grid-template-columns: 96px 1fr; gap: 8px; font-weight: 300; font-size: 13.5px; line-height: 1.3; color: var(--c-ink-2); }
+
+/* Короткий список у кабінеті завідувача (фінансовий режим): пацієнт · лікар · кількість зауважень */
+.q-compact-count {
+  flex-shrink: 0;
+  font-size: 14px; font-weight: 400;
+  color: var(--c-accent-amber);
+  font-variant-numeric: tabular-nums;
+}
+.q-compact-count.q-compact-error { color: var(--c-accent-red); }
+
+/* Нагадування лікарю — вкладка в полі «Перебуває у відділенні» (doctor-cabinet.js) */
+.census-title .census-remind { margin-left: 14px; cursor: pointer; color: var(--c-accent-berry); transition: color .2s ease, text-shadow .2s ease; }
+.census-title .census-remind:hover { color: #6d93d8; }
+.census-title .census-remind.active { color: #6d93d8; font-weight: 600; text-shadow: 0 0 5px rgba(109,147,216,0.35); }
+.remind-item { padding: 9px 0 7px; border-top: 1px solid rgba(0,0,0,0.06); font-weight: 300; }
+.remind-item:first-child { border-top: none; }
+.remind-item.remind-escalated { box-shadow: inset 3px 0 0 var(--c-accent-berry); padding-left: 10px; }
+.remind-head { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
+.remind-patient { font-size: 16px; color: var(--c-ink-2); }
+.remind-day { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-taupe-light); white-space: nowrap; }
+.remind-dx { font-size: 13.5px; color: var(--c-ink-4); margin-bottom: 4px; }
+.remind-line { font-size: 14px; line-height: 1.35; color: var(--c-ink-3); padding-top: 3px; }
+.remind-line b { font-weight: 500; }
+.remind-err b { color: var(--c-accent-berry); }
+.remind-warn b { color: var(--c-accent-blue); }
+.remind-since { color: var(--c-taupe-light); font-size: 12.5px; }
+.remind-hint { font-size: 13px; color: var(--c-taupe-light); }
+.remind-foot { font-size: 12px; letter-spacing: 0.04em; color: var(--c-taupe-light); margin-top: 4px; }
+.slide.fin-mode .remind-item { border-top-color: rgba(255,255,255,0.08); }
+
+/* Темна тема (фінансовий режим, layout.css): жорстко задані світлі фони й
+   рамки, які не йдуть через змінні. */
+.slide.fin-mode .q-detail { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.08); }
+.slide.fin-mode .q-detail-issue { border-bottom-color: rgba(255,255,255,0.12); }
+.slide.fin-mode .q-basis-opt { border-color: rgba(255,255,255,0.2); }
+.slide.fin-mode .remind-soft-title { border-top-color: rgba(255,255,255,0.15); }
+
+.remind-soft b { color: var(--c-taupe); font-weight: 400; }
+.remind-item-soft .remind-patient { color: var(--c-ink-3); font-size: 14.5px; }
+.remind-soft-title { margin: 12px 0 2px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.12); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-taupe-light); }

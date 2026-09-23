@@ -1,5 +1,4 @@
-const MONO = { fontFamily: '"IBM Plex Mono", monospace' }
-const SANS = { fontFamily: '"IBM Plex Sans", sans-serif' }
+import { SANS, MONO } from './shared'
 
 /**
  * SplitBar — горизонтальна смужка з двома сегментами у відсотках

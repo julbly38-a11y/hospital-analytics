@@ -5,7 +5,7 @@ const nextConfig = {
   async redirects() {
     return [
       // корінь сайту → слайд-вхід (а не старий дашборд index.js)
-      { source: '/', destination: '/khotyn_slide.html', permanent: false },
+      { source: '/', destination: '/layout.html', permanent: false },
     ]
   },
 }
