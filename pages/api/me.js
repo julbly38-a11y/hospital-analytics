@@ -113,6 +113,20 @@ export default async function handler(req, res) {
     // lpz_department вище вже коректно визначені з того самого lpzEmpl.
     if (!org_edrpou && lpzEmpl) org_edrpou = lpzEmpl.org_edrpou
 
+    // Лікарі не мають власного доступу до кабінетів (рішення 2026-09-23):
+    // рішення ухвалюють завідувачі й керівники, а кабінет лікаря лишається
+    // лише як нижній поверх ІЄРАРХІЧНОГО проходу власника сайту
+    // (is_owner + ?org=&dept=&doctor= — окремий механізм, ця гілка його НЕ
+    // чіпає, бо власник сюди не потрапляє: у нього немає lpz_empl-ролі
+    // 'doctor'). Сесію з власною роллю 'doctor' виштовхуємо: усі сторінки
+    // гейтять на `if (!me.role) → редірект`, тож role:null = немає доступу.
+    // Тестові акаунти персоналу (Lsmd2026) існують — саме тому блок у коді,
+    // а не в операційній видачі паролів.
+    const effectiveRole = lpz_role || appUser?.role || 'viewer'
+    if (effectiveRole === 'doctor' && !appUser?.is_owner) {
+      return res.status(200).json({ role: null })
+    }
+
     return res.status(200).json({
       // role — пріоритет lpz_role (актуальний канон, doctor/head/deputy/nurse),
       // app_users.role лишається фолбеком для тих, кого ще нема в lpz_empl
