@@ -153,7 +153,7 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
       if (!data || !docsList) return;
       docsList.innerHTML = data.rows.map(d => `
         <div class="doc-item${d.resource_id === ownDoctorId ? ' own' : ''}" data-doctor="${d.resource_id}" data-doctor-name="${d.full_name}">
-          <span class="pii">${d.full_name}</span>
+          ${d.full_name}
           <span class="doc-position">Ординатор</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';
@@ -197,7 +197,7 @@ let remindMode = false;
 
 function reminderItemHtml(r) {
   const rem = r.reminder;
-  const patient = r.patient_name ? piiWrap(qEsc(r.patient_name)) : `картка № ${qEsc(r.card_number || '—')}`;
+  const patient = r.patient_name ? qEsc(r.patient_name) : `картка № ${qEsc(r.card_number || '—')}`;
   const norm = rem.norm ? ` · норма ≈ ${rem.norm.median} діб` : '';
   const lines = rem.items.filter(i => Q_FLAGS[i.code]).map(i => {
     const f = Q_FLAGS[i.code];

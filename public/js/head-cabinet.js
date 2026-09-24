@@ -310,7 +310,7 @@ function openDoctorExpand(el) {
         ? data.rows.map(r => `
           <div class="census-row">
             <div class="census-info">
-              <span class="census-name pii">${r.pib || '—'}</span>
+              <span class="census-name">${r.pib || '—'}</span>
               <span class="census-meta">${fmtDDMMYYYY(r.admission_date)} · ${r.age ?? '—'} р. · ${r.gender || '—'} · ${fmtDDMMYYYY(r.birth_date)}</span>
             </div>
             <div class="doc-census-diag">${r.icd_code ? r.icd_code + ' ' : ''}${r.diagnosis || '—'}</div>
@@ -357,7 +357,7 @@ function loadStaff(org, deptId, isOwner, deptName) {
       if (!data || !docsList) return;
       docsList.innerHTML = data.rows.map(d => `
         <div class="doc-item" data-doctor="${d.resource_id}" data-doctor-name="${d.full_name}">
-          <span class="pii">${d.full_name}</span>
+          ${d.full_name}
           <span class="doc-position">Ординатор</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';
