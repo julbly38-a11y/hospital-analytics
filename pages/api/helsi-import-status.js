@@ -1,8 +1,28 @@
+import { createServerClient } from '@supabase/ssr'
+
 const REPO = 'julbly38-a11y/hospital-analytics'
 const GH_TOKEN = process.env.GITHUB_TOKEN
 
+// Той самий захист, що й у helsi-import-trigger: лише адміністратор. Без нього будь-хто
+// з runId міг би через наш GitHub-токен читати статус запусків workflow.
+async function getMe(req) {
+  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll() { return Object.entries(req.cookies || {}).map(([name, value]) => ({ name, value })) },
+      setAll() {},
+    },
+  })
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  const { data } = await supabase.from('app_users').select('role').eq('auth_user_id', user.id).single()
+  return data || null
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
+
+  const me = await getMe(req)
+  if (!me || me.role !== 'admin') return res.status(403).json({ error: 'Тільки для адміністраторів' })
 
   const { runId } = req.query
   if (!runId) return res.status(400).json({ error: 'runId required' })

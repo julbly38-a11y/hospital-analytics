@@ -29,6 +29,9 @@
 <script>
   (function () {
     const sel = document.getElementById('devOrgSwitch');
+    // Перемикач лікарень — лише для локальної розробки; на проді відвідувачам не показуємо
+    // (лікарня обирається параметром ?org=<ЄДРПОУ>; власник після входу має перемикач на entry.html).
+    if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) { sel.remove(); return; }
     if (window.HOSPITAL_ORG_EDRPOU) sel.value = window.HOSPITAL_ORG_EDRPOU;
     sel.addEventListener('change', () => { location.href = '/layout.html?org=' + sel.value; });
   })();
