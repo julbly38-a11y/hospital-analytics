@@ -1,6 +1,7 @@
 (function () {
   /* helsi.pro -> local receiver of scripts/helsi_sync.py. Run ONLY in a logged-in https://helsi.pro tab.
      The port and token placeholders below are filled in by helsi_sync.py.
+     PORT '0' = do not post anywhere: data stays in window.__helsiPayload and helsi_sync.py pulls it via CDP.
      Keep this file ASCII-only (AppleScript garbles other encodings) and free of line comments. */
   if (window.__helsiSync && !window.__helsiSync.done) return 'already running';
   var PORT = '__PORT__', TOKEN = '__TOKEN__';
@@ -66,10 +67,15 @@
       disposition()
     ]);
     var now = new Date().toISOString();
-    if (res[0]) await post('closed', { meta: { type: 'closed', year: YEAR, extractedAt: now, count: res[0].length }, data: res[0] });
-    if (res[1]) await post('open', { meta: { type: 'open', extractedAt: now, count: res[1].length }, data: res[1] });
-    if (res[2]) await post('episodes', { meta: { type: 'episodes', extractedAt: now, count: res[2].length }, data: res[2] });
-    if (res[3]) await post('disp', res[3]);
+    var P = {};
+    if (res[0]) P.closed = { meta: { type: 'closed', year: YEAR, extractedAt: now, count: res[0].length }, data: res[0] };
+    if (res[1]) P.open = { meta: { type: 'open', extractedAt: now, count: res[1].length }, data: res[1] };
+    if (res[2]) P.episodes = { meta: { type: 'episodes', extractedAt: now, count: res[2].length }, data: res[2] };
+    if (res[3]) P.disp = res[3];
+    window.__helsiPayload = P;
+    if (PORT !== '0') {
+      for (var k in P) await post(k, P[k]);
+    }
     S.done = true;
   })();
   return 'started';

@@ -271,12 +271,16 @@ window.runQualityDaily = async function ({
 
     state.rows = rows
     state.stage = 'ingest'
-    const r = await fetch(ingestUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ org, rows, runStartedAt }),
-    })
-    state.result = { http: r.status, body: await r.json().catch(() => null) }
+    // ingestUrl: null — не надсилати з сторінки (scripts/helsi_evening.py --transport cdp
+    // забирає rows зі стану вкладки сам і шле на dev-сервер із терміналу).
+    if (ingestUrl) {
+      const r = await fetch(ingestUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org, rows, runStartedAt }),
+      })
+      state.result = { http: r.status, body: await r.json().catch(() => null) }
+    }
   } catch (e) {
     state.err = String(e.message || e)
   }
