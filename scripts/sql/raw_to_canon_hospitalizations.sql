@@ -100,7 +100,17 @@ SELECT
   patient_severity_name,
   CASE admission_enc_priority_name WHEN 'Ургентний' THEN 'Екстренна' WHEN 'Плановий' THEN 'Планова' ELSE NULL END AS admission_type,
   re_admission
-FROM src;
+FROM src
+-- ВИКЛЮЧЕННЯ (2026-09-24, за вказівкою користувача): ЛШМД, госпіталізації з
+-- квітня–травня 2026 — артефакт запуску модуля «Стаціонар» (картки висіли
+-- відкритими ~90 діб, масово закриті 19.08). Їх свідомо прибрано з канону
+-- (копія — у схемі lpz_archive, *_lshmd_2026_04_05), тож raw-знімок НЕ повинен
+-- повертати їх назад. Зсув по Kyiv — як і для admission_date нижче.
+WHERE NOT (
+  org_edrpou = '43342788'
+  AND (start_::timestamptz AT TIME ZONE 'Europe/Kyiv')::date >= DATE '2026-04-01'
+  AND (start_::timestamptz AT TIME ZONE 'Europe/Kyiv')::date <  DATE '2026-06-01'
+);
 
 -- 1) Пацієнти — upsert ПЕРЕД госпіталізаціями (FK), не чіпаємо наявних
 INSERT INTO lpz.lpz_patients (org_edrpou, patient_id, full_name, last_name, first_name, middle_name, gender, birthday)
