@@ -4,10 +4,7 @@ import '../styles/globals.css'
 import { createClient } from '../lib/supabase'
 
 /* Сторінки без авторизації */
-const PUBLIC = ['/', '/login', '/auth/reset-password', '/charts']
-
-/* Сторінки тільки для адміна */
-const ADMIN_ONLY = ['/admit', '/import', '/glow', '/analytics']
+const PUBLIC = ['/', '/login', '/auth/reset-password']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
@@ -64,12 +61,6 @@ export default function App({ Component, pageProps }) {
   /* Не авторизований → на логін */
   if (!isPublic && !auth.role) {
     if (typeof window !== 'undefined') router.replace('/login')
-    return null
-  }
-
-  /* Не адмін намагається зайти на адмін-сторінку → на кабінет (якщо лікар) або головну */
-  if (ADMIN_ONLY.includes(path) && auth.role !== 'admin') {
-    if (typeof window !== 'undefined') router.replace(auth.role === 'doctor' ? '/cabinet' : '/')
     return null
   }
 
