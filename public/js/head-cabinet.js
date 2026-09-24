@@ -192,7 +192,7 @@ let doctorIcdBlocks = {};
 
 function renderStaffAndCensus(root, deptName) {
   (root.querySelector('.lf-left-top') || root).insertAdjacentHTML('beforeend', `
-    <div class="docs-title">${deptName ? deptName + ' · ' : ''}Ординаторська</div>
+    <div class="docs-title">${deptName ? qEsc(deptName) + ' · ' : ''}Ординаторська</div>
     <div class="docs-list" id="docsList"></div>
   `);
   // showReset:false — "Перебуває у відділенні" праворуч тепер НЕ реагує на
@@ -310,10 +310,10 @@ function openDoctorExpand(el) {
         ? data.rows.map(r => `
           <div class="census-row">
             <div class="census-info">
-              <span class="census-name">${r.pib || '—'}</span>
-              <span class="census-meta">${fmtDDMMYYYY(r.admission_date)} · ${r.age ?? '—'} р. · ${r.gender || '—'} · ${fmtDDMMYYYY(r.birth_date)}</span>
+              <span class="census-name">${qEsc(r.pib || '—')}</span>
+              <span class="census-meta">${fmtDDMMYYYY(r.admission_date)} · ${qEsc(r.age ?? '—')} р. · ${qEsc(r.gender || '—')} · ${fmtDDMMYYYY(r.birth_date)}</span>
             </div>
-            <div class="doc-census-diag">${r.icd_code ? r.icd_code + ' ' : ''}${r.diagnosis || '—'}</div>
+            <div class="doc-census-diag">${qEsc(r.icd_code ? r.icd_code + ' ' : '')}${qEsc(r.diagnosis || '—')}</div>
           </div>`).join('')
         : `<div class="census-empty">Немає пацієнтів цього лікаря на цю дату</div>`;
       const docsList = document.getElementById('docsList');
@@ -356,8 +356,8 @@ function loadStaff(org, deptId, isOwner, deptName) {
       const docsList = document.getElementById('docsList');
       if (!data || !docsList) return;
       docsList.innerHTML = data.rows.map(d => `
-        <div class="doc-item" data-doctor="${d.resource_id}" data-doctor-name="${d.full_name}">
-          ${d.full_name}
+        <div class="doc-item" data-doctor="${qEsc(d.resource_id)}" data-doctor-name="${qEsc(d.full_name)}">
+          ${qEsc(d.full_name)}
           <span class="doc-position">Ординатор</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';
