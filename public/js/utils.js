@@ -308,7 +308,7 @@ function renderDutyBand(root, org, onLoaded) {
       const dutyEl = document.getElementById('dutyDocs');
       if (!data || !dutyEl) return;
       dutyEl.innerHTML = data.rows.map(r => `
-        <span data-full="${r.doctorFull}" data-position="${r.position}" data-home="${r.department}">${r.doctor}</span>
+        <span class="pii" data-full="${r.doctorFull}" data-position="${r.position}" data-home="${r.department}">${r.doctor}</span>
       `).join('');
       initDutyTooltip(dutyEl);
       updateFadeMask(dutyEl, 'x');
@@ -361,6 +361,51 @@ function renderMeBar(root) {
     </div>
   `);
 }
+
+// ── Режим «сховати ПІБ» (лише власник сайту) ─────────────────────────────
+// Кнопка з'являється тільки для me.is_owner. Ховає ПІБ лікарів і пацієнтів через
+// visibility:hidden (клас .pii), тож місце під іменами ЛИШАЄТЬСЯ порожнім і розкладка
+// (поля lf-*) не зсувається. Стан пам'ятається в localStorage і діє на всіх сторінках;
+// клас на <html> ставиться ще до рендеру (нижче, IIFE), щоб імена не блимали при завантаженні.
+// Для не-власника режим завжди вимикається (див. syncPiiMode).
+(function () {
+  try { if (localStorage.getItem('hidePii') === '1') document.documentElement.classList.add('pii-hidden'); } catch (e) {}
+})();
+
+function piiWrap(html) { return `<span class="pii">${html}</span>`; }
+
+function syncPiiMode(me) {
+  const id = 'piiToggle';
+  if (!me || !me.is_owner) {
+    document.documentElement.classList.remove('pii-hidden');
+    try { localStorage.removeItem('hidePii'); } catch (e) {}
+    const old = document.getElementById(id);
+    if (old) old.remove();
+    return;
+  }
+  if (document.getElementById(id)) return;
+  const btn = document.createElement('button');
+  btn.id = id;
+  btn.type = 'button';
+  btn.className = 'pii-toggle';
+  const paint = () => {
+    const on = document.documentElement.classList.contains('pii-hidden');
+    btn.textContent = on ? 'Показати ПІБ' : 'Сховати ПІБ';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+  btn.addEventListener('click', () => {
+    const on = document.documentElement.classList.toggle('pii-hidden');
+    try { if (on) localStorage.setItem('hidePii', '1'); else localStorage.removeItem('hidePii'); } catch (e) {}
+    paint();
+  });
+  paint();
+  document.body.appendChild(btn);
+}
+
+// Кожна сторінка з utils.js сама питає /api/me (один легкий запит) і показує кнопку власнику.
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/me').then(r => r.json()).then(syncPiiMode).catch(() => {});
+});
 
 function applyMeProfile(me) {
   const surEl = document.getElementById('meSurname');
@@ -1007,7 +1052,7 @@ function loadCensus(doctorId, options = {}) {
         return `
         <div class="census-row" data-doctor="${r.doc_resource_id || ''}" data-blok="${r.blok || ''}" data-patient="${r.patient_id || ''}">
           <div class="census-info">
-            <span class="census-name">${r.pib || '—'}</span>
+            <span class="census-name pii">${r.pib || '—'}</span>
             <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · поступив ${admStr} · ${diagStr}${hospCountStr}${repeatStr}</span>
           </div>
           <div class="census-stay" title="${days} діб">
