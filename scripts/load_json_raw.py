@@ -20,10 +20,14 @@ hospitalizations_closed_2026.json з різних лікарень ідуть в
 """
 
 import argparse
+import csv
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -112,6 +116,72 @@ def drop_identical_duplicates(records: list, name: str) -> list:
     if len(ids) != len(set(ids)):
         print(f"  УВАГА [{name}]: {len(ids) - len(set(ids))} записів мають повторний id, але РІЗНИЙ вміст — лишено як є", file=sys.stderr)
     return unique
+
+
+# ───────────── пряме завантаження в Postgres (psql \copy, одна транзакція) ─────────────
+# Замість сотень пакетів через PostgREST: DELETE + COPY + перевірка кількості в ОДНІЙ
+# транзакції. Або таблиця повністю оновилась, або взагалі не змінилась (жодних
+# "напівзавантажених" файлів після обриву). Якщо рядка підключення до БД нема —
+# працює старий шлях через PostgREST.
+DBURL_FILE = Path(os.environ.get("HELSI_SYNC_DBURL_FILE", "~/hospital-analytics/db-export/.dburl")).expanduser()
+NULL_MARK = "NULL_9f3a1c7e"  # маркер NULL у CSV: порожній рядок ('') лишається порожнім рядком, а не NULL
+
+
+class PgUnavailable(Exception):
+    pass
+
+
+def pg_target():
+    """(psql, url) або PgUnavailable. Захист: URL мусить вести на той самий проєкт, що й SUPABASE_URL."""
+    psql = shutil.which("psql") or "/opt/homebrew/opt/libpq/bin/psql"
+    if not Path(psql).exists():
+        raise PgUnavailable("psql не знайдено")
+    url = (os.environ.get("HELSI_SYNC_DB_URL") or (DBURL_FILE.read_text().strip() if DBURL_FILE.exists() else "")).strip()
+    if not url:
+        raise PgUnavailable("нема рядка підключення до БД")
+    m = re.match(r"https?://([a-z0-9]+)\.supabase\.co", SUPABASE_URL)
+    if not m or m.group(1) not in url:
+        raise PgUnavailable("рядок підключення не веде на той самий проєкт, що NEXT_PUBLIC_SUPABASE_URL")
+    return psql, url
+
+
+def load_via_psql(table: str, columns: list, rows: list, org_edrpou: str, source_file: str, schema: str = "lpz") -> None:
+    """Атомарно замінює рядки (org_edrpou, source_file) у schema.table. RuntimeError при збої (БД не змінена)."""
+    psql, url = pg_target()
+    for r in rows:
+        if NULL_MARK in {v for v in r.values() if isinstance(v, str)}:
+            raise RuntimeError("у даних трапився службовий маркер NULL")
+    ident = lambda c: '"' + c.replace('"', '""') + '"'
+    cols_sql = ", ".join(ident(c) for c in columns)
+    q = lambda v: "'" + v.replace("'", "''") + "'"
+    tbl = f"{ident(schema)}.{ident(table)}"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        csv_path = Path(tmp) / "data.csv"
+        with open(csv_path, "w", encoding="utf-8", newline="") as f:
+            w = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+            for r in rows:
+                w.writerow([NULL_MARK if r.get(c) is None else r[c] for c in columns])
+        sql_path = Path(tmp) / "load.sql"
+        sql_path.write_text(
+            "\\set ON_ERROR_STOP on\n"
+            "BEGIN;\n"
+            "SET LOCAL statement_timeout = '600s';\n"
+            f"DELETE FROM {tbl} WHERE org_edrpou = {q(org_edrpou)} AND source_file = {q(source_file)};\n"
+            f"\\copy {tbl} ({cols_sql}) FROM {q(str(csv_path))} WITH (FORMAT csv, NULL {q(NULL_MARK)})\n"
+            "DO $chk$ BEGIN\n"
+            f"  IF (SELECT count(*) FROM {tbl} WHERE org_edrpou = {q(org_edrpou)} AND source_file = {q(source_file)}) <> {len(rows)} THEN\n"
+            f"    RAISE EXCEPTION 'після COPY у таблиці не {len(rows)} рядків';\n"
+            "  END IF;\n"
+            "END $chk$;\n"
+            "COMMIT;\n",
+            encoding="utf-8",
+        )
+        env = {**os.environ, "PGCLIENTENCODING": "UTF8"}
+        r = subprocess.run([psql, url, "-X", "-q", "-f", str(sql_path)], capture_output=True, text=True, env=env)
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or r.stdout).strip()[-600:])
+    print(f"  завантажено {len(rows)}/{len(rows)} (psql \\copy, одна транзакція)")
 
 
 def derive_table_name(src: Path) -> str:
@@ -222,6 +292,17 @@ def load_generic(src: Path, org_edrpou=None, table=None, dry_run=False, limit=No
         row["source_file"] = src.name
         if meta.get("extractedAt"):
             row["extracted_at"] = meta["extractedAt"]
+
+    columns = sql_columns + ["org_edrpou", "source_file", "extracted_at"]
+    if os.environ.get("HELSI_RAW_LOADER", "psql") != "rest":
+        try:
+            load_via_psql(table, columns, flat_rows, org_edrpou, src.name)
+            print(f"\nГотово: {len(flat_rows)} записів у lpz.{table}")
+            return True
+        except PgUnavailable as e:
+            print(f"  прямий psql недоступний ({e}) — використовую PostgREST", file=sys.stderr)
+        except RuntimeError as e:
+            print(f"  psql-завантаження не вдалось, БД не змінено ({e}) — пробую PostgREST", file=sys.stderr)
 
     # Обрив зв'язку посеред файлу (Connection reset) лишає таблицю неповною. Повтор
     # окремого пакета міг би задублювати рядки, якщо сервер його вже зберіг, тому при
