@@ -9,6 +9,9 @@ load_json_raw.py — Заливає БУДЬ-ЯКИЙ helsi JSON-дамп у raw
 (назва файлу без року), тому hospitalizations_closed_2024.json і
 hospitalizations_closed_2026.json з різних лікарень ідуть в одну таблицю.
 
+ЗАВАНТАЖЕННЯ: за замовчуванням psql \copy в одній транзакції (потрібен рядок підключення
+до БД, див. pg_target); без нього або при HELSI_RAW_LOADER=rest — PostgREST пакетами.
+
 ОБМЕЖЕННЯ: DDL (CREATE TABLE / ALTER TABLE) через PostgREST неможливий — для
 цього немає прямого підключення до БД (SUPABASE_DB_URL не налаштований).
 Якщо потрібної таблиці або колонки ще нема, скрипт друкує готовий SQL і
