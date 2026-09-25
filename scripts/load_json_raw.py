@@ -24,6 +24,7 @@ import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -43,6 +44,74 @@ HEADERS = {
     "Prefer": "return=minimal",
 }
 BATCH_SIZE = 200
+# Скільки рядків видаляти за один запит. Одним DELETE на всі рядки файлу
+# (7.5 тис. широких рядків) PostgREST не встигає за statement_timeout
+# Supabase (8 с) і повертає 500 — тому чистимо пакетами.
+DELETE_BATCH_SIZE = 500
+LOAD_ATTEMPTS = 3
+
+
+def insert_rows(table: str, rows: list) -> None:
+    ins_url = f"{SUPABASE_URL}/rest/v1/{table}"
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i : i + BATCH_SIZE]
+        r = requests.post(ins_url, headers={**HEADERS, "Content-Profile": "lpz"}, json=batch, timeout=120)
+        if not r.ok:
+            print(f"Помилка на batch {i}-{i+len(batch)}: {r.status_code} {r.text[:500]}", file=sys.stderr)
+            r.raise_for_status()
+        print(f"  завантажено {min(i+BATCH_SIZE, len(rows))}/{len(rows)}")
+
+
+def delete_existing(table: str, org_edrpou: str, source_file: str) -> int:
+    """Видаляє попередній вміст цього файлу пакетами по id. Повертає скільки видалено."""
+    base = f"{SUPABASE_URL}/rest/v1/{table}"
+    scope = {"org_edrpou": f"eq.{org_edrpou}", "source_file": f"eq.{source_file}"}
+    headers = {**HEADERS, "Content-Profile": "lpz", "Accept-Profile": "lpz"}
+    deleted = 0
+
+    while True:
+        r = requests.get(base, headers=headers, params={**scope, "select": "id", "id": "not.is.null", "limit": DELETE_BATCH_SIZE})
+        r.raise_for_status()
+        ids = [row["id"] for row in (r.json() or []) if row.get("id")]
+        if not ids:
+            break
+        quoted = ",".join('"' + str(i).replace('"', '""') + '"' for i in ids)
+        d = requests.delete(base, headers=headers, params={**scope, "id": f"in.({quoted})"})
+        d.raise_for_status()
+        deleted += len(ids)
+        print(f"  очищено {deleted}")
+
+    # Рядки без id (якщо такі є) — окремим запитом, їх зазвичай одиниці.
+    d = requests.delete(base, headers=headers, params={**scope, "id": "is.null"})
+    d.raise_for_status()
+    return deleted
+
+
+def drop_identical_duplicates(records: list, name: str) -> list:
+    """Прибирає з вибірки записи, ІДЕНТИЧНІ вже наявним (побайтово однаковий JSON).
+
+    helsi віддає списки посторінково зі зсувом (skip), а список росте під час
+    вивантаження, тож сусідні сторінки перекриваються й один запис приходить
+    двічі (наприклад, ~600 повторів з 15.9 тис. епізодів). Ідентичні копії
+    відкидаємо без втрат. Якщо ж однаковий id має РІЗНИЙ вміст — нічого не
+    викидаємо, лише попереджаємо (канон бере найсвіжіший last_updated_at).
+    """
+    seen = set()
+    unique = []
+    for rec in records:
+        key = json.dumps(rec, sort_keys=True, ensure_ascii=False)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(rec)
+    dropped = len(records) - len(unique)
+    if dropped:
+        print(f"  прибрано ідентичних дублікатів: {dropped} ({len(records)} -> {len(unique)})")
+
+    ids = [r.get("id") for r in unique if isinstance(r, dict) and r.get("id")]
+    if len(ids) != len(set(ids)):
+        print(f"  УВАГА [{name}]: {len(ids) - len(set(ids))} записів мають повторний id, але РІЗНИЙ вміст — лишено як є", file=sys.stderr)
+    return unique
 
 
 def derive_table_name(src: Path) -> str:
@@ -96,6 +165,7 @@ def load_generic(src: Path, org_edrpou=None, table=None, dry_run=False, limit=No
     meta = meta or {}
     if limit:
         records = records[:limit]
+    records = drop_identical_duplicates(records, src.name)
 
     org_edrpou = org_edrpou or meta.get("org_edrpou")
     if not org_edrpou:
@@ -153,22 +223,19 @@ def load_generic(src: Path, org_edrpou=None, table=None, dry_run=False, limit=No
         if meta.get("extractedAt"):
             row["extracted_at"] = meta["extractedAt"]
 
-    del_url = f"{SUPABASE_URL}/rest/v1/{table}"
-    r = requests.delete(
-        del_url,
-        headers={**HEADERS, "Content-Profile": "lpz"},
-        params={"org_edrpou": f"eq.{org_edrpou}", "source_file": f"eq.{src.name}"},
-    )
-    r.raise_for_status()
-
-    ins_url = f"{SUPABASE_URL}/rest/v1/{table}"
-    for i in range(0, len(flat_rows), BATCH_SIZE):
-        batch = flat_rows[i : i + BATCH_SIZE]
-        r = requests.post(ins_url, headers={**HEADERS, "Content-Profile": "lpz"}, json=batch)
-        if not r.ok:
-            print(f"Помилка на batch {i}-{i+len(batch)}: {r.status_code} {r.text[:500]}", file=sys.stderr)
-            r.raise_for_status()
-        print(f"  завантажено {min(i+BATCH_SIZE, len(flat_rows))}/{len(flat_rows)}")
+    # Обрив зв'язку посеред файлу (Connection reset) лишає таблицю неповною. Повтор
+    # окремого пакета міг би задублювати рядки, якщо сервер його вже зберіг, тому при
+    # мережевому збої повторюємо файл ЦІЛКОМ: видалення + вставка (ідемпотентно).
+    for attempt in range(1, LOAD_ATTEMPTS + 1):
+        try:
+            delete_existing(table, org_edrpou, src.name)
+            insert_rows(table, flat_rows)
+            break
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt == LOAD_ATTEMPTS:
+                raise
+            print(f"  мережевий збій ({e.__class__.__name__}), повтор файлу {attempt + 1}/{LOAD_ATTEMPTS} за {5 * attempt} с…", file=sys.stderr)
+            time.sleep(5 * attempt)
 
     print(f"\nГотово: {len(flat_rows)} записів у lpz.{table}")
     return True
