@@ -20,8 +20,12 @@
 --
 -- Ключові правила (не змінювати без явної причини — див. memory):
 --   1. Номер картки: чистий int -> id_case напряму; формат "N-YYYY" (Хотинський,
---      трапляється і в ЛШМД) -> id_case = YYYY*1000000+N; інше -> пропускаємо
---      (свідомо не форсуємо сміттєві номери в канон).
+--      трапляється і в ЛШМД) -> id_case = YYYY*1000000+N; інше (друкарські
+--      помилки на кшталт "1`5399", "№12566") -> запис НЕ відкидаємо (це справжня
+--      helsi-госпіталізація, від неї залежить оплата), а даємо синтетичний
+--      id_case з технічного діапазону 850000000+. helsi_no (bigint) = лише цифри
+--      з номера; оригінальний текст лишається в lpz_raw_hospitalizations_*.number
+--      (звʼязок за helsi_record_id). До 2026-09-25 такі записи мовчки випадали.
 --   2. helsi_record_id (raw.id) — справжній стабільний ідентифікатор. Якщо
 --      рядок з таким helsi_record_id вже є в каноні — його id_case НЕ
 --      змінюється (щоб не зʼїжджали вже показані користувачу дані).
@@ -177,21 +181,21 @@ need_synth AS (
     helsi_record_id,
     ROW_NUMBER() OVER (ORDER BY start_ ASC NULLS LAST, helsi_record_id) AS synth_rank
   FROM pre
-  WHERE final_id_case_pre IS NULL AND parsed_id_case IS NOT NULL
+  WHERE final_id_case_pre IS NULL  -- у т.ч. непарсибельні номери (parsed_id_case IS NULL)
 )
 SELECT
   pre.*,
   COALESCE(pre.final_id_case_pre, (SELECT max_technical FROM tech_base) + need_synth.synth_rank) AS final_id_case
 FROM pre
-LEFT JOIN need_synth ON need_synth.helsi_record_id = pre.helsi_record_id
-WHERE pre.parsed_id_case IS NOT NULL;  -- непарсибельні номери свідомо не заливаємо (як і раніше)
+LEFT JOIN need_synth ON need_synth.helsi_record_id = pre.helsi_record_id;
 
 -- Контрольні цифри перед записом (видно і в dry-run, і в реальному прогоні)
 SELECT
   count(*) AS rows_to_upsert,
   count(*) FILTER (WHERE existing_id_case IS NOT NULL) AS updates_existing,
   count(*) FILTER (WHERE existing_id_case IS NULL AND final_id_case = parsed_id_case) AS inserts_natural_id,
-  count(*) FILTER (WHERE existing_id_case IS NULL AND final_id_case <> parsed_id_case) AS inserts_synthetic_id,
+  count(*) FILTER (WHERE existing_id_case IS NULL AND parsed_id_case IS NOT NULL AND final_id_case <> parsed_id_case) AS inserts_synthetic_id,
+  count(*) FILTER (WHERE existing_id_case IS NULL AND parsed_id_case IS NULL) AS inserts_unparsable_number,
   count(DISTINCT final_id_case) AS distinct_final_ids,
   count(*) AS total_rows
 FROM stg_resolved;
@@ -207,7 +211,11 @@ INSERT INTO lpz.lpz_hospitalizations (
 SELECT
   r.org_edrpou,
   r.final_id_case,
-  r.parsed_id_case,
+  COALESCE(
+    r.parsed_id_case,
+    CASE WHEN regexp_replace(coalesce(r.number, ''), '\D', '', 'g') ~ '^[0-9]{1,15}$'
+         THEN regexp_replace(r.number, '\D', '', 'g')::bigint END
+  ),
   r.patient_id,
   trim(concat_ws(' ', r.patient_last_name, r.patient_first_name, r.patient_middle_name)),
   r.patient_last_name, r.patient_first_name, r.patient_middle_name,

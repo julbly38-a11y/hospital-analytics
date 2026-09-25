@@ -70,6 +70,7 @@ DATASETS = {
     "episodes": "episodes.json",
     "disp": "discharge_disposition_2026.json",
 }
+PAY_FROM = "2026-07-01"  # з цієї дати записи впливають на оплату — окремі перевірки у verify
 MIN_RATIO = {"closed": 0.9, "open": 0.5, "episodes": 0.9, "disp": 0.9}  # відкритих природно може бути менше
 
 STEPS = ["extract", "load_raw", "load_disp", "canon", "verify"]
@@ -754,8 +755,34 @@ def step_verify():
     if n:
         bad.append(f"age порожній у {n} рядках")
     r = query(f"select count(*) filter (where status='Закритий'), count(*) filter (where status='Закритий' and discharge_disposition_id is null) "
-              f"from lpz.lpz_hospitalizations where org_edrpou='{ORG}' and admission_date >= '2026-01-01'")[0]
-    log(f"  закритих у 2026: {r[0]}, без результату лікування: {r[1]}")
+              f"from lpz.lpz_hospitalizations where org_edrpou='{ORG}' and helsi_record_id is not null and admission_date >= '2026-01-01'")[0]
+    log(f"  закритих helsi-записів у 2026: {r[0]}, без результату лікування: {r[1]}")
+
+    # Період, що впливає на оплату: з 01.07.2026, лише записи з helsi (helsi_record_id не NULL).
+    log(f"  --- helsi-записи з {PAY_FROM} і далі ---")
+    for mon, total, closed, no_res, still_open in query(
+            f"select to_char(admission_date,'YYYY-MM'), count(*), "
+            f"count(*) filter (where status='Закритий'), "
+            f"count(*) filter (where status='Закритий' and discharge_disposition_id is null), "
+            f"count(*) filter (where status<>'Закритий') "
+            f"from lpz.lpz_hospitalizations where org_edrpou='{ORG}' and helsi_record_id is not null "
+            f"and admission_date >= '{PAY_FROM}' group by 1 order by 1"):
+        log(f"  {mon}: усього {total}, закритих {closed} (без результату лікування {no_res}), відкритих {still_open}")
+
+    # Кожен запис з вивантаження за цей період мусить бути в каноні: інакше він випав з розрахунків.
+    n = int(query(
+        f"with raw as ("
+        f"  select id::uuid as rid from lpz.lpz_raw_hospitalizations_closed "
+        f"    where org_edrpou='{ORG}' and nullif(start_,'')::timestamptz >= '{PAY_FROM}' "
+        f"  union "
+        f"  select id::uuid from lpz.lpz_raw_hospitalizations_open "
+        f"    where org_edrpou='{ORG}' and nullif(start_,'')::timestamptz >= '{PAY_FROM}'), "
+        f"canon as (select helsi_record_id from lpz.lpz_hospitalizations "
+        f"  where org_edrpou='{ORG}' and helsi_record_id is not null and admission_date >= date '{PAY_FROM}' - 2) "
+        f"select count(*) from raw left join canon on canon.helsi_record_id = raw.rid where canon.helsi_record_id is null")[0][0])
+    log(f"  записів helsi з {PAY_FROM} і далі, яких нема в каноні: {n} (має бути 0)")
+    if n:
+        bad.append(f"{n} записів helsi з {PAY_FROM} відсутні в каноні (випали з розрахунків)")
     if bad:
         log("УВАГА, перевірки виявили проблеми:\n  - " + "\n  - ".join(bad))
         return False
