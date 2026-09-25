@@ -23,6 +23,10 @@ function fmt(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
+function qEsc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
 function countUp(el, target, dur, delay) {
   el.textContent = '0';
   setTimeout(() => {
@@ -976,7 +980,7 @@ function loadCensus(doctorId, options = {}) {
         const diagStr = r.icd_code ? `${r.icd_code} ${r.diagnosis || '—'}` : (r.diagnosis || '—');
         const hospCountStr = r.hosp_count > 1 ? ` · <span class="census-hosp-count">${r.hosp_count}</span>` : '';
         const repeatStr = (r.re_admission && r.re_admission !== 'Ні')
-          ? ` · <span class="census-repeat">${r.re_admission.toLowerCase()}</span>` : '';
+          ? ` · <span class="census-repeat">${qEsc(r.re_admission.toLowerCase())}</span>` : '';
         // days тепер рахує RPC (lpz_department_census): якщо пацієнт уже
         // виписаний — ПОВНА відома тривалість перебування (виписка−
         // поступлення, весь термін, а не обрізаний на вказаній даті); якщо
@@ -1005,10 +1009,10 @@ function loadCensus(doctorId, options = {}) {
         const segs = Array.from({ length: segCount }, (_, i) =>
           i === todayIdx ? '<i class="census-today"></i>' : '<i></i>').join('');
         return `
-        <div class="census-row" data-doctor="${r.doc_resource_id || ''}" data-blok="${r.blok || ''}" data-patient="${r.patient_id || ''}">
+        <div class="census-row" data-doctor="${qEsc(r.doc_resource_id || '')}" data-blok="${qEsc(r.blok || '')}" data-patient="${qEsc(r.patient_id || '')}">
           <div class="census-info">
-            <span class="census-name">${r.pib || '—'}</span>
-            <span class="census-meta">${r.age ?? '—'} р. · ${r.gender || '—'} · поступив ${admStr} · ${diagStr}${hospCountStr}${repeatStr}</span>
+            <span class="census-name">${qEsc(r.pib || '—')}</span>
+            <span class="census-meta">${qEsc(r.age ?? '—')} р. · ${qEsc(r.gender || '—')} · поступив ${admStr} · ${qEsc(diagStr)}${hospCountStr}${repeatStr}</span>
           </div>
           <div class="census-stay" title="${days} діб">
             <span class="census-bar">${segs}</span>
@@ -1291,7 +1295,7 @@ function initHospitalName() {
     .then(r => r.ok ? r.json() : null)
     .then(info => {
       if (!info) { markThemeReady(); return; }
-      if (title)   title.innerHTML  = (info.display_name || '').split(' ').join('<br>');
+      if (title)   title.innerHTML  = qEsc(info.display_name || '').split(' ').join('<br>');
       if (tagline) tagline.textContent = info.tagline || '';
       if (logo && info.logo_url) logo.src = info.logo_url;
       if (info.display_name) document.title = info.display_name + ' — слайд';

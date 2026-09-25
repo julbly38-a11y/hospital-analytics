@@ -136,7 +136,7 @@ function loadDoctorWave(org, doctorId, year) {
 // deptPieApi/donut тут теж нема, підсвічувати нічого).
 function renderColleagueList(root, deptName) {
   (root.querySelector('.lf-left-top') || root).insertAdjacentHTML('beforeend', `
-    <div class="docs-title">${deptName ? deptName + ' · ' : ''}Ординаторська</div>
+    <div class="docs-title">${deptName ? qEsc(deptName) + ' · ' : ''}Ординаторська</div>
     <div class="docs-list" id="docsList"></div>
   `);
 }
@@ -152,8 +152,8 @@ function loadColleagues(root, org, deptId, ownDoctorId, isOwner, deptName) {
       const docsList = document.getElementById('docsList');
       if (!data || !docsList) return;
       docsList.innerHTML = data.rows.map(d => `
-        <div class="doc-item${d.resource_id === ownDoctorId ? ' own' : ''}" data-doctor="${d.resource_id}" data-doctor-name="${d.full_name}">
-          ${d.full_name}
+        <div class="doc-item${d.resource_id === ownDoctorId ? ' own' : ''}" data-doctor="${qEsc(d.resource_id)}" data-doctor-name="${qEsc(d.full_name)}">
+          ${qEsc(d.full_name)}
           <span class="doc-position">Ординатор</span>
         </div>
       `).join('') || '<div class="census-empty">Лікарів не знайдено</div>';

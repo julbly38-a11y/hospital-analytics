@@ -106,7 +106,8 @@ const Q_FLAGS = {
 };
 const Q_FLAG_ORDER = Object.keys(Q_FLAGS);
 
-const qEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// qEsc — глобальна, визначена в utils.js (завантажується перед цим файлом
+// на всіх сторінках, де він підключений); тут окрема декларація не потрібна.
 
 function qFmtDate(iso) {
   if (!iso) return '';
@@ -388,7 +389,7 @@ function qCompactRowHtml(r) {
   const doctor = r.doctor_full_name || r.doctor_name;
   const issues = codes.map(c => Q_FLAGS[c]?.short || c).join(', ');
   return `
-    <div class="census-row q-compact-row" data-doctor="${r.doctor_resource_id || ''}">
+    <div class="census-row q-compact-row" data-doctor="${qEsc(r.doctor_resource_id || '')}">
       <div class="census-info">
         <span class="census-name">${patient}</span>
         <span class="census-meta">${doctor ? `Лікар: ${qEsc(doctor)}` : 'Лікаря не визначено — завідувачу'}${issues ? ` · ${qEsc(issues)}` : ''}</span>
