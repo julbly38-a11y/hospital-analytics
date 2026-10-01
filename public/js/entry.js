@@ -176,7 +176,7 @@ function loadDirectionBlocks(org, year, month = 'all') {
 // data-dept — назва (для крос-підсвітки з duty-docs, той самий формат, що
 // й раніше), data-dept-id — uuid (для розгортки, openDeptExpand). ──
 function renderDeptList(el, depts) {
-  el.innerHTML = depts.map(d => `<div class="dept" data-dept="${d.name}" data-dept-id="${d.structure_id}">${d.name}</div>`).join('');
+  el.innerHTML = depts.map(d => `<div class="dept" data-dept="${qEsc(d.name)}" data-dept-id="${qEsc(d.structure_id)}">${qEsc(d.name)}</div>`).join('');
 }
 
 // Поточний обраний рік+місяць (для розгортки відділення) — той самий
