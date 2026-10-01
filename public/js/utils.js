@@ -370,29 +370,41 @@ function renderMeBar(root) {
 function piiWrap(html) { return `<span class="pii">${html}</span>`; }
 
 function syncPiiMode(me, state) {
-  const btnId = 'piiToggle', badgeId = 'piiBadge';
-  [btnId, badgeId].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
-  if (!state) return;
-  if (me && me.is_owner && state.can_toggle) {
-    const btn = document.createElement('button');
-    btn.id = btnId;
-    btn.type = 'button';
-    btn.className = 'pii-toggle';
-    btn.textContent = state.masked ? 'Показати ПІБ' : 'Приховати ПІБ';
-    btn.title = 'Режим діє на ВСІХ користувачів (завідувачів, головного лікаря): імена пацієнтів і лікарів замінюються кодами на сервері';
-    btn.setAttribute('aria-pressed', state.masked ? 'true' : 'false');
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      try {
-        const r = await fetch('/api/pii-mode', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ masked: !state.masked }),
-        });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        location.reload(); // дані перезавантажуються вже в новому режимі
-      } catch (e) { btn.disabled = false; btn.textContent = 'Помилка, спробуйте ще раз'; }
-    });
-    document.body.appendChild(btn);
-  } else if (state.masked) {
+  const toolsId = 'ownerTools', badgeId = 'piiBadge';
+  [toolsId, badgeId].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+  if (me && me.is_owner) {
+    // Панель власника: «Пошук» (admin-search.html) і перемикач режиму приватності.
+    const tools = document.createElement('div');
+    tools.id = toolsId;
+    tools.className = 'owner-tools';
+    const search = document.createElement('a');
+    search.className = 'owner-link';
+    search.href = '/admin-search.html';
+    search.textContent = 'Пошук';
+    search.title = 'Швидкий пошук пацієнтів і співробітників за ПІБ або телефоном';
+    tools.appendChild(search);
+    if (state && state.can_toggle) {
+      const btn = document.createElement('button');
+      btn.id = 'piiToggle';
+      btn.type = 'button';
+      btn.className = 'pii-toggle';
+      btn.textContent = state.masked ? 'Показати ПІБ' : 'Приховати ПІБ';
+      btn.title = 'Режим діє на ВСІХ користувачів (завідувачів, головного лікаря): імена пацієнтів і лікарів замінюються кодами на сервері';
+      btn.setAttribute('aria-pressed', state.masked ? 'true' : 'false');
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const r = await fetch('/api/pii-mode', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ masked: !state.masked }),
+          });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          location.reload(); // дані перезавантажуються вже в новому режимі
+        } catch (e) { btn.disabled = false; btn.textContent = 'Помилка, спробуйте ще раз'; }
+      });
+      tools.appendChild(btn);
+    }
+    document.body.appendChild(tools);
+  } else if (state && state.masked) {
     const badge = document.createElement('div');
     badge.id = badgeId;
     badge.className = 'pii-badge';

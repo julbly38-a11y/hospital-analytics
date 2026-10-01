@@ -1065,13 +1065,13 @@ html.fin-mode { background: #1e2227; }
 
 /* ── Режим приватності ПІБ (логіка: utils.js syncPiiMode; маскування імен — на сервері, lib/pii-mask.js) ──
    Імена в цьому режимі вже замінені кодами у відповідях API, тож CSS їх не ховає: лише кнопка власника й позначка для решти. */
-.pii-toggle {
-  position: fixed; top: 8px; right: 8px; z-index: 9999;
-  font: 12px/1 sans-serif; padding: 5px 11px; border-radius: 14px;
+.owner-tools { position: fixed; top: 8px; right: 8px; z-index: 9999; display: flex; gap: 6px; }
+.pii-toggle, .owner-link {
+  font: 12px/1 sans-serif; padding: 5px 11px; border-radius: 14px; text-decoration: none;
   color: #6d93d8; background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(109, 147, 216, 0.5); cursor: pointer; opacity: 0.8;
 }
-.pii-toggle:hover { opacity: 1; }
+.pii-toggle:hover, .owner-link:hover { opacity: 1; }
 .pii-toggle:disabled { opacity: .5; cursor: default; }
 .pii-badge {
   position: fixed; top: 8px; right: 8px; z-index: 9999;
