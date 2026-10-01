@@ -6,6 +6,8 @@
   if (window.__helsiSync && !window.__helsiSync.done) return 'already running';
   var PORT = '__PORT__', TOKEN = '__TOKEN__';
   var EPISODES_CAP = Number('__EPISODES_CAP__') || 60000;
+  var EPISODES_SINCE_RAW = '__EPISODES_SINCE__';
+  var EPISODES_SINCE = /^\d{4}-\d{2}-\d{2}$/.test(EPISODES_SINCE_RAW) ? EPISODES_SINCE_RAW : '';
   var EPISODE_TYPES_RAW = '__EPISODE_TYPES__';
   var EPISODE_TYPES = (/^[A-Z][A-Z_,]*$/.test(EPISODE_TYPES_RAW) && EPISODE_TYPES_RAW.indexOf('__') < 0) ? EPISODE_TYPES_RAW.split(',') : [''];
   var YEAR = new Date().getFullYear();
@@ -34,11 +36,36 @@
 
   /* Episodes: one pass per type when a type list is configured (the API filters with &type=X), otherwise one
      unfiltered pass. An empty type means no filter. An episode has exactly one type, so passes do not overlap. */
+  /* Bounded pass: the list is sorted by lastEncounterAt, newest first (episodes without that date are at the very
+     end). Rows older than EPISODES_SINCE, or without the date, are skipped, and the pass stops after the first page
+     that contains no row from the window (one extra page of margin against small disorder at the boundary). */
+  async function episodesSince(t, base) {
+    var skip = 0, part = [], hasNext = true, limit = 30;
+    try {
+      while (hasNext) {
+        var r = await fetch('/api/organizationEpisodes?limit=' + limit + '&skip=' + skip + (t ? '&type=' + t : ''), { credentials: 'include' });
+        if (!r.ok) { S.err.episodes = 'HTTP ' + r.status + ' ' + t + ' skip ' + skip; return null; }
+        var d = await r.json();
+        var rows = d.data;
+        if (!Array.isArray(rows)) { S.err.episodes = 'no rows ' + t + ' skip ' + skip; return null; }
+        var inWindow = 0;
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].lastEncounterAt && rows[i].lastEncounterAt >= EPISODES_SINCE) { part.push(rows[i]); inWindow++; }
+        }
+        S.episodes = base + part.length;
+        hasNext = inWindow > 0 && (d.meta ? d.meta.hasNext : d.has_next);
+        skip += limit;
+        if (skip > EPISODES_CAP) { S.err.episodes = 'cap exceeded'; return null; }
+      }
+    } catch (e) { S.err.episodes = String(e); return null; }
+    return part;
+  }
+
   async function episodesAll() {
     var out = [];
     for (var ti = 0; ti < EPISODE_TYPES.length; ti++) {
       var t = EPISODE_TYPES[ti];
-      var part = await paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s + (t ? '&type=' + t : ''); }, 30, EPISODES_CAP, function (d) { return d.data; }, out.length);
+      var part = EPISODES_SINCE ? await episodesSince(t, out.length) : await paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s + (t ? '&type=' + t : ''); }, 30, EPISODES_CAP, function (d) { return d.data; }, out.length);
       if (!part) return null;
       for (var j = 0; j < part.length; j++) out.push(part[j]);
       S.episodes = out.length;

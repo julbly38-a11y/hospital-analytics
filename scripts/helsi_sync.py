@@ -68,12 +68,15 @@ DEFAULT_ORG = "43342788"  # ЛШМД — за замовчуванням, пов
 ORGS = {
     "43342788": {"name": "ЛШМД", "raw_dir": "~/Documents/LSMD/raw/lsmd", "cdp_port": 9333,
                  "cdp_profile": "~/Library/Application Support/helsi-sync-chrome", "log_tag": "",
-                 "episodes_cap": 60000, "extract_timeout": 1200, "episode_types": []},
+                 "episodes_cap": 60000, "extract_timeout": 1200, "episode_types": [], "episodes_since": None},
     "02005875": {"name": "Хотинська ЦРЛ", "raw_dir": "~/Documents/LSMD/raw/khotyn", "cdp_port": 9334,
                  "cdp_profile": "~/Library/Application Support/helsi-sync-chrome-02005875", "log_tag": "khotyn_",
                  "episodes_cap": 250000, "extract_timeout": 7200,
                  # лише стаціонарні типи; діагностика (DG) і профілактика (PREVENTION) — амбулаторні, ~51% епізодів
-                 "episode_types": ["TREATMENT", "REHAB", "PALLIATIVE_CARE"]},  # 110+ тис. епізодів, понад годину (темп падає з ~60 до ~20/с)
+                 "episode_types": ["TREATMENT", "REHAB", "PALLIATIVE_CARE"],
+                 # helsi має ~330 тис. стаціонарних епізодів, з поточного року ~26 тис.: беремо лише їх ("YEAR" = 1 січня
+                 # поточного року, як і для карток). Епізоди без дати останнього звернення (кінець списку) не беруться.
+                 "episodes_since": "YEAR"},  # 110+ тис. епізодів, понад годину (темп падає з ~60 до ~20/с)
 }
 ORG = DEFAULT_ORG
 EXPECTED_DB_REF = "ubjnztanehqlsrqphdqy"
@@ -747,6 +750,8 @@ def step_extract(args, stamp):
     js = js.replace("__PORT__", str(PORT)).replace("__TOKEN__", token)
     js = js.replace("__EPISODES_CAP__", str(ORGS[ORG]["episodes_cap"]))
     js = js.replace("__EPISODE_TYPES__", ",".join(ORGS[ORG]["episode_types"]) or "-")
+    since = ORGS[ORG].get("episodes_since")
+    js = js.replace("__EPISODES_SINCE__", f"{datetime.now().year}-01-01" if since == "YEAR" else (since or "-"))
     incoming = Path(tempfile.mkdtemp(prefix="helsi_sync_"))
     rx = Receiver(token, incoming)
     tab, created = None, False
