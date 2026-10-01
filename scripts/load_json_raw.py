@@ -187,6 +187,34 @@ def load_via_psql(table: str, columns: list, rows: list, org_edrpou: str, source
     print(f"  завантажено {len(rows)}/{len(rows)} (psql \\copy, одна транзакція)")
 
 
+# helsi час від часу додає нові поля до карток. Усі колонки lpz_raw_* — text, тож нову колонку
+# безпечно додати автоматично (порожню, наявні дані не змінюються), замість того щоб зупиняти
+# весь прогін. Лише для таблиць lpz_raw_* і лише для "безпечних" імен колонок; вимкнути:
+# HELSI_RAW_AUTO_COLUMNS=0. Потрібне пряме підключення до БД (psql).
+SAFE_COLUMN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def add_columns_via_psql(table: str, columns: list, schema: str = "lpz") -> None:
+    """ALTER TABLE ... ADD COLUMN IF NOT EXISTS <col> text для кожної колонки, в одній транзакції."""
+    psql, url = pg_target()
+    if not table.startswith("lpz_raw_") and schema == "lpz":
+        raise RuntimeError(f"автододавання колонок дозволене лише для lpz_raw_*, не для {table}")
+    bad = [c for c in columns if not SAFE_COLUMN.match(c)]
+    if bad:
+        raise RuntimeError(f"небезпечні імена колонок: {bad[:3]}")
+    ident = lambda c: '"' + c.replace('"', '""') + '"'
+    sql = (
+        "BEGIN;\n"
+        f"ALTER TABLE {ident(schema)}.{ident(table)}\n  "
+        + ",\n  ".join(f"ADD COLUMN IF NOT EXISTS {ident(c)} text" for c in columns)
+        + ";\nNOTIFY pgrst, 'reload schema';\nCOMMIT;\n"
+    )
+    r = subprocess.run([psql, url, "-X", "-q", "-v", "ON_ERROR_STOP=1"], input=sql, capture_output=True, text=True,
+                       env={**os.environ, "PGCLIENTENCODING": "UTF8"})
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout).strip()[-600:])
+
+
 def derive_table_name(src: Path) -> str:
     stem = re.sub(r"_\d{4}$", "", src.stem)
     return f"lpz_raw_{stem}"
@@ -280,6 +308,22 @@ def load_generic(src: Path, org_edrpou=None, table=None, dry_run=False, limit=No
 
     fixed_cols = {"org_edrpou", "source_file", "extracted_at", "loaded_at"}
     missing = sorted(set(sql_columns) - remote_columns - fixed_cols)
+    if missing and os.environ.get("HELSI_RAW_AUTO_COLUMNS", "1") != "0" and table.startswith("lpz_raw_") \
+            and all(SAFE_COLUMN.match(c) for c in missing):
+        names = ", ".join(missing)
+        if dry_run:
+            print(f"\nУ таблиці lpz.{table} бракує {len(missing)} колонок — при реальному прогоні вони додадуться "
+                  f"автоматично (text, порожні): {names}")
+            missing = []
+        else:
+            try:
+                add_columns_via_psql(table, missing)
+                print(f"  додано {len(missing)} нових колонок у lpz.{table} (helsi додала поля): {names}")
+                missing = []
+            except PgUnavailable as e:
+                print(f"  автододавання колонок неможливе (нема прямого підключення до БД: {e})", file=sys.stderr)
+            except RuntimeError as e:
+                print(f"  автододавання колонок не вдалось ({e})", file=sys.stderr)
     if missing:
         print(f"\nУ таблиці lpz.{table} бракує {len(missing)} колонок. Спершу застосуй:\n")
         print(f"ALTER TABLE lpz.{table}")

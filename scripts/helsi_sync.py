@@ -725,6 +725,11 @@ def step_load_raw():
                        capture_output=True, text=True)
     tail = "\n".join((r.stdout or "").strip().splitlines()[-6:])
     log(tail)
+    # Важливе з виводу завантажувача: нові колонки helsi, відсіяні дублі, повтори через мережу, попередження.
+    notes = [l.strip() for l in ((r.stdout or "") + "\n" + (r.stderr or "")).splitlines()
+             if any(k in l for k in ("додано ", "прибрано ідентичних", "УВАГА", "повтор файлу", "автододавання"))]
+    if notes:
+        log("  з завантажувача:\n    " + "\n    ".join(notes))
     if r.returncode != 0 or "FAIL" in (r.stdout or ""):
         # Причина збою (напр. "у таблиці бракує N колонок" + готовий ALTER) друкується у STDOUT, не в stderr.
         die(f"load_all_raw не завершився успішно:\n{(r.stdout or '').strip()[-1800:]}\n{(r.stderr or '').strip()[-800:]}")
