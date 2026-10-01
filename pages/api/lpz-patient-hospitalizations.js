@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { withPiiMask } from '../../lib/pii-mask'
 
 // Уся історія госпіталізацій пацієнта (клік на цифру повторних
 // госпіталізацій, .census-hosp-count в utils.js) — по всій лікарні
@@ -13,7 +14,7 @@ import { createClient } from '@supabase/supabase-js'
 // admin-override, що в /api/lpz-department-census) — без цього винятку
 // клік на повторні госпіталізації в чужому кабінеті завжди повертав 403
 // (лікар/завідувач шукався по email власника і не знаходився).
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -70,3 +71,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

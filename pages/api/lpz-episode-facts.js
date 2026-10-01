@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { withPiiMask } from '../../lib/pii-mask'
 
 const sb = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,7 +30,7 @@ async function isOwner(req) {
 // Сирі факти епізоду (lpz.lpz_episode_facts) — для дослідницької перевірки
 // правил коректності (не готові висновки, як lpz_case_quality_snapshot).
 // Лише для власника сайту: сторінка службова, не для лікарів/завідувачів.
-export default async function handler(req, res) {
+async function handler(req, res) {
   const owner = await isOwner(req)
   if (!owner) return res.status(403).json({ error: 'Доступ заборонено' })
 
@@ -109,3 +110,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient } from '@supabase/supabase-js'
+import { withPiiMask } from '../../lib/pii-mask'
 
 // "Перебуває у відділенні" — містить ПІБ/вік/діагноз пацієнтів (не як
 // /api/lpz-kpi-department, де лише агрегати). Тому відділення НЕ береться з
@@ -17,7 +18,7 @@ import { createClient } from '@supabase/supabase-js'
 // відділення/лікаря (lpz_department_last_date) — те, що реально показати.
 // Відповідь завжди містить використану date, щоб фронтенд знав, що саме
 // показує (day-name + дата в заголовку), навіть коли дату підібрав сервер.
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -109,3 +110,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

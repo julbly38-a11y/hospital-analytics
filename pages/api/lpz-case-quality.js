@@ -1,5 +1,6 @@
 import { estimatePrice, estimateRisk, PRICING_SOURCE } from '../../lib/quality-pricing'
 import { resolveQualityAccess, fetchSnapshotRows, segmentOf, kyivDate, hasIssues, getLosNorms, buildReminder } from '../../lib/quality-access'
+import { withPiiMask } from '../../lib/pii-mask'
 
 // Контроль записів (public/quality.html, кабінети у фінансовому режимі) —
 // епізоди з ознаками помилок, що впливають на оплату НСЗУ. Хто що бачить —
@@ -93,7 +94,7 @@ function summarizeActivity(rows) {
   return s
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const access = await resolveQualityAccess(req)
     if (access.error) return res.status(access.error.status).json(access.error.body)
@@ -147,3 +148,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

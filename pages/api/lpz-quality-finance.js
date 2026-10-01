@@ -1,5 +1,6 @@
 import { estimatePrice, estimateRisk, PRICING_SOURCE } from '../../lib/quality-pricing'
 import { resolveQualityAccess, fetchSnapshotRows, segmentOf, kyivDate } from '../../lib/quality-access'
+import { withPiiMask } from '../../lib/pii-mask'
 
 // Фінансовий режим кабінетів (клік на емблему): показники й динаміка
 // контролю записів за обраний період — правильні / поправимі / непоправимі
@@ -38,7 +39,7 @@ function addTo(b, r, money) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   try {
     const access = await resolveQualityAccess(req)
     if (access.error) return res.status(access.error.status).json(access.error.body)
@@ -129,3 +130,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

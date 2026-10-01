@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { displayDeptName } from '../../lib/department-display-names'
+import { withPiiMask } from '../../lib/pii-mask'
 
 const sb = () => createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -11,7 +12,7 @@ const sb = () => createClient(
 // Тимчасово — по одному лікарю (role='doctor') на кожне клінічне відділення,
 // перший за алфавітом прізвища. Коли з'явиться джерело даних про реальні
 // чергування — замінити цей запит на нього, інтерфейс (department/doctor) лишити.
-export default async function handler(req, res) {
+async function handler(req, res) {
   const org = String(req.query.org || '').trim()
   if (!org) return res.status(400).json({ error: 'org (ЄДРПОУ) обовʼязковий' })
 
@@ -58,3 +59,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)

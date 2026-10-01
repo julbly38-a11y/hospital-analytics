@@ -362,48 +362,54 @@ function renderMeBar(root) {
   `);
 }
 
-// ── Режим «розмити ПІБ» (лише власник сайту) ─────────────────────────────
-// Кнопка з'являється тільки для me.is_owner. Розмиває ПІБ лікарів і пацієнтів через
-// filter:blur (клас .pii), тож імена лишаються на місці й розкладка (поля lf-*) не зсувається. Стан пам'ятається в localStorage і діє на всіх сторінках;
-// клас на <html> ставиться ще до рендеру (нижче, IIFE), щоб імена не блимали при завантаженні.
-// Для не-власника режим завжди вимикається (див. syncPiiMode).
-(function () {
-  try { if (localStorage.getItem('hidePii') === '1') document.documentElement.classList.add('pii-hidden'); } catch (e) {}
-})();
-
+// ── Режим приватності ПІБ ────────────────────────────────────────────────
+// Маскування робить СЕРВЕР (lib/pii-mask.js, прапорець public.app_settings.pii_mask): коли власник сайту вмикає режим,
+// API замінює ПІБ пацієнтів і лікарів кодами («Лікар 3FA9C1») у відповідях для ВСІХ ролей, включно із завідувачами й
+// головним лікарем. Розмиття в браузері для цього не годиться: воно обходиться інструментами розробника й діє лише в
+// браузері власника. Тут лише перемикач для власника (me.is_owner) і позначка «ПІБ приховано» для решти користувачів.
 function piiWrap(html) { return `<span class="pii">${html}</span>`; }
 
-function syncPiiMode(me) {
-  const id = 'piiToggle';
-  if (!me || !me.is_owner) {
-    document.documentElement.classList.remove('pii-hidden');
-    try { localStorage.removeItem('hidePii'); } catch (e) {}
-    const old = document.getElementById(id);
-    if (old) old.remove();
-    return;
+function syncPiiMode(me, state) {
+  const btnId = 'piiToggle', badgeId = 'piiBadge';
+  [btnId, badgeId].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+  if (!state) return;
+  if (me && me.is_owner && state.can_toggle) {
+    const btn = document.createElement('button');
+    btn.id = btnId;
+    btn.type = 'button';
+    btn.className = 'pii-toggle';
+    btn.textContent = state.masked ? 'Показати ПІБ' : 'Приховати ПІБ';
+    btn.title = 'Режим діє на ВСІХ користувачів (завідувачів, головного лікаря): імена пацієнтів і лікарів замінюються кодами на сервері';
+    btn.setAttribute('aria-pressed', state.masked ? 'true' : 'false');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/pii-mode', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ masked: !state.masked }),
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        location.reload(); // дані перезавантажуються вже в новому режимі
+      } catch (e) { btn.disabled = false; btn.textContent = 'Помилка, спробуйте ще раз'; }
+    });
+    document.body.appendChild(btn);
+  } else if (state.masked) {
+    const badge = document.createElement('div');
+    badge.id = badgeId;
+    badge.className = 'pii-badge';
+    badge.textContent = 'ПІБ приховано';
+    document.body.appendChild(badge);
   }
-  if (document.getElementById(id)) return;
-  const btn = document.createElement('button');
-  btn.id = id;
-  btn.type = 'button';
-  btn.className = 'pii-toggle';
-  const paint = () => {
-    const on = document.documentElement.classList.contains('pii-hidden');
-    btn.textContent = on ? 'Показати ПІБ' : 'Розмити ПІБ';
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  };
-  btn.addEventListener('click', () => {
-    const on = document.documentElement.classList.toggle('pii-hidden');
-    try { if (on) localStorage.setItem('hidePii', '1'); else localStorage.removeItem('hidePii'); } catch (e) {}
-    paint();
-  });
-  paint();
-  document.body.appendChild(btn);
 }
 
-// Кожна сторінка з utils.js сама питає /api/me (один легкий запит) і показує кнопку власнику.
+// Кожна сторінка з utils.js сама питає /api/me і /api/pii-mode (два легкі запити). Старий режим розмиття в браузері
+// (localStorage 'hidePii') прибрано: чистимо його залишки.
 document.addEventListener('DOMContentLoaded', () => {
-  fetch('/api/me').then(r => r.json()).then(syncPiiMode).catch(() => {});
+  try { localStorage.removeItem('hidePii'); } catch (e) {}
+  document.documentElement.classList.remove('pii-hidden');
+  Promise.all([
+    fetch('/api/me').then(r => r.json()).catch(() => null),
+    fetch('/api/pii-mode').then(r => (r.ok ? r.json() : null)).catch(() => null),
+  ]).then(([me, state]) => syncPiiMode(me, state));
 });
 
 function applyMeProfile(me) {
