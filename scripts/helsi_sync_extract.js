@@ -28,23 +28,33 @@
     return all;
   }
 
+  var DISP_STATUSES = ['closed', 'registered', 'pending_registration', 'on_discharge'];
+
+  /* Result of treatment exists for every discharged case, not only for status=closed: after discharge helsi moves
+     the case through on_discharge / pending_registration / registered, and only later to closed. Taking just
+     status=closed left ~300 discharged cases without a result (verified 2026-10-01). Duplicates by id are dropped. */
   async function disposition() {
-    var skip = 0, limit = 300, all = [], hasNext = true, stop = false;
+    var limit = 300, all = [], seen = {};
     try {
-      while (hasNext && !stop) {
-        var r = await fetch('/api/hospital/api/v1/encounter_cases/?limit=' + limit + '&skip=' + skip + '&page_size=' + limit + '&status=closed', { credentials: 'include' });
-        if (!r.ok) { S.err.disp = 'HTTP ' + r.status + ' skip ' + skip; return null; }
-        var d = await r.json();
-        if (!Array.isArray(d.results)) { S.err.disp = 'no results skip ' + skip; return null; }
-        for (var i = 0; i < d.results.length; i++) {
-          var c = d.results[i];
-          if (c.start_datetime && c.start_datetime < (YEAR + '-01-01')) { stop = true; break; }
-          all.push({ id: c.id, number: c.number, disp: c.discharge_disposition ? c.discharge_disposition.id : null });
+      for (var si = 0; si < DISP_STATUSES.length; si++) {
+        var skip = 0, hasNext = true, stop = false;
+        while (hasNext && !stop) {
+          var r = await fetch('/api/hospital/api/v1/encounter_cases/?limit=' + limit + '&skip=' + skip + '&page_size=' + limit + '&status=' + DISP_STATUSES[si], { credentials: 'include' });
+          if (!r.ok) { S.err.disp = 'HTTP ' + r.status + ' ' + DISP_STATUSES[si] + ' skip ' + skip; return null; }
+          var d = await r.json();
+          if (!Array.isArray(d.results)) { S.err.disp = 'no results ' + DISP_STATUSES[si] + ' skip ' + skip; return null; }
+          for (var i = 0; i < d.results.length; i++) {
+            var c = d.results[i];
+            if (c.start_datetime && c.start_datetime < (YEAR + '-01-01')) { stop = true; break; }
+            if (seen[c.id]) continue;
+            seen[c.id] = 1;
+            all.push({ id: c.id, number: c.number, disp: c.discharge_disposition ? c.discharge_disposition.id : null });
+          }
+          S.disp = all.length;
+          hasNext = d.has_next;
+          skip += limit;
+          if (skip > 30000) { S.err.disp = 'cap exceeded ' + DISP_STATUSES[si]; return null; }
         }
-        S.disp = all.length;
-        hasNext = d.has_next;
-        skip += limit;
-        if (skip > 30000) { S.err.disp = 'cap exceeded'; return null; }
       }
     } catch (e) { S.err.disp = String(e); return null; }
     return all;
