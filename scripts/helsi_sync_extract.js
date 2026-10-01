@@ -5,6 +5,7 @@
      Keep this file ASCII-only (AppleScript garbles other encodings) and free of line comments. */
   if (window.__helsiSync && !window.__helsiSync.done) return 'already running';
   var PORT = '__PORT__', TOKEN = '__TOKEN__';
+  var EPISODES_CAP = Number('__EPISODES_CAP__') || 60000;
   var YEAR = new Date().getFullYear();
   var COLS = 'resolution,patientSeverity,patientData,diagnosisIcd10Am,inpatientDepartment,inpatientDepartmentName';
   var S = window.__helsiSync = { closed: 0, open: 0, episodes: 0, disp: 0, sent: {}, err: {}, done: false };
@@ -73,7 +74,7 @@
     var res = await Promise.all([
       paged('closed', function (s, l) { return '/api/cards?columns=' + COLS + '&limit=' + l + '&skip=' + s + '&isActive=false&startDateFrom=' + YEAR + '-01-01T00%3A00%3A00%2B03%3A00&startDateTo=' + YEAR + '-12-31T23%3A59%3A59%2B03%3A00'; }, 50, 50000, function (d) { return d.data; }),
       paged('open', function (s, l) { return '/api/cards?columns=' + COLS + '&limit=' + l + '&skip=' + s + '&loadNonInpatientDepartments=false&startDateTo=2030-01-01T00%3A00%3A00%2B03%3A00'; }, 50, 50000, function (d) { return d.data; }),
-      paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s; }, 30, 60000, function (d) { return d.data; }),
+      paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s; }, 30, EPISODES_CAP, function (d) { return d.data; }),
       disposition()
     ]);
     var now = new Date().toISOString();

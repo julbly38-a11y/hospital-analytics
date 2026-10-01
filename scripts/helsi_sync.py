@@ -67,9 +67,11 @@ DEFAULT_ORG = "43342788"  # ЛШМД — за замовчуванням, пов
 # Кожна лікарня має власну папку даних і власний профіль Chrome (вхід в одну не вилогінює іншу).
 ORGS = {
     "43342788": {"name": "ЛШМД", "raw_dir": "~/Documents/LSMD/raw/lsmd", "cdp_port": 9333,
-                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome", "log_tag": ""},
+                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome", "log_tag": "",
+                 "episodes_cap": 60000, "extract_timeout": 1200},
     "02005875": {"name": "Хотинська ЦРЛ", "raw_dir": "~/Documents/LSMD/raw/khotyn", "cdp_port": 9334,
-                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome-02005875", "log_tag": "khotyn_"},
+                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome-02005875", "log_tag": "khotyn_",
+                 "episodes_cap": 200000, "extract_timeout": 3600},  # ~100 тис. епізодів, ~30-35 хв
 }
 ORG = DEFAULT_ORG
 EXPECTED_DB_REF = "ubjnztanehqlsrqphdqy"
@@ -737,6 +739,7 @@ def step_extract(args, stamp):
     js = (REPO / "scripts" / "helsi_sync_extract.js").read_text(encoding="utf-8")
     token = secrets.token_hex(8)
     js = js.replace("__PORT__", str(PORT)).replace("__TOKEN__", token)
+    js = js.replace("__EPISODES_CAP__", str(ORGS[ORG]["episodes_cap"]))
     incoming = Path(tempfile.mkdtemp(prefix="helsi_sync_"))
     rx = Receiver(token, incoming)
     tab, created = None, False
@@ -917,9 +920,12 @@ def main():
     ap.add_argument("--skip", default="", help=f"кроки, які пропустити: {','.join(STEPS)}")
     ap.add_argument("--transport", choices=["auto", "applescript", "cdp", "manual", "claude"], default="auto")
     ap.add_argument("--login-timeout", type=int, default=900, help="сек очікування логіну користувача")
-    ap.add_argument("--extract-timeout", type=int, default=1200, help="сек на вивантаження")
+    ap.add_argument("--extract-timeout", type=int, default=None,
+                    help="сек на вивантаження (за замовчуванням з довідника лікарень: ЛШМД 1200, Хотин 3600)")
     args = ap.parse_args()
     configure_org(args.org)
+    if args.extract_timeout is None:
+        args.extract_timeout = ORGS[ORG]["extract_timeout"]
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
     unknown = skip - set(STEPS)
     if unknown:
