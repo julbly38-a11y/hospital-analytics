@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """
-helsi_sync.py — повний автоматичний цикл helsi.pro -> lpz-канон для ЛШМД (43342788).
+helsi_sync.py — повний автоматичний цикл helsi.pro -> lpz-канон. За замовчуванням ЛШМД (43342788);
+інша лікарня з довідника ORGS — через --org (напр. --org 02005875 для Хотинської ЦРЛ).
 
-Єдина умова: у Chrome є сесія helsi.pro під ЛШМД (логін робить користувач; скрипт
-пароль не вводить і не бачить). Якщо сесії нема — скрипт чекає, поки ви залогінитесь.
+Єдина умова: у Chrome є сесія helsi.pro під тією лікарнею, для якої запуск (логін робить користувач;
+скрипт пароль не вводить і не бачить). Якщо сесії нема — скрипт чекає, поки ви залогінитесь.
+Скрипт перевіряє, чия це сесія (/api/user/me -> organization.edrpou), і зупиняється, якщо не та
+лікарня: інакше дані однієї лікарні записалися б під ЄДРПОУ іншої.
+
+Кілька лікарень: кожна має власну папку даних (raw/<лікарня>) і власний профіль Chrome та порт
+налагодження (ЛШМД 9333, Хотин 9334), тож вхід в одну не вилогінює іншу. Нову лікарню додають у ORGS.
+SQL-кроки написані під ЛШМД і для іншої лікарні підставляють ЄДРПОУ (render_sql); ЛШМД-правила
+(виключення квітня–травня) на інші лікарні не поширюються. НОВЕ ЛШМД-специфічне правило в SQL
+обов'язково додавати в LSHMD_ONLY_SQL_LEFT, інакше воно діятиме й на інші лікарні.
 
 Кроки (кожен можна пропустити через --skip):
   extract        вивантаження з helsi (закриті/відкриті картки, епізоди, результат лікування)
@@ -30,7 +39,7 @@ helsi_sync.py — повний автоматичний цикл helsi.pro -> lp
   claude       Claude відкриває вкладку у своїй сесії Chrome
 auto: applescript, якщо дозволено → інакше cdp → інакше manual.
 
-Захист: скрипт працює лише з БД проєкту qwerty (ubjnztanehqlsrqphdqy), лише з org 43342788;
+Захист: скрипт працює лише з БД проєкту qwerty (ubjnztanehqlsrqphdqy), лише з org із довідника ORGS;
 нові файли спершу валідуються (кількість не менша 90% від попереднього знімку) і лише потім
 замінюють старі (попередні копіюються в raw/lsmd/_prev_<дата>).
 
@@ -53,7 +62,16 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-ORG = "43342788"
+DEFAULT_ORG = "43342788"  # ЛШМД — за замовчуванням, поведінка без --org не змінилась
+# Дозволені лікарні (ЄДРПОУ -> параметри). Запис лише в ці org — запобіжник від запису не туди.
+# Кожна лікарня має власну папку даних і власний профіль Chrome (вхід в одну не вилогінює іншу).
+ORGS = {
+    "43342788": {"name": "ЛШМД", "raw_dir": "~/Documents/LSMD/raw/lsmd", "cdp_port": 9333,
+                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome", "log_tag": ""},
+    "02005875": {"name": "Хотинська ЦРЛ", "raw_dir": "~/Documents/LSMD/raw/khotyn", "cdp_port": 9334,
+                 "cdp_profile": "~/Library/Application Support/helsi-sync-chrome-02005875", "log_tag": "khotyn_"},
+}
+ORG = DEFAULT_ORG
 EXPECTED_DB_REF = "ubjnztanehqlsrqphdqy"
 REPO = Path(__file__).resolve().parent.parent
 SQL_DIR = REPO / "scripts" / "sql"
@@ -132,8 +150,26 @@ def query(sql):
     return [line.split("|") for line in r.stdout.strip().splitlines() if line]
 
 
+# SQL-кроки написані під ЛШМД ('43342788' вписаний у тексті). Для іншої лікарні ЄДРПОУ підставляється,
+# КРІМ правил, що стосуються лише ЛШМД (виключення квітня–травня 2026) — їх підстановка зіпсувала б.
+# Після підстановки лишок згадок ЛШМД має збігатися з очікуваним, інакше зупинка: нове ЛШМД-правило
+# у SQL не має мовчки діяти на іншу лікарню.
+LSHMD_ONLY_SQL_LEFT = {"raw_to_canon_hospitalizations.sql": 1}
+_LSHMD_ONLY_RULE = re.compile(r"'43342788'(?!\s+AND \(start_::timestamptz)")
+
+
+def render_sql(text, name, org):
+    if org == DEFAULT_ORG:
+        return text
+    out = _LSHMD_ONLY_RULE.sub(f"'{org}'", text)
+    left, want = out.count("'43342788'"), LSHMD_ONLY_SQL_LEFT.get(name, 0)
+    if left != want:
+        die(f"{name}: після підстановки ЄДРПОУ лишилось {left} згадок ЛШМД замість {want} — зупинка (перевірте SQL)")
+    return out
+
+
 def run_sql_file(path, commit):
-    text = path.read_text()
+    text = render_sql(path.read_text(), path.name, ORG)
     has_tx = re.search(r"^\s*BEGIN;", text, re.M) and re.search(r"^\s*COMMIT;", text, re.M)
     end = "COMMIT" if commit else "ROLLBACK"
     if has_tx:
@@ -228,6 +264,22 @@ def chrome_js_allowed():
 CHROME_BIN = os.environ.get("HELSI_CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 CDP_PORT = int(os.environ.get("HELSI_CDP_PORT", "9333"))
 CDP_PROFILE = Path(os.environ.get("HELSI_CDP_PROFILE", "~/Library/Application Support/helsi-sync-chrome")).expanduser()
+_CDP_PORT_DEFAULT, _CDP_PROFILE_DEFAULT = CDP_PORT, CDP_PROFILE
+
+
+def configure_org(org):
+    """Перемикає глобальні налаштування на лікарню з ORGS (викликається один раз у main, до будь-яких дій)."""
+    global ORG, RAW_DIR, CDP_PORT, CDP_PROFILE
+    if org not in ORGS:
+        die(f"org {org} нема в довіднику ORGS ({', '.join(ORGS)}) — зупинка для безпеки")
+    cfg = ORGS[org]
+    ORG = org
+    RAW_DIR = Path(cfg["raw_dir"]).expanduser()
+    if org != DEFAULT_ORG:
+        CDP_PORT = int(os.environ.get("HELSI_CDP_PORT", cfg["cdp_port"]))
+        CDP_PROFILE = Path(os.environ.get("HELSI_CDP_PROFILE", cfg["cdp_profile"])).expanduser()
+    else:  # для ЛШМД — значення за замовчуванням/з env, як було до появи --org
+        CDP_PORT, CDP_PROFILE = _CDP_PORT_DEFAULT, _CDP_PROFILE_DEFAULT
 
 
 class _WS:
@@ -346,7 +398,7 @@ def cdp_ensure_browser():
         if cdp_browser_up():
             return True
         time.sleep(0.5)
-    die("окремий Chrome не відповів на порту налагодження (9333). Закрийте його вікно й спробуйте ще раз")
+    die(f"окремий Chrome не відповів на порту налагодження ({CDP_PORT}). Закрийте його вікно й спробуйте ще раз")
 
 
 class CdpTab:
@@ -509,6 +561,28 @@ LOGIN_CHECK_JS = ("(function(){try{if(location.hostname!=='helsi.pro')return 'OF
                   "x.withCredentials=true;x.send();return 'S:'+x.status;}catch(e){return 'ERR:'+e}})()")
 
 
+ORG_CHECK_JS = ("(function(){try{var x=new XMLHttpRequest();x.open('GET','/api/user/me',false);x.withCredentials=true;x.send();"
+                "if(x.status!==200)return 'S:'+x.status;var d=JSON.parse(x.responseText);"
+                "return 'O:'+((d.organization||{}).edrpou||'');}catch(e){return 'ERR:'+e}})()")
+
+
+def verify_session_org(tab):
+    """Сесія helsi мусить належати саме тій організації, для якої запущено скрипт: інакше дані ІНШОЇ лікарні
+    записалися б під чужим ЄДРПОУ. Без цієї впевненості — зупинка до будь-якого вивантаження й запису."""
+    try:
+        res = chrome_exec(tab, ORG_CHECK_JS)
+    except RuntimeError as e:
+        res = f"ERR:{e}"
+    if res == f"O:{ORG}":
+        log(f"Перевірка: сесія helsi належить {ORGS[ORG]['name']} ({ORG}) ✔")
+        return
+    if res.startswith("O:") and res[2:]:
+        die(f"сесія helsi належить організації {res[2:]}, а скрипт запущено для {ORG} ({ORGS[ORG]['name']}). "
+            f"Нічого не записано. Увійдіть у helsi під потрібною лікарнею у вікні Chrome скрипта")
+    die(f"не вдалося визначити організацію сесії helsi ({res}) — зупинка: без цього не можна гарантувати, "
+        f"що дані потраплять під правильний ЄДРПОУ")
+
+
 def wait_for_login(tab, timeout):
     t0, told = time.time(), False
     while time.time() - t0 < timeout:
@@ -567,10 +641,12 @@ def acquire_tab(transport, login_timeout):
         state = f"ERR:{e}"
     if state == "S:200":
         log("Перевірка: сесія helsi вже активна ✔ — вхід не потрібен")
+        verify_session_org(tab)
         return tab, created
     log(f"Перевірка: сесія helsi не активна ({state}) — потрібен вхід")
     if not wait_for_login(tab, login_timeout):
         die("сесія helsi так і не стала активною")
+    verify_session_org(tab)
     return tab, created
 
 
@@ -667,6 +743,9 @@ def step_extract(args, stamp):
     try:
         transport = pick_transport(args.transport)
         log(f"extract: транспорт = {transport}")
+        if transport in ("manual", "claude") and ORG != DEFAULT_ORG:
+            die(f"для {ORGS[ORG]['name']} потрібен транспорт cdp або applescript: лише там скрипт може перевірити, "
+                f"якій організації належить сесія helsi")
 
         if transport in ("applescript", "cdp"):
             tab, created = acquire_tab(transport, args.login_timeout)
@@ -780,11 +859,12 @@ def step_verify():
     lag = (datetime.now().date() - datetime.strptime(r[0], "%Y-%m-%d").date()).days
     if lag > 2:
         bad.append(f"канон відстає на {lag} дн.")
-    n = int(query(f"select count(*) from lpz.lpz_hospitalizations where org_edrpou='{ORG}' "
-                  "and admission_date >= '2026-04-01' and admission_date < '2026-06-01'")[0][0])
-    log(f"  квітень–травень 2026 у каноні: {n} (має бути 0)")
-    if n:
-        bad.append(f"квітень–травень повернувся в канон: {n}")
+    if ORG == DEFAULT_ORG:  # виключення квітня–травня стосується лише ЛШМД
+        n = int(query(f"select count(*) from lpz.lpz_hospitalizations where org_edrpou='{ORG}' "
+                      "and admission_date >= '2026-04-01' and admission_date < '2026-06-01'")[0][0])
+        log(f"  квітень–травень 2026 у каноні: {n} (має бути 0)")
+        if n:
+            bad.append(f"квітень–травень повернувся в канон: {n}")
     n = int(query(f"select count(*) from lpz.lpz_hospitalizations where org_edrpou='{ORG}' and helsi_record_id is not null "
                   "and age is null and birth_date is not null")[0][0])
     log(f"  рядків з birth_date, але без age: {n} (має бути 0)")
@@ -830,13 +910,16 @@ def step_verify():
 
 def main():
     global _log_fh
-    ap = argparse.ArgumentParser(description="Повний цикл helsi.pro → lpz (ЛШМД)")
+    ap = argparse.ArgumentParser(description="Повний цикл helsi.pro → lpz (за замовчуванням ЛШМД)")
+    ap.add_argument("--org", default=DEFAULT_ORG, choices=sorted(ORGS),
+                    help="ЄДРПОУ лікарні (за замовчуванням ЛШМД 43342788): " + ", ".join(f"{k} = {v['name']}" for k, v in ORGS.items()))
     ap.add_argument("--dry-run", action="store_true", help="не писати в БД: raw не вантажиться, SQL лише ROLLBACK")
     ap.add_argument("--skip", default="", help=f"кроки, які пропустити: {','.join(STEPS)}")
     ap.add_argument("--transport", choices=["auto", "applescript", "cdp", "manual", "claude"], default="auto")
     ap.add_argument("--login-timeout", type=int, default=900, help="сек очікування логіну користувача")
     ap.add_argument("--extract-timeout", type=int, default=1200, help="сек на вивантаження")
     args = ap.parse_args()
+    configure_org(args.org)
     skip = {s.strip() for s in args.skip.split(",") if s.strip()}
     unknown = skip - set(STEPS)
     if unknown:
@@ -844,8 +927,9 @@ def main():
 
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-    _log_fh = open(LOG_DIR / f"helsi_sync_{stamp}.log", "a", encoding="utf-8")
-    log(f"helsi_sync для org {ORG}; dry-run={args.dry_run}; пропуск={sorted(skip) or '—'}")
+    log_name = f"helsi_sync_{ORGS[ORG]['log_tag']}{stamp}.log"
+    _log_fh = open(LOG_DIR / log_name, "a", encoding="utf-8")
+    log(f"helsi_sync для org {ORG} ({ORGS[ORG]['name']}); dry-run={args.dry_run}; пропуск={sorted(skip) or '—'}")
     db_url()  # рання перевірка підключення/проєкту
     log(f"БД: проєкт {EXPECTED_DB_REF} ✔, max(admission_date) до запуску = "
         f"{query(f'select max(admission_date) from lpz.lpz_hospitalizations where org_edrpou={chr(39)}{ORG}{chr(39)}')[0][0]}")
@@ -863,7 +947,7 @@ def main():
     ok = True
     if "verify" not in skip:
         ok = step_verify()
-    log(f"Готово. Журнал: {LOG_DIR / f'helsi_sync_{stamp}.log'}")
+    log(f"Готово. Журнал: {LOG_DIR / log_name}")
     sys.exit(0 if ok else 2)
 
 
