@@ -64,7 +64,7 @@ WITH src AS (
     inpatient_department_name,
     admission_enc_dx_0_cond_code_icd10_am_code,
     resolution_name, resolution_short_name, patient_severity_name,
-    admission_enc_priority_name, re_admission
+    admission_enc_priority_name, re_admission, last_updated_at
   FROM lpz.lpz_raw_hospitalizations_closed WHERE org_edrpou = '43342788'
   UNION ALL
   SELECT
@@ -76,10 +76,10 @@ WITH src AS (
     inpatient_department_name,
     admission_enc_dx_0_cond_code_icd10_am_code,
     resolution_name, resolution_short_name, patient_severity_name,
-    admission_enc_priority_name, re_admission
+    admission_enc_priority_name, re_admission, last_updated_at
   FROM lpz.lpz_raw_hospitalizations_open WHERE org_edrpou = '43342788'
 )
-SELECT
+SELECT DISTINCT ON (id)
   org_edrpou,
   canon_status,
   id::uuid AS helsi_record_id,
@@ -114,7 +114,13 @@ WHERE NOT (
   org_edrpou = '43342788'
   AND (start_::timestamptz AT TIME ZONE 'Europe/Kyiv')::date >= DATE '2026-04-01'
   AND (start_::timestamptz AT TIME ZONE 'Europe/Kyiv')::date <  DATE '2026-06-01'
-);
+)
+-- ОДИН рядок на helsi id (2026-10-01). helsi віддає списки посторінково зі зсувом, тож той самий
+-- запис може прийти двічі — і з різним вмістом (різниця в службовому полі), а також одразу в
+-- closed і в open (картку закрили між двома запитами). Без цього ON CONFLICT DO UPDATE падає
+-- ("cannot affect row a second time"), а для нового запису вийшов би ДУБЛЬ госпіталізації.
+-- Беремо закритий варіант (новіший за станом), далі найсвіжіший last_updated_at.
+ORDER BY id, (canon_status = 'Закритий') DESC, NULLIF(last_updated_at, '')::timestamptz DESC NULLS LAST;
 
 -- 1) Пацієнти — upsert ПЕРЕД госпіталізаціями (FK), не чіпаємо наявних
 INSERT INTO lpz.lpz_patients (org_edrpou, patient_id, full_name, last_name, first_name, middle_name, gender, birthday)
