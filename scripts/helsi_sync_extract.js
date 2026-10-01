@@ -6,12 +6,15 @@
   if (window.__helsiSync && !window.__helsiSync.done) return 'already running';
   var PORT = '__PORT__', TOKEN = '__TOKEN__';
   var EPISODES_CAP = Number('__EPISODES_CAP__') || 60000;
+  var EPISODE_TYPES_RAW = '__EPISODE_TYPES__';
+  var EPISODE_TYPES = (/^[A-Z][A-Z_,]*$/.test(EPISODE_TYPES_RAW) && EPISODE_TYPES_RAW.indexOf('__') < 0) ? EPISODE_TYPES_RAW.split(',') : [''];
   var YEAR = new Date().getFullYear();
   var COLS = 'resolution,patientSeverity,patientData,diagnosisIcd10Am,inpatientDepartment,inpatientDepartmentName';
   var S = window.__helsiSync = { closed: 0, open: 0, episodes: 0, disp: 0, sent: {}, err: {}, done: false };
 
-  async function paged(name, mk, limit, cap, pick) {
+  async function paged(name, mk, limit, cap, pick, base) {
     var skip = 0, all = [], hasNext = true;
+    base = base || 0;
     try {
       while (hasNext) {
         var r = await fetch(mk(skip, limit), { credentials: 'include' });
@@ -20,13 +23,27 @@
         var rows = pick(d);
         if (!Array.isArray(rows)) { S.err[name] = 'no rows skip ' + skip; return null; }
         for (var i = 0; i < rows.length; i++) all.push(rows[i]);
-        S[name] = all.length;
+        S[name] = base + all.length;
         hasNext = d.meta ? d.meta.hasNext : d.has_next;
         skip += limit;
         if (skip > cap) { S.err[name] = 'cap exceeded'; return null; }
       }
     } catch (e) { S.err[name] = String(e); return null; }
     return all;
+  }
+
+  /* Episodes: one pass per type when a type list is configured (the API filters with &type=X), otherwise one
+     unfiltered pass. An empty type means no filter. An episode has exactly one type, so passes do not overlap. */
+  async function episodesAll() {
+    var out = [];
+    for (var ti = 0; ti < EPISODE_TYPES.length; ti++) {
+      var t = EPISODE_TYPES[ti];
+      var part = await paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s + (t ? '&type=' + t : ''); }, 30, EPISODES_CAP, function (d) { return d.data; }, out.length);
+      if (!part) return null;
+      for (var j = 0; j < part.length; j++) out.push(part[j]);
+      S.episodes = out.length;
+    }
+    return out;
   }
 
   var DISP_STATUSES = ['closed', 'registered', 'pending_registration', 'on_discharge'];
@@ -74,7 +91,7 @@
     var res = await Promise.all([
       paged('closed', function (s, l) { return '/api/cards?columns=' + COLS + '&limit=' + l + '&skip=' + s + '&isActive=false&startDateFrom=' + YEAR + '-01-01T00%3A00%3A00%2B03%3A00&startDateTo=' + YEAR + '-12-31T23%3A59%3A59%2B03%3A00'; }, 50, 50000, function (d) { return d.data; }),
       paged('open', function (s, l) { return '/api/cards?columns=' + COLS + '&limit=' + l + '&skip=' + s + '&loadNonInpatientDepartments=false&startDateTo=2030-01-01T00%3A00%3A00%2B03%3A00'; }, 50, 50000, function (d) { return d.data; }),
-      paged('episodes', function (s, l) { return '/api/organizationEpisodes?limit=' + l + '&skip=' + s; }, 30, EPISODES_CAP, function (d) { return d.data; }),
+      episodesAll(),
       disposition()
     ]);
     var now = new Date().toISOString();

@@ -68,10 +68,12 @@ DEFAULT_ORG = "43342788"  # ЛШМД — за замовчуванням, пов
 ORGS = {
     "43342788": {"name": "ЛШМД", "raw_dir": "~/Documents/LSMD/raw/lsmd", "cdp_port": 9333,
                  "cdp_profile": "~/Library/Application Support/helsi-sync-chrome", "log_tag": "",
-                 "episodes_cap": 60000, "extract_timeout": 1200},
+                 "episodes_cap": 60000, "extract_timeout": 1200, "episode_types": []},
     "02005875": {"name": "Хотинська ЦРЛ", "raw_dir": "~/Documents/LSMD/raw/khotyn", "cdp_port": 9334,
                  "cdp_profile": "~/Library/Application Support/helsi-sync-chrome-02005875", "log_tag": "khotyn_",
-                 "episodes_cap": 200000, "extract_timeout": 3600},  # ~100 тис. епізодів, ~30-35 хв
+                 "episodes_cap": 250000, "extract_timeout": 7200,
+                 # лише стаціонарні типи; діагностика (DG) і профілактика (PREVENTION) — амбулаторні, ~51% епізодів
+                 "episode_types": ["TREATMENT", "REHAB", "PALLIATIVE_CARE"]},  # 110+ тис. епізодів, понад годину (темп падає з ~60 до ~20/с)
 }
 ORG = DEFAULT_ORG
 EXPECTED_DB_REF = "ubjnztanehqlsrqphdqy"
@@ -667,7 +669,11 @@ def validate_and_promote(incoming, stamp):
         old_n = None
         if old_p.exists():
             old = json.loads(old_p.read_text())
-            old_n = len(old["data"] if isinstance(old, dict) else old)
+            old_rows = old["data"] if isinstance(old, dict) else old
+            types = ORGS[ORG]["episode_types"]
+            if name == "episodes" and types:  # попередній файл міг бути без фільтра: рахуємо лише дозволені типи
+                old_rows = [r for r in old_rows if r.get("type") in types]
+            old_n = len(old_rows)
         info[name] = (len(new_rows), old_n)
         if not new_rows:
             problems.append(f"{name}: порожній набір")
@@ -740,6 +746,7 @@ def step_extract(args, stamp):
     token = secrets.token_hex(8)
     js = js.replace("__PORT__", str(PORT)).replace("__TOKEN__", token)
     js = js.replace("__EPISODES_CAP__", str(ORGS[ORG]["episodes_cap"]))
+    js = js.replace("__EPISODE_TYPES__", ",".join(ORGS[ORG]["episode_types"]) or "-")
     incoming = Path(tempfile.mkdtemp(prefix="helsi_sync_"))
     rx = Receiver(token, incoming)
     tab, created = None, False
