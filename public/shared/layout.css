@@ -208,6 +208,8 @@ html.fin-mode { background: #1e2227; }
   cursor: pointer;
 }
 .fin-back-link:hover { background: var(--c-accent-berry); color: #fff; }
+/* У звичайному режимі напису режиму нема — кнопка стає на його місце (над назвою лікарні). */
+.nav-back-link { left: 221px; }
 .fin-basis {
   position: absolute; left: 412px; top: 44px; z-index: 5;
   display: flex; gap: 6px;

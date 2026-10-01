@@ -451,6 +451,7 @@ function initHeadCabinet() {
       // лише кількість, власнику сайту — ще й суми.
       FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
     wireFinanceEmblem(root, finAllowed);
+    wireBackLink(root);
     renderFieldMe(root, me);
     renderDutyBand(root, org);
     renderStaffAndCensus(root, deptName);

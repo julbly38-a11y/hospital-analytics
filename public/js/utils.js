@@ -554,12 +554,13 @@ function finBasis() {
 // Куди веде «← Назад» у фінансовому режимі: кабінет лікаря → кабінет
 // відділення (якщо власник сайту прийшов через нього, dept/deptName у адресі),
 // інакше → entry.html; кабінет відділення → entry.html; entry.html — верхній
-// рівень, тож null. Параметри фінансового режиму (fin, basis) зберігаються.
+// рівень, тож null. Параметри фінансового режиму (fin, basis) зберігаються;
+// у звичайному режимі їх нема (та сама ієрархія — wireBackLink).
 function finBackHref() {
   const p = new URLSearchParams(location.search);
   const org = window.HOSPITAL_ORG_EDRPOU || p.get('org');
-  const keep = { fin: '1' };
-  if (finBasis() === 'nszu') keep.basis = 'nszu';
+  const keep = isFinanceMode() ? { fin: '1' } : {};
+  if (isFinanceMode() && finBasis() === 'nszu') keep.basis = 'nszu';
   const page = location.pathname;
   if (page.endsWith('/doctor-cabinet.html') && p.get('dept')) {
     return '/head-cabinet.html?' + new URLSearchParams({ org, dept: p.get('dept'), deptName: p.get('deptName') || '', ...keep });
@@ -568,6 +569,15 @@ function finBackHref() {
     return '/entry.html?' + new URLSearchParams({ ...(org ? { org } : {}), ...keep });
   }
   return null;
+}
+
+// «← Назад» у звичайному режимі — та сама ієрархія, що у фінансовому (finBackHref):
+// кабінет лікаря → кабінет відділення (якщо прийшли через нього) → entry.html.
+// У фінансовому режимі кнопку ставить wireFinanceEmblem; на entry.html її нема.
+function wireBackLink(root) {
+  if (isFinanceMode() || root.querySelector('.fin-back-link')) return;
+  const href = finBackHref();
+  if (href) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link nav-back-link" href="${href}">← Назад</a>`);
 }
 
 // Емблема (.logo з renderHeaderBlock) — перемикач режиму для тих, кому він

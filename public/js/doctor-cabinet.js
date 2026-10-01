@@ -324,6 +324,7 @@ function initDoctorCabinet() {
       loadDoctorKpi(org, doctorId, year, month);
     }, FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
     wireFinanceEmblem(root, finAllowed);
+    wireBackLink(root);
     if (FIN_MODE) renderFinanceCasesSection(root);
     else renderCensusSection(root);
     renderFieldMe(root, me);
