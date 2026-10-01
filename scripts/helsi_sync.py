@@ -726,7 +726,8 @@ def step_load_raw():
     tail = "\n".join((r.stdout or "").strip().splitlines()[-6:])
     log(tail)
     if r.returncode != 0 or "FAIL" in (r.stdout or ""):
-        die(f"load_all_raw не завершився успішно:\n{r.stderr[-800:]}")
+        # Причина збою (напр. "у таблиці бракує N колонок" + готовий ALTER) друкується у STDOUT, не в stderr.
+        die(f"load_all_raw не завершився успішно:\n{(r.stdout or '').strip()[-1800:]}\n{(r.stderr or '').strip()[-800:]}")
 
 
 def step_load_disp():
