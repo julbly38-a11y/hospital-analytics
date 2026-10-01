@@ -256,7 +256,9 @@ function fetchDeptExpand(org, deptId) {
 }
 function applyDeptExpandInfo(exp, info) {
   if (!info || !exp.isConnected) return;
-  exp.querySelector('.de-chief').textContent = info.head_name || '—';
+  const chiefEl = exp.querySelector('.de-chief');
+  chiefEl.classList.add('pii');
+  chiefEl.textContent = info.head_name || '—';
   exp.querySelector('[data-f="cases"]').textContent = fmt(info.cases ?? 0);
   exp.querySelector('[data-f="patients"]').textContent = fmt(info.unique_patients ?? 0);
   exp.querySelector('[data-f="doctors"]').textContent = info.doctors ?? '—';

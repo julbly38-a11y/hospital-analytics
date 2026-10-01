@@ -157,7 +157,7 @@ function qHelsiUrl(r, code) {
 
 function qNoteHtml(r) {
   const to = r.addressee === 'doctor'
-    ? `<span class="q-note-to">Лікарю: ${qEsc(r.doctor_name || '—')}</span>`
+    ? `<span class="q-note-to">Лікарю: ${piiWrap(qEsc(r.doctor_name || '—'))}</span>`
     : `<span class="q-note-to q-note-to-head">Завідувачу відділення · лікаря не визначено</span>`;
   const items = qIssues(r).map(i => {
     const f = Q_FLAGS[i.code];
@@ -286,7 +286,7 @@ function qDetailHtml(r) {
     fact('Госпіталізація', qFmtDateTime(r.admission_at)),
     fact('Виписка', r.is_open ? 'ще у відділенні' : qFmtDateTime(r.discharge_at)),
     fact('Тривалість', r.los_days != null ? `${Number(r.los_days).toFixed(1)} доби` : ''),
-    fact('Лікуючий лікар', doctor ? `${qEsc(doctor)}${r.doctor_position ? ` · ${qEsc(r.doctor_position)}` : ''}` : 'не визначено'),
+    fact('Лікуючий лікар', doctor ? `${piiWrap(qEsc(doctor))}${r.doctor_position ? ` · ${qEsc(r.doctor_position)}` : ''}` : 'не визначено'),
     fact('Основний діагноз', r.primary_icd ? `${qEsc(r.primary_icd)} ${qEsc(r.primary_name || '')}` : 'немає'),
     fact('Усі діагнози', (r.dx_codes || []).length ? qEsc(r.dx_codes.join(', ')) : 'немає'),
     fact('Втручань у записі', r.procedures_count),
@@ -330,7 +330,7 @@ function qEpisodeHtml(r, today) {
       <div class="q-case">
         <div class="q-case-main">
           <div class="q-case-line1">
-            ${r.patient_name ? `<span class="q-case-patient">${qEsc(r.patient_name)}</span>` : ''}
+            ${r.patient_name ? `<span class="q-case-patient pii">${qEsc(r.patient_name)}</span>` : ''}
             <span class="q-case-num">№ ${qEsc(r.card_number)}</span>
             <span class="q-case-dx">${qEsc(r.primary_icd || '—')} ${qEsc(r.primary_name || '')}</span>
           </div>
@@ -384,14 +384,14 @@ const Q_CABINET_ORDER = { fixable: 0, open: 1, lost: 2, warned: 3 };
 function qCompactRowHtml(r) {
   const codes = [...(r.flags || []), ...(r.warnings || [])];
   const n = codes.length;
-  const patient = r.patient_name ? qEsc(r.patient_name) : `картка № ${qEsc(r.card_number || '—')}`;
+  const patient = r.patient_name ? piiWrap(qEsc(r.patient_name)) : `картка № ${qEsc(r.card_number || '—')}`;
   const doctor = r.doctor_full_name || r.doctor_name;
   const issues = codes.map(c => Q_FLAGS[c]?.short || c).join(', ');
   return `
     <div class="census-row q-compact-row" data-doctor="${r.doctor_resource_id || ''}">
       <div class="census-info">
         <span class="census-name">${patient}</span>
-        <span class="census-meta">${doctor ? `Лікар: ${qEsc(doctor)}` : 'Лікаря не визначено — завідувачу'}${issues ? ` · ${qEsc(issues)}` : ''}</span>
+        <span class="census-meta">${doctor ? `Лікар: ${piiWrap(qEsc(doctor))}` : 'Лікаря не визначено — завідувачу'}${issues ? ` · ${qEsc(issues)}` : ''}</span>
       </div>
       <span class="q-compact-count${(r.flags || []).length ? ' q-compact-error' : ''}">⚠ ${n}</span>
     </div>`;
@@ -410,7 +410,7 @@ function renderFinanceCases({ data, year, month, day = null, doctorId = null, do
   const period = year === 'all' ? 'усі роки'
     : [year, month !== 'all' && MONTH_PILL_NAMES[Number(month) - 1], day != null && day].filter(Boolean).join(' · ');
   title.innerHTML = `Зауваження до записів · ${rows.length} · ${qEsc(period)}`
-    + (doctorId ? ` · ${qEsc(doctorName)}<span class="q-reset" id="finCasesReset">✕ усі лікарі</span>` : '');
+    + (doctorId ? ` · ${piiWrap(qEsc(doctorName))}<span class="q-reset" id="finCasesReset">✕ усі лікарі</span>` : '');
   const reset = document.getElementById('finCasesReset');
   if (reset && onResetDoctor) reset.addEventListener('click', onResetDoctor);
   list.innerHTML = rows.map(r => compact ? qCompactRowHtml(r) : qEpisodeHtml(r, today)).join('')
