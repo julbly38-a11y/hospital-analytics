@@ -612,6 +612,51 @@ def validate_and_promote(incoming, stamp):
         log(f"  прибрано стару резервну копію: {p.name}")
 
 
+POLL_LOST_LIMIT = 3         # стільки опитувань поспіль (по 10 с) порожній стан у вкладці = стан втрачено
+MAX_EXTRACT_RESTARTS = 3    # скільки разів перезапускати вивантаження, якщо вкладка його губить
+
+
+def poll_extraction(tab, js, transport, rx, args):
+    """Чекає, поки вкладка завершить вивантаження.
+
+    Якщо стан window.__helsiSync зник (helsi перезавантажила або перекинула сторінку — напр. одразу
+    після входу, і вставлений код пропав разом із нею), чекаємо активну сесію й запускаємо вивантаження
+    заново. Раніше скрипт у такому разі 20 хв поспіль опитував порожню вкладку до таймауту.
+    Дані збираються у window.__helsiPayload лише наприкінці, тож перезапуск не змішує часткові набори."""
+    restarts, lost = 0, 0
+    t0 = time.time()
+    while time.time() - t0 < args.extract_timeout:
+        time.sleep(10)
+        try:
+            st = json.loads(chrome_exec(tab, "JSON.stringify(window.__helsiSync)"))
+            if not isinstance(st, dict):
+                raise ValueError("порожня відповідь")
+        except Exception as e:
+            lost += 1
+            log(f"  (опитування {lost}/{POLL_LOST_LIMIT}: стану вивантаження у вкладці нема — {e})")
+            if lost < POLL_LOST_LIMIT:
+                continue
+            if restarts >= MAX_EXTRACT_RESTARTS:
+                die(f"вкладка {MAX_EXTRACT_RESTARTS} рази поспіль губила стан вивантаження — зупинка")
+            restarts += 1
+            log(f"Вкладка втратила стан вивантаження (сторінку перезавантажено?) — перезапуск {restarts}/{MAX_EXTRACT_RESTARTS}…")
+            if not wait_for_login(tab, args.login_timeout):
+                die("сесія helsi так і не стала активною")
+            out = chrome_exec(tab, js)
+            if out not in ("started", "already running"):
+                die(f"не вдалося перезапустити вивантаження у вкладці: {out}")
+            lost, t0 = 0, time.time()
+            continue
+        lost = 0
+        log(f"  closed={st['closed']} open={st['open']} episodes={st['episodes']} disp={st['disp']} "
+            f"надіслано={list(st['sent'])} помилки={st['err'] or '—'}")
+        if st["err"]:
+            die(f"помилка вивантаження в браузері: {st['err']}")
+        if st["done"] and (transport == "cdp" or len(rx.received) == len(DATASETS)):
+            return
+    die("таймаут вивантаження")
+
+
 def step_extract(args, stamp):
     js = (REPO / "scripts" / "helsi_sync_extract.js").read_text(encoding="utf-8")
     token = secrets.token_hex(8)
@@ -631,22 +676,7 @@ def step_extract(args, stamp):
             out = chrome_exec(tab, js)
             if out not in ("started", "already running"):
                 die(f"не вдалося запустити вивантаження у вкладці: {out}")
-            t0 = time.time()
-            while time.time() - t0 < args.extract_timeout:
-                time.sleep(10)
-                try:
-                    st = json.loads(chrome_exec(tab, "JSON.stringify(window.__helsiSync)"))
-                except Exception as e:
-                    log(f"  (опитування: {e})")
-                    continue
-                log(f"  closed={st['closed']} open={st['open']} episodes={st['episodes']} disp={st['disp']} "
-                    f"надіслано={list(st['sent'])} помилки={st['err'] or '—'}")
-                if st["err"]:
-                    die(f"помилка вивантаження в браузері: {st['err']}")
-                if st["done"] and (transport == "cdp" or len(rx.received) == len(DATASETS)):
-                    break
-            else:
-                die("таймаут вивантаження")
+            poll_extraction(tab, js, transport, rx, args)
             if transport == "cdp":
                 log("Забираю дані з вкладки через канал налагодження…")
                 have = json.loads(chrome_exec(tab, "JSON.stringify(Object.keys(window.__helsiPayload||{}))"))
