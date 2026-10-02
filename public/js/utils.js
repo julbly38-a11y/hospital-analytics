@@ -574,7 +574,9 @@ function finBackHref() {
 // «← Назад» у звичайному режимі — та сама ієрархія, що у фінансовому (finBackHref):
 // кабінет лікаря → кабінет відділення (якщо прийшли через нього) → entry.html.
 // У фінансовому режимі кнопку ставить wireFinanceEmblem; на entry.html її нема.
-function wireBackLink(root) {
+// Лише власнику сайту (адміну): завідувач і лікар у кабінеті «назад» не ходять.
+function wireBackLink(root, me) {
+  if (!me || me.is_owner !== true) return;
   if (isFinanceMode() || root.querySelector('.fin-back-link')) return;
   const href = finBackHref();
   if (href) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link nav-back-link" href="${href}">← Назад</a>`);
