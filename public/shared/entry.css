@@ -1,0 +1,78 @@
+/* Візуальні доповнення лише для entry.html (не чіпає layout.css,
+   спільний з layout.html) — плавна поява блоків при завантаженні + позиції
+   КПІ-блоків по напрямку. Mesh-фон і базові стилі гістограми — спільні
+   (layout.css), бо потрібні й на head-cabinet.html/doctor-cabinet.html. */
+
+/* КПІ-блоки по напрямку (терапевтичний/хірургічний) + графіки динаміки —
+   права частина канви (x=690..1866), яку dept-list (x=20..565) не займає,
+   ті самі координати, що й у старому проекті (kabinet.html block-row/
+   block-row2/chart-therap/chart-surg), просто перенесені сюди без змін. */
+.kpi-row.block-row {
+  top: 257px;
+  width: 1176px;
+}
+.kpi-row.block-row2 {
+  top: 603px;
+}
+.chart-therap { top: 322px; }
+.chart-surg   { top: 697px; }
+.direction-label {
+  position: absolute;
+  left: 690px;
+  font-weight: 300;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: var(--c-taupe-light, #9a958f);
+  text-transform: uppercase;
+}
+.direction-label.for-therap { top: 232px; }
+.direction-label.for-surg   { top: 578px; }
+
+/* поява блоків при завантаженні, з невеликою затримкою по черзі */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(26px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.name-block, .vline, .vline2, .hline, .hline2, .kpi-row, .year-badge,
+.dept-list, .dept-list2, .year-filter, .work-band {
+  opacity: 0;
+  animation: rise 0.9s cubic-bezier(.2,.7,.2,1) forwards;
+}
+.vline      { animation-delay: 0.15s; }
+.vline2     { animation-delay: 0.20s; }
+.hline      { animation-delay: 0.30s; }
+.hline2     { animation-delay: 0.35s; }
+.name-block { animation-delay: 0.25s; }
+.year-filter{ animation-delay: 0.40s; }
+.kpi-row    { animation-delay: 0.50s; }
+.dept-list  { animation-delay: 0.55s; }
+.year-badge { animation-delay: 0.60s; }
+.dept-list2 { animation-delay: 0.70s; }
+.work-band  { animation-delay: 0.80s; }
+
+/* Хвилястий графік ургентні/планові — спільна частина (.side-stack/.wave-*)
+   перенесена в layout.css (2026-08-25, head-cabinet.html теж має цей стек
+   тепер). Тут лишається лише entry-специфічне: два ряди (терапевтичний/
+   хірургічний), на відміну від одного .chart-row-dept на head-cabinet.html
+   (layout.css).
+   Колонка (не ряд): хвиля зверху, під нею — та сама гістограма
+   (bar-chart.js), яку раніше ховали (display:none) — тепер знову видима.
+   .field-chart-1/2 — position:static (замість базового position:absolute
+   у layout.css:.bar-chart, розрахованого на самостійне розміщення) — щоб
+   бралася участь у звичайному flex-потоці колонки й лягала точно під
+   хвилею, а не поверх довільного місця сторінки. */
+.chart-row-1, .chart-row-2 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chart-row-1 .side-stack,
+.chart-row-2 .side-stack {
+  flex: none;
+  width: 100%;
+}
+.chart-row-1 .field-chart-1,
+.chart-row-2 .field-chart-2 {
+  position: static;
+  align-self: flex-start;
+}

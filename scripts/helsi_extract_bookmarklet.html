@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<title>Helsi Extract — кнопка-закладка</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }
+  .btn { display: inline-block; padding: 12px 22px; background: #2563eb; color: #fff; text-decoration: none;
+         border-radius: 8px; font-weight: 600; font-size: 15px; cursor: grab; }
+  .btn:hover { background: #1d4ed8; }
+  ol { padding-left: 20px; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; }
+  .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<h2>Helsi → JSON, одним кліком</h2>
+
+<div class="box">
+  <p><b>Крок 1.</b> Перетягни цю кнопку на панель закладок браузера (не клікай — саме перетягни):</p>
+  <p style="text-align:center; padding: 20px 0;">
+    <a class="btn" id="bkmk" href="#">📥 Helsi Extract</a>
+  </p>
+</div>
+
+<ol>
+  <li>Відкрий <code>helsi.pro</code>, залогінься</li>
+  <li>Клікни закладку "📥 Helsi Extract" на панелі</li>
+  <li>Файл сам скачається (може впасти в Downloads, якщо повторно — Chrome інколи блокує другий download поспіль; онови сторінку й спробуй ще раз)</li>
+</ol>
+
+<p>Якщо панель закладок схована — увімкни її: <code>Cmd+Shift+B</code> (Mac) / <code>Ctrl+Shift+B</code> (Windows).</p>
+
+<script>
+const code = `
+(async function(){
+  try {
+    const j = async (url) => { const r = await fetch(url, {credentials:'include'}); if (!r.ok) throw new Error(url+' -> '+r.status); return r.json(); };
+    const user = await j('/api/user/me').catch(() => null);
+    const structure = await j('/api/dict/structure?en=true');
+    const rootId = structure && structure[0] ? structure[0].structureId : null;
+    if (!rootId) { alert('Не залогінено або не на helsi.pro'); return; }
+    const resources = [];
+    for (let page = 1; page < 100; page++) {
+      const url = '/api/resources?isRemoved=false&limit=40&page='+page+'&populate=true&sort=lastName&structureIds='+rootId+'&type=1&visibilityZone=1';
+      const d = await j(url);
+      const rows = d.data || [];
+      resources.push.apply(resources, rows);
+      const total = d.paging ? d.paging.length : rows.length;
+      if (resources.length >= total || rows.length === 0) break;
+    }
+    const dict = {
+      specialities: await j('/api/dict/speciality?levels=false&find={%22delete%22:%22false%22}').catch(() => null),
+      positions: await j('/api/dict/position?levels=false').catch(() => null)
+    };
+    const bundle = { meta: { extractedAt: new Date().toISOString(), source: 'helsi.pro', rootStructureId: rootId, rootName: structure[0].name || null, counts: { resources: resources.length } }, user: user, structure: structure, resources: resources, dict: dict };
+    const slug = (bundle.meta.rootName || 'helsi').toLowerCase().replace(/[^a-z0-9а-яіїєґ]+/gi, '_').slice(0, 40);
+    const json = JSON.stringify(bundle, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url2 = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url2; a.download = 'helsi_raw_' + slug + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    alert('Готово! ' + resources.length + ' працівників, файл ' + a.download + ' завантажено.');
+  } catch(e) { alert('Помилка: ' + e.message); }
+})();
+`;
+document.getElementById('bkmk').href = 'javascript:' + encodeURIComponent(code);
+</script>
+
+</body>
+</html>

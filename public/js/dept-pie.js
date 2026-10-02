@@ -23,7 +23,18 @@
  *   popIn(i)  : return segment,
  *   getLocked : () => locked index or null,
  *   unlock()  : clear locked state,
+ *   highlightIndices(indices) : paint multiple segments red at once (no
+ *                                title/center change, no pop/rotate) — for
+ *                                cross-highlight from an external list hover
+ *                                (не власний hover діаграми, той лишається
+ *                                setName-based, один сегмент за раз).
+ *   clearHighlight()           : revert highlightIndices back to locked/default.
+ *   selectIndex(i)     : same as clicking segment i (lock/rotate/setName toggle).
+ *   selectByName(name) : same as selectIndex, by назва — no-op if not in top-5.
  * }
+ *
+ * opts.onSegmentHover(row|null) — called on own hover (row on enter, null on
+ * leave), для зворотного напрямку (сегмент → підсвітити лікарів іззовні).
  *
  * Required CSS on host page:
  *   .dept-pie { pointer-events: none; }
@@ -51,10 +62,18 @@ function renderDeptPie(container, rows, opts) {
     centerLabel  = 'випадків',
     lockedBlok   = null,
     onSegmentClick = null,
+    onSegmentHover = null,
     fmt          = v => Number(v).toLocaleString('uk-UA'),
   } = opts || {};
 
-  const EMBLEM_RED = '#b27c8b';
+  // Кольори — з theme.css (спільна палітра лікарняних сторінок), з fallback
+  // на випадок, якщо файл використовують без theme.css.
+  const rootStyle = getComputedStyle(document.documentElement);
+  const cssVar = (name, fallback) => rootStyle.getPropertyValue(name).trim() || fallback;
+  const EMBLEM_RED = cssVar('--c-accent-pink', '#b27c8b');
+  const INK_3       = cssVar('--c-ink-3', '#3a3a3a');
+  const INK_1       = cssVar('--c-ink-1', '#1a1a1a');
+  const TAUPE_LIGHT = cssVar('--c-taupe-light', '#9a958f');
   const SAGE_LIGHT = [176, 185, 172], SAGE_DARK = [104, 116, 103];
   const sageShade  = (k, n) => {
     const t = n > 1 ? k / (n - 1) : 0.5;
@@ -98,9 +117,9 @@ function renderDeptPie(container, rows, opts) {
   const trx = (cx + Rt * Math.sin(tA)).toFixed(1);
   defs += `<path id="dpTitleArc" d="M ${tlx},${tty} A ${Rt},${Rt} 0 0 1 ${trx},${tty}" fill="none"/></defs>`;
 
-  const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="#3a3a3a"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
-  const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="#1a1a1a">${fmt(totalCases)}</text>` +
-    `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="#978f88">${centerLabel}</text>`;
+  const header = `<text id="dpTitle" font-family="'ITFLight','Palatino',serif" font-size="15.75" fill="${INK_3}"><textPath id="dpTitlePath" href="#dpTitleArc" xlink:href="#dpTitleArc" startOffset="50%" text-anchor="middle">Структура діагнозів</textPath></text>`;
+  const center = `<text id="dpCenterV" x="${cx}" y="${cy - 2}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="29" fill="${INK_1}">${fmt(totalCases)}</text>` +
+    `<text id="dpCenterL" x="${cx}" y="${cy + 18}" text-anchor="middle" font-family="'ITFLight','Palatino',serif" font-size="11" fill="${TAUPE_LIGHT}">${centerLabel}</text>`;
 
   el.innerHTML = `<svg width="${VW}" height="${VH}" viewBox="0 0 ${VW} ${VH}">${defs}<g id="dpRing">${arcs}${hits}</g>${header}${center}</svg>`;
 
@@ -126,6 +145,11 @@ function renderDeptPie(container, rows, opts) {
       segCircles[k].setAttribute('stroke', Number(k) === activeI ? EMBLEM_RED : greenById[k]);
     });
   }
+  function paintMulti(activeSet) {
+    Object.keys(segCircles).forEach(k => {
+      segCircles[k].setAttribute('stroke', activeSet.has(Number(k)) ? EMBLEM_RED : greenById[k]);
+    });
+  }
   function setName(i) {
     const r = top[i]; if (!r) return;
     paint(i);
@@ -137,7 +161,7 @@ function renderDeptPie(container, rows, opts) {
   function clearName() {
     paint(-1);
     titlePath.textContent = 'Структура діагнозів';
-    titleEl.setAttribute('fill', '#3a3a3a');
+    titleEl.setAttribute('fill', INK_3);
     cV.textContent = fmt(totalCases);
     cL.textContent = centerLabel;
   }
@@ -151,21 +175,36 @@ function renderDeptPie(container, rows, opts) {
   const rotateTo    = i => { ring.style.transform = `rotate(${(-(midById[i] || 0) * 360).toFixed(1)}deg)`; };
   const rotateReset = () => { ring.style.transform = 'rotate(0deg)'; };
 
+  // toggleLock(i) — замкнути/розімкнути сегмент i (обертання кільця + підпис
+  // по центру), спільна логіка для власного кліку на кільці (нижче) і
+  // зовнішнього виклику ззовні (selectByName/selectIndex у поверненому API —
+  // напр. клік на пацієнта в "Перебуває у відділенні", head-cabinet.js).
+  function toggleLock(i) {
+    if (locked === i) {
+      locked = null;
+      beginRotate(); clearName(); rotateReset();
+      if (onSegmentClick) onSegmentClick(null);
+    } else {
+      locked = i;
+      beginRotate(); setName(i); rotateTo(i);
+      if (onSegmentClick) onSegmentClick(top[i]);
+    }
+  }
+
   el.querySelectorAll('.dp-hit').forEach(hit => {
     const i = Number(hit.getAttribute('data-i'));
-    hit.addEventListener('mouseenter', () => { if (scrolling) return; setName(i); popOut(i); });
-    hit.addEventListener('mouseleave', () => { popIn(i); if (scrolling) return; if (locked !== null) setName(locked); else clearName(); });
-    hit.addEventListener('click', () => {
-      if (locked === i) {
-        locked = null;
-        beginRotate(); clearName(); rotateReset();
-        if (onSegmentClick) onSegmentClick(null);
-      } else {
-        locked = i;
-        beginRotate(); setName(i); rotateTo(i);
-        if (onSegmentClick) onSegmentClick(top[i]);
-      }
+    hit.addEventListener('mouseenter', () => {
+      if (scrolling) return;
+      setName(i); popOut(i);
+      if (onSegmentHover) onSegmentHover(top[i]);
     });
+    hit.addEventListener('mouseleave', () => {
+      popIn(i);
+      if (onSegmentHover) onSegmentHover(null);
+      if (scrolling) return;
+      if (locked !== null) setName(locked); else clearName();
+    });
+    hit.addEventListener('click', () => toggleLock(i));
   });
 
   // build byName index
@@ -186,5 +225,13 @@ function renderDeptPie(container, rows, opts) {
     popIn,
     getLocked: () => locked,
     unlock: () => { locked = null; clearName(); rotateReset(); },
+    highlightIndices: indices => paintMulti(new Set(indices)),
+    clearHighlight: () => { if (locked !== null) paint(locked); else paint(-1); },
+    // Та сама поведінка, що клік на самому сегменті (toggleLock) — для
+    // зовнішнього тригера (клік на пацієнта в іншому списку, не на кільці).
+    // selectByName — no-op, якщо назва не входить у топ-5 (не намальована,
+    // немає індексу в byName).
+    selectIndex: toggleLock,
+    selectByName: name => { const i = byName[name]; if (i !== undefined) toggleLock(i); },
   };
 }

@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { withPiiMask } from '../../lib/pii-mask'
 
 // Спільний CASE-вираз для визначення блоку МКХ (аліаси l=lsmd, i=icd_10)
 const ICD_BLOCK_CASE = `CASE
@@ -738,7 +739,7 @@ const PUBLIC_KEYS = new Set([
   // periodAdmissions — НЕ тут: містить ПІБ пацієнтів, доступний лише авторизованим
 ])
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   const { key } = req.body || {}
   const isPublic = PUBLIC_KEYS.has(key)
 
@@ -811,3 +812,6 @@ export default async function handler(req, res) {
 
   res.status(405).end()
 }
+
+// Режим приватності (public.app_settings.pii_mask): коли ввімкнено, ПІБ у відповіді замінюються кодами для ВСІХ ролей.
+export default withPiiMask(handler)
