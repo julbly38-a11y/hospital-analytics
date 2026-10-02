@@ -464,7 +464,7 @@ function initEntry() {
     }
     const root = document.getElementById('slideRoot');
     renderGeneralLayer(root, org);
-    wireFinanceEmblem(root, finAllowed);
+    wireFinanceEmblem(root, finAllowed, me.is_owner === true);
     renderClinicalBlock(root, org, buildOwnDeptLink(me), me.is_owner);
     renderFieldMe(root, me);
     applyMeProfile(me);

@@ -586,7 +586,8 @@ function wireBackLink(root, me) {
 // доступний на цій сторінці (allowed). Перемикання перезавантажує сторінку з
 // ?fin=1 або без нього: кожна сторінка будує свої блоки один раз на старті,
 // під обраний режим; решта параметрів адреси (org/dept/doctor) лишається.
-function wireFinanceEmblem(root, allowed) {
+// showBack — кнопка «← Назад» лише власнику сайту (завідувач і лікар по ієрархії не ходять).
+function wireFinanceEmblem(root, allowed, showBack) {
   const logo = root.querySelector('.logo');
   if (!logo || !allowed) return;
   logo.classList.add('logo-toggle');
@@ -601,7 +602,7 @@ function wireFinanceEmblem(root, allowed) {
     // «← Назад» — на рівень вище тієї ж фінансової схеми (режим і база
     // лишаються). На entry.html (верхній рівень) кнопки немає.
     const backHref = finBackHref();
-    if (backHref) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link" href="${backHref}">← Назад</a>`);
+    if (backHref && showBack) root.insertAdjacentHTML('beforeend', `<a class="fin-back-link" href="${backHref}">← Назад</a>`);
     // Перехід на сторінку контролю записів (quality.html) — сама вона на ці
     // сторінки не посилається; сервер сам обмежує обсяг за роллю. next=
     // поточна сторінка (кабінет конкретного лікаря/відділення з усіма

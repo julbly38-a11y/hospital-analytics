@@ -323,7 +323,7 @@ function initDoctorCabinet() {
     }, true, (year, month) => {
       loadDoctorKpi(org, doctorId, year, month);
     }, FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
-    wireFinanceEmblem(root, finAllowed);
+    wireFinanceEmblem(root, finAllowed, me.is_owner === true);
     wireBackLink(root, me);
     if (FIN_MODE) renderFinanceCasesSection(root);
     else renderCensusSection(root);

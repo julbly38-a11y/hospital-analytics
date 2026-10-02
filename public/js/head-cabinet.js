@@ -450,7 +450,7 @@ function initHeadCabinet() {
       // Шапка у фінансовому режимі — уся лікарня (level=hospital): завідувачу
       // лише кількість, власнику сайту — ще й суми.
       FIN_MODE ? { loadKpi: (year, month) => loadFinanceHeaderKpi({ org, year, month, level: 'hospital' }) } : {});
-    wireFinanceEmblem(root, finAllowed);
+    wireFinanceEmblem(root, finAllowed, me.is_owner === true);
     wireBackLink(root, me);
     renderFieldMe(root, me);
     renderDutyBand(root, org);
